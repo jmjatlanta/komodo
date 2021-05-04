@@ -12,7 +12,7 @@
  * Removal or modification of this copyright notice is prohibited.            *
  *                                                                            *
  ******************************************************************************/
-
+#include <mutex>
 #include "komodo_defs.h"
 
 void komodo_prefetch(FILE *fp);
@@ -31,7 +31,7 @@ uint64_t komodo_maxallowed(int32_t baseid);
 int32_t komodo_bannedset(int32_t *indallvoutsp,uint256 *array,int32_t max);
 int32_t komodo_checkvout(int32_t vout,int32_t k,int32_t indallvouts);
 
-pthread_mutex_t komodo_mutex,staked_mutex;
+std::mutex komodo_mutex, staked_mutex;
 
 #define KOMODO_ELECTION_GAP 2000    //((ASSETCHAINS_SYMBOL[0] == 0) ? 2000 : 100)
 #define KOMODO_ASSETCHAIN_MAXLEN 65
@@ -126,7 +126,8 @@ int32_t ASSETCHAINS_STAKED_SPLIT_PERCENTAGE;
 std::map <std::int8_t, int32_t> mapHeightEvalActivate;
 
 struct komodo_kv *KOMODO_KV;
-pthread_mutex_t KOMODO_KV_mutex,KOMODO_CC_mutex;
+std::mutex KOMODO_KV_mutex;
+std::mutex KOMODO_CC_mutex;
 
 #define MAX_CURRENCIES 32
 char CURRENCIES[][8] = { "USD", "EUR", "JPY", "GBP", "AUD", "CAD", "CHF", "NZD", // major currencies

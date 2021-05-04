@@ -94,6 +94,7 @@ What is needed is for the dealer node to track the entropy tx that was already b
  validate refund
 
  */
+#include <mutex>
 
 #include "../compat/endian.h"
 
@@ -101,7 +102,8 @@ What is needed is for the dealer node to track the entropy tx that was already b
 #define DICE_MINUTXOS 15000
 extern int32_t KOMODO_INSYNC;
 
-pthread_mutex_t DICE_MUTEX,DICEREVEALED_MUTEX;
+std::mutex DICE_MUTEX;
+std::mutex DICEREVEALED_MUTEX;
 
 struct dicefinish_utxo { uint256 txid; int32_t vout; };
 
@@ -208,9 +210,8 @@ int32_t DiceEntropyUsed(CTransaction &oldbetTx,uint256 &oldbettxid,int32_t &olde
         fprintf(stderr,"null entropyused or bettxid\n");
         return(1);
     }
-    pthread_mutex_lock(&DICEREVEALED_MUTEX);
+    std::lock_guard<std::mutex> lock(DICEREVEALED_MUTEX);
     retval = _dicerevealed_find(oldbettxid,oldbetTx,oldentropyvout,entropyused,bettxid,entropyvout);
-    pthread_mutex_unlock(&DICEREVEALED_MUTEX);
     return(retval);
 }
 
@@ -234,9 +235,10 @@ bool mySenddicetransaction(std::string res,uint256 entropyused,int32_t entropyvo
                     {
                         if ( ptr != 0 )
                             ptr->revealed = (uint32_t)time(NULL);
-                        pthread_mutex_lock(&DICEREVEALED_MUTEX);
-                        _dicerevealed_add(entropyused,bettxid,betTx,entropyvout);
-                        pthread_mutex_unlock(&DICEREVEALED_MUTEX);
+                        {
+                            std::lock_guard<std::mutex> lock(DICEREVEALED_MUTEX);
+                            _dicerevealed_add(entropyused,bettxid,betTx,entropyvout);
+                        }
                         fprintf(stderr,"added.%c to mempool.[%d] and broadcast entropyused.%s bettxid.%s -> %s\n",funcid,i,entropyused.GetHex().c_str(),bettxid.GetHex().c_str(),tx.GetHash().GetHex().c_str());
                     } else fprintf(stderr,"rebroadcast.%c to mempool.[%d] and broadcast entropyused.%s bettxid.%s -> %s\n",funcid,i,entropyused.GetHex().c_str(),bettxid.GetHex().c_str(),tx.GetHash().GetHex().c_str());
                     return(true);
@@ -313,9 +315,10 @@ int32_t dice_betspent(char *debugstr,uint256 bettxid)
 
 void dicefinish_delete(struct dicefinish_info *ptr)
 {
-    pthread_mutex_lock(&DICE_MUTEX);
-    _dicehash_clear(ptr->bettxid);
-    pthread_mutex_unlock(&DICE_MUTEX);
+    {
+        std::lock_guard<std::mutex> lock(DICE_MUTEX);
+        _dicehash_clear(ptr->bettxid);
+    }
     DL_DELETE(DICEFINISH_LIST,ptr);
     free(ptr);
 }
@@ -504,8 +507,6 @@ void DiceQueue(int32_t iswin,uint64_t sbits,uint256 fundingtxid,uint256 bettxid,
     {
         if ( pthread_create((pthread_t *)malloc(sizeof(pthread_t)),NULL,dicefinish,0) == 0 )
         {
-            pthread_mutex_init(&DICE_MUTEX,NULL);
-            pthread_mutex_init(&DICEREVEALED_MUTEX,NULL);
             didinit = 1;
         }
         else
@@ -516,7 +517,7 @@ void DiceQueue(int32_t iswin,uint64_t sbits,uint256 fundingtxid,uint256 bettxid,
     }
     //if ( dice_betspent((char *)"DiceQueue",bettxid) != 0 )
     //    return;
-    pthread_mutex_lock(&DICE_MUTEX);
+    std::lock_guard<std::mutex> lock(DICE_MUTEX);
     if ( _dicehash_find(bettxid) == 0 )
     {
         _dicehash_add(bettxid);
@@ -536,7 +537,6 @@ void DiceQueue(int32_t iswin,uint64_t sbits,uint256 fundingtxid,uint256 bettxid,
         //fprintf(stderr,"DiceQueue status bettxid.%s already in list\n",bettxid.GetHex().c_str());
         //_dicehash_clear(bettxid);
     }
-    pthread_mutex_unlock(&DICE_MUTEX);
 }
 
 CPubKey DiceFundingPk(CScript scriptPubKey)
