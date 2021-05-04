@@ -829,7 +829,7 @@ int32_t komodo_isPoS(CBlock *pblock, int32_t height,CTxDestination *addressout)
 
 void komodo_disconnect(CBlockIndex *pindex,CBlock& block)
 {
-    char symbol[KOMODO_ASSETCHAIN_MAXLEN],dest[KOMODO_ASSETCHAIN_MAXLEN]; struct komodo_state *sp;
+    char symbol[KOMODO_ASSETCHAIN_MAXLEN],dest[KOMODO_ASSETCHAIN_MAXLEN]; komodo::state *sp;
     //fprintf(stderr,"disconnect ht.%d\n",pindex->GetHeight());
     komodo_init(pindex->GetHeight());
     if ( (sp= komodo_stateptr(symbol,dest)) != 0 )
@@ -1296,7 +1296,7 @@ int32_t komodo_nextheight()
 
 int32_t komodo_isrealtime(int32_t *kmdheightp)
 {
-    struct komodo_state *sp; CBlockIndex *pindex;
+    komodo::state *sp; CBlockIndex *pindex;
     if ( (sp= komodo_stateptrget((char *)"KMD")) != 0 )
         *kmdheightp = sp->CURRENT_HEIGHT;
     else *kmdheightp = 0;

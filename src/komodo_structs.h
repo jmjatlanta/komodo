@@ -59,21 +59,6 @@ typedef union _bits320 bits320;
 
 struct komodo_kv { UT_hash_handle hh; bits256 pubkey; uint8_t *key,*value; int32_t height; uint32_t flags; uint16_t keylen,valuesize; };
 
-struct komodo_event_notarized { uint256 blockhash,desttxid,MoM; int32_t notarizedheight,MoMdepth; char dest[16]; };
-struct komodo_event_pubkeys { uint8_t num; uint8_t pubkeys[64][33]; };
-struct komodo_event_opreturn { uint256 txid; uint64_t value; uint16_t vout,oplen; uint8_t opret[]; };
-struct komodo_event_pricefeed { uint8_t num; uint32_t prices[35]; };
-
-struct komodo_event
-{
-    struct komodo_event *related;
-    uint16_t len;
-    int32_t height;
-    uint8_t type,reorged;
-    char symbol[KOMODO_ASSETCHAIN_MAXLEN];
-    uint8_t space[];
-};
-
 struct pax_transaction
 {
     UT_hash_handle hh;
@@ -116,15 +101,163 @@ struct komodo_ccdata
     char symbol[65];
 };
 
-struct komodo_state
+/****
+ * The komodo namespace will eventually house all komodo domain classes
+ * For now, only event related classes are here.
+ */
+
+namespace komodo {
+
+enum event_type
+{
+    EVENT_UNKNOWN,
+    EVENT_RATIFY,
+    EVENT_NOTARIZED,
+    EVENT_KMDHEIGHT,
+    EVENT_REWIND,
+    EVENT_PRICEFEED,
+    EVENT_OPRETURN,
+    EVENT_PUBKEYS
+};
+
+/***
+ * an event
+ */
+struct event
+{
+    event(event_type in) : type(in) {}
+    struct komodo_event *related;
+    uint16_t len;
+    int32_t height;
+    event_type type;
+    uint8_t reorged;
+    char symbol[KOMODO_ASSETCHAIN_MAXLEN];
+    uint8_t* space;
+    char to_id(event_type in)
+    {
+        switch(in)
+        {
+            case EVENT_RATIFY:
+                return KOMODO_EVENT_RATIFY;
+            case EVENT_NOTARIZED:
+                return KOMODO_EVENT_NOTARIZED;
+            case EVENT_KMDHEIGHT:
+                return KOMODO_EVENT_KMDHEIGHT;
+            case EVENT_REWIND:
+                return KOMODO_EVENT_REWIND;
+            case EVENT_PRICEFEED:
+                return KOMODO_EVENT_PRICEFEED;
+            case EVENT_OPRETURN:
+                return KOMODO_EVENT_OPRETURN;
+        }
+        return '\0';
+    }
+    event_type to_event_type(char in)
+    {
+        switch (in)
+        {
+            case KOMODO_EVENT_RATIFY:
+                return EVENT_RATIFY;
+            case KOMODO_EVENT_NOTARIZED:
+                return EVENT_NOTARIZED;
+            case KOMODO_EVENT_KMDHEIGHT:
+                return EVENT_KMDHEIGHT;
+            case KOMODO_EVENT_REWIND:
+                return EVENT_REWIND;
+            case KOMODO_EVENT_PRICEFEED:
+                return EVENT_PRICEFEED;
+            case KOMODO_OPRETURN_DEPOSIT:
+            case KOMODO_OPRETURN_ISSUED:
+            case KOMODO_OPRETURN_REDEEMED:
+            case KOMODO_OPRETURN_WITHDRAW:
+                return EVENT_OPRETURN;
+        }
+        return EVENT_UNKNOWN;
+    }
+};
+
+struct pricefeed_event : public event 
+{
+    pricefeed_event() : event(EVENT_PRICEFEED) {}
+    uint8_t num; 
+    uint32_t prices[35]; 
+};
+
+struct notarized_event : public event
+{ 
+    notarized_event(uint256 bh, uint256 txid, int32_t height, uint256 mom, int32_t depth, char* bytes) 
+            : event(EVENT_NOTARIZED), blockhash(bh), desttxid(txid), 
+            notarizedheight(height), MoM(mom), MoMdepth(depth) 
+    {
+        memcpy(dest, 0, 16);
+        strncpy(dest, bytes, 15);
+    }
+    uint256 blockhash,desttxid,MoM; 
+    int32_t notarizedheight,MoMdepth; 
+    char dest[16]; 
+};
+
+struct pubkeys_event : public event 
+{ 
+    pubkeys_event() : event(EVENT_PUBKEYS) {}
+    uint8_t num; 
+    uint8_t pubkeys[64][33]; 
+};
+
+struct opreturn_event : public event
+{ 
+    enum opreturn_type
+    {
+        OPRETURN_DEPOSIT,
+        OPRETURN_ISSUED,
+        OPRETURN_WITHDRAW,
+        OPRETURN_REDEEMED
+    };
+    opreturn_event() : event(EVENT_OPRETURN) {}
+    uint256 txid; 
+    uint64_t value; 
+    uint16_t vout,oplen; 
+    uint8_t* opret;
+    opreturn_type return_type;
+    char to_opreturn_id(opreturn_type in)
+    {
+        switch(in)
+        {
+            case OPRETURN_DEPOSIT:
+                return KOMODO_OPRETURN_DEPOSIT;
+            case OPRETURN_ISSUED:
+                return KOMODO_OPRETURN_ISSUED;
+            case OPRETURN_WITHDRAW:
+                return KOMODO_OPRETURN_WITHDRAW;
+            case OPRETURN_REDEEMED:
+                return KOMODO_OPRETURN_REDEEMED;
+        }
+        return '\0';
+    }
+};
+
+/****
+ * Stores the current state
+ */
+struct state
 {
     uint256 NOTARIZED_HASH,NOTARIZED_DESTTXID,MoM;
     int32_t SAVEDHEIGHT,CURRENT_HEIGHT,NOTARIZED_HEIGHT,MoMdepth;
     uint32_t SAVEDTIMESTAMP;
     uint64_t deposited,issued,withdrawn,approved,redeemed,shorted;
     struct notarized_checkpoint *NPOINTS; int32_t NUM_NPOINTS,last_NPOINTSi;
-    struct komodo_event **Komodo_events; int32_t Komodo_numevents;
+    std::list<std::shared_ptr<event>> events; // events in chronological order
     uint32_t RTbufs[64][3]; uint64_t RTmask;
+    void add_event(std::shared_ptr<event> in)
+    {
+        if (ASSETCHAINS_SYMBOL[0] != 0)
+        {
+            std::lock_guard<std::mutex> lock(komodo_mutex);
+            events.push_back(in);
+        }
+    }
 };
+
+} // namespace komodo
 
 #endif /* KOMODO_STRUCTS_H */

@@ -2499,7 +2499,7 @@ void komodo_nameset(char *symbol,char *dest,char *source)
     }
 }
 
-struct komodo_state *komodo_stateptrget(char *base)
+komodo::state *komodo_stateptrget(char *base)
 {
     int32_t baseid;
     if ( base == 0 || base[0] == 0 || strcmp(base,(char *)"KMD") == 0 )
@@ -2509,7 +2509,7 @@ struct komodo_state *komodo_stateptrget(char *base)
     else return(&KOMODO_STATES[0]);
 }
 
-struct komodo_state *komodo_stateptr(char *symbol,char *dest)
+komodo::state *komodo_stateptr(char *symbol,char *dest)
 {
     int32_t baseid;
     komodo_nameset(symbol,dest,ASSETCHAINS_SYMBOL);

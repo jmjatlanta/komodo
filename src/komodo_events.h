@@ -17,7 +17,7 @@
 #define H_KOMODOEVENTS_H
 #include "komodo_defs.h"
 
-struct komodo_event *komodo_eventadd(struct komodo_state *sp,int32_t height,char *symbol,uint8_t type,uint8_t *data,uint16_t datalen)
+struct komodo_event *komodo_eventadd(komodo::state *sp,int32_t height,char *symbol,uint8_t type,uint8_t *data,uint16_t datalen)
 {
     struct komodo_event *ep=0; uint16_t len = (uint16_t)(sizeof(*ep) + datalen);
     if ( sp != 0 && ASSETCHAINS_SYMBOL[0] != 0 )
@@ -36,9 +36,9 @@ struct komodo_event *komodo_eventadd(struct komodo_state *sp,int32_t height,char
     return(ep);
 }
 
-void komodo_eventadd_notarized(struct komodo_state *sp,char *symbol,int32_t height,char *dest,uint256 notarized_hash,uint256 notarized_desttxid,int32_t notarizedheight,uint256 MoM,int32_t MoMdepth)
+void komodo_eventadd_notarized(komodo::state *sp,char *symbol,int32_t height,char *dest,uint256 notarized_hash,uint256 notarized_desttxid,int32_t notarizedheight,uint256 MoM,int32_t MoMdepth)
 {
-    static uint32_t counter; int32_t verified=0; char *coin; struct komodo_event_notarized N;
+    static uint32_t counter; int32_t verified=0; char *coin; 
     coin = (ASSETCHAINS_SYMBOL[0] == 0) ? (char *)"KMD" : ASSETCHAINS_SYMBOL;
     if ( IS_KOMODO_NOTARY != 0 && (verified= komodo_verifynotarization(symbol,dest,height,notarizedheight,notarized_hash,notarized_desttxid)) < 0 )
     {
@@ -49,20 +49,16 @@ void komodo_eventadd_notarized(struct komodo_state *sp,char *symbol,int32_t heig
     {
         if ( 0 && IS_KOMODO_NOTARY != 0 && verified != 0 )
             fprintf(stderr,"validated [%s] ht.%d notarized %d\n",coin,height,notarizedheight);
-        memset(&N,0,sizeof(N));
-        N.blockhash = notarized_hash;
-        N.desttxid = notarized_desttxid;
-        N.notarizedheight = notarizedheight;
-        N.MoM = MoM;
-        N.MoMdepth = MoMdepth;
-        strncpy(N.dest,dest,sizeof(N.dest)-1);
-        komodo_eventadd(sp,height,symbol,KOMODO_EVENT_NOTARIZED,(uint8_t *)&N,sizeof(N));
-        if ( sp != 0 )
+        if (sp != nullptr)
+        {
+            std::shared_ptr<komodo::notarized_event> N(new komodo::notarized_event( notarized_hash, notarized_desttxid, notarizedheight, MoM, MoMdepth, dest));
+            sp->add_event(N);
             komodo_notarized_update(sp,height,notarizedheight,notarized_hash,notarized_desttxid,MoM,MoMdepth);
+        }
     }
 }
 
-void komodo_eventadd_pubkeys(struct komodo_state *sp,char *symbol,int32_t height,uint8_t num,uint8_t pubkeys[64][33])
+void komodo_eventadd_pubkeys(komodo::state *sp,char *symbol,int32_t height,uint8_t num,uint8_t pubkeys[64][33])
 {
     struct komodo_event_pubkeys P;
     //printf("eventadd pubkeys ht.%d\n",height);
@@ -74,7 +70,7 @@ void komodo_eventadd_pubkeys(struct komodo_state *sp,char *symbol,int32_t height
         komodo_notarysinit(height,pubkeys,num);
 }
 
-void komodo_eventadd_pricefeed(struct komodo_state *sp,char *symbol,int32_t height,uint32_t *prices,uint8_t num)
+void komodo_eventadd_pricefeed(komodo::state *sp,char *symbol,int32_t height,uint32_t *prices,uint8_t num)
 {
     struct komodo_event_pricefeed F;
     if ( num == sizeof(F.prices)/sizeof(*F.prices) )
@@ -88,7 +84,7 @@ void komodo_eventadd_pricefeed(struct komodo_state *sp,char *symbol,int32_t heig
     } //else fprintf(stderr,"skip pricefeed[%d]\n",num);
 }
 
-void komodo_eventadd_opreturn(struct komodo_state *sp,char *symbol,int32_t height,uint256 txid,uint64_t value,uint16_t vout,uint8_t *buf,uint16_t opretlen)
+void komodo_eventadd_opreturn(komodo::state *sp,char *symbol,int32_t height,uint256 txid,uint64_t value,uint16_t vout,uint8_t *buf,uint16_t opretlen)
 {
     struct komodo_event_opreturn O; uint8_t *opret;
     if ( ASSETCHAINS_SYMBOL[0] != 0 )
@@ -107,7 +103,7 @@ void komodo_eventadd_opreturn(struct komodo_state *sp,char *symbol,int32_t heigh
     }
 }
 
-void komodo_event_undo(struct komodo_state *sp,struct komodo_event *ep)
+void komodo_event_undo(komodo::state *sp,struct komodo_event *ep)
 {
     switch ( ep->type )
     {
@@ -126,7 +122,7 @@ void komodo_event_undo(struct komodo_state *sp,struct komodo_event *ep)
     }
 }
 
-void komodo_event_rewind(struct komodo_state *sp,char *symbol,int32_t height)
+void komodo_event_rewind(komodo::state *sp,char *symbol,int32_t height)
 {
     struct komodo_event *ep;
     if ( sp != 0 )
@@ -151,7 +147,7 @@ void komodo_event_rewind(struct komodo_state *sp,char *symbol,int32_t height)
     }
 }
 
-void komodo_setkmdheight(struct komodo_state *sp,int32_t kmdheight,uint32_t timestamp)
+void komodo_setkmdheight(komodo::state *sp,int32_t kmdheight,uint32_t timestamp)
 {
     if ( sp != 0 )
     {
@@ -165,7 +161,7 @@ void komodo_setkmdheight(struct komodo_state *sp,int32_t kmdheight,uint32_t time
     }
 }
 
-void komodo_eventadd_kmdheight(struct komodo_state *sp,char *symbol,int32_t height,int32_t kmdheight,uint32_t timestamp)
+void komodo_eventadd_kmdheight(komodo::state *sp,char *symbol,int32_t height,int32_t kmdheight,uint32_t timestamp)
 {
     uint32_t buf[2];
     if ( kmdheight > 0 )
