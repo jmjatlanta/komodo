@@ -60,6 +60,8 @@ later:
  detect evil peer: 'Q' is directly protected by txpow, G is a fixed size, so it cant be very big and invalid request can be detected. 'P' message will lead to 'G' queries that cannot be answered, 'R' needs to have high priority
  */
 
+#include <mutex>
+
 uint8_t *komodo_DEX_encrypt(uint8_t **allocatedp,uint8_t *data,int32_t *datalenp,bits256 pubkey,bits256 privkey);
 uint8_t *komodo_DEX_decrypt(uint8_t *senderpub,uint8_t **allocatedp,uint8_t *data,int32_t *datalenp,bits256 privkey);
 void komodo_DEX_pubkey(bits256 &pub0);
@@ -156,7 +158,7 @@ static int64_t DEX_Numpending,DEX_freed,DEX_truncated;
 
 static uint32_t Got_Recent_Quote;
 bits256 DEX_pubkey,GENESIS_PUBKEY,GENESIS_PRIVKEY;
-pthread_mutex_t DEX_globalmutex;
+std::mutex DEX_globalmutex;
 
 static struct DEX_globals
 {
@@ -187,7 +189,6 @@ void komodo_DEX_init()
     {
         decode_hex(GENESIS_PUBKEY.bytes,sizeof(GENESIS_PUBKEY),GENESIS_PUBKEYSTR);
         decode_hex(GENESIS_PRIVKEY.bytes,sizeof(GENESIS_PRIVKEY),GENESIS_PRIVKEYSTR);
-        pthread_mutex_init(&DEX_globalmutex,0);
         komodo_DEX_pubkeyupdate();
         G = (struct DEX_globals *)calloc(1,sizeof(*G));
         if ( (G->fp= fopen((char *)"DEX.log",(char *)"wb")) == 0 )
@@ -1782,7 +1783,7 @@ UniValue komodo_DEXbroadcast(uint64_t *locatorp,uint8_t funcid,char *hexstr,int3
             return(0);
         }
         {
-            pthread_mutex_lock(&DEX_globalmutex);
+            std::lock_guard<std::mutex> lock(DEX_globalmutex);
             iguana_rwnum(0,&packet[2],sizeof(timestamp),&timestamp);
             modval = (timestamp % KOMODO_DEX_PURGETIME);
             if ( (ptr= _komodo_DEXfind(modval,shorthash)) == 0 )
@@ -1802,7 +1803,6 @@ UniValue komodo_DEXbroadcast(uint64_t *locatorp,uint8_t funcid,char *hexstr,int3
                     fprintf(stderr," cant issue duplicate order modval.%d t.%u %08x %016llx\n",modval,timestamp,shorthash,(long long)hash.ulongs[0]);
                 srand((int32_t)timestamp);
             }
-            pthread_mutex_unlock(&DEX_globalmutex);
         }
         if ( blastflag == 0 )
             break;
@@ -2140,7 +2140,7 @@ UniValue komodo_DEX_stats()
     static uint32_t lastadd,lasttime;
     UniValue result(UniValue::VOBJ); char str[65],pubstr[67],logstr[1024],recvaddr[64]; int32_t i,total,histo[64]; uint32_t now,totalhash,d;
     pubkey2addr(recvaddr,NOTARY_PUBKEY33);
-    pthread_mutex_lock(&DEX_globalmutex);
+    std::lock_guard<std::mutex> lock(DEX_globalmutex);
     now = (uint32_t)time(NULL);
     bits256_str(pubstr+2,DEX_pubkey);
     pubstr[0] = '0';
@@ -2169,7 +2169,6 @@ UniValue komodo_DEX_stats()
     lasttime = now;
     lastadd = DEX_totaladd;
     result.push_back(Pair((char *)"perfstats",logstr));
-    pthread_mutex_unlock(&DEX_globalmutex);
     return(result);
 }
 
@@ -2184,9 +2183,8 @@ UniValue komodo_DEXcancel(char *pubkeystr,uint32_t shorthash,char *tagA,char *ta
     {
         len = iguana_rwnum(1,&hex[len],sizeof(shorthash),&shorthash);
         {
-            pthread_mutex_lock(&DEX_globalmutex);
+            std::lock_guard<std::mutex> lock(DEX_globalmutex);
             _komodo_DEX_cancelid(shorthash,DEX_pubkey,(uint32_t)time(NULL));
-            pthread_mutex_unlock(&DEX_globalmutex);
         }
     }
     else if ( pubkeystr[0] != 0 )
@@ -2202,9 +2200,8 @@ UniValue komodo_DEXcancel(char *pubkeystr,uint32_t shorthash,char *tagA,char *ta
         decode_hex(hex,33,checkstr);
         len = 33;
         {
-            pthread_mutex_lock(&DEX_globalmutex);
+            std::lock_guard<std::mutex> lock(DEX_globalmutex);
             _komodo_DEX_cancelpubkey((char *)"",(char *)"",pub33,(uint32_t)time(NULL));
-            pthread_mutex_unlock(&DEX_globalmutex);
         }
     }
     else if ( tagA[0] != 0 && tagB[0] != 0 )
@@ -2224,9 +2221,8 @@ UniValue komodo_DEXcancel(char *pubkeystr,uint32_t shorthash,char *tagA,char *ta
         hex[len++] = lenB;
         memcpy(&hex[len],tagB,lenB), len += lenB;
         {
-            pthread_mutex_lock(&DEX_globalmutex);
+            std::lock_guard<std::mutex> lock(DEX_globalmutex);
             _komodo_DEX_cancelpubkey(tagA,tagB,pub33,(uint32_t)time(NULL));
-            pthread_mutex_unlock(&DEX_globalmutex);
         }
     }
     for (i=0; i<len; i++)
@@ -2241,27 +2237,24 @@ UniValue komodo_DEXcancel(char *pubkeystr,uint32_t shorthash,char *tagA,char *ta
 UniValue komodo_DEXget(uint32_t shorthash)
 {
     UniValue result;
-    pthread_mutex_lock(&DEX_globalmutex);
+    std::lock_guard<std::mutex> lock(DEX_globalmutex);
     result = _komodo_DEXget(shorthash);
-    pthread_mutex_unlock(&DEX_globalmutex);
     return(result);
 }
 
 UniValue komodo_DEXlist(uint32_t stopat,int32_t minpriority,char *tagA,char *tagB,char *destpub33,char *minA,char *maxA,char *minB,char *maxB,char *stophashstr)
 {
     UniValue result;
-    pthread_mutex_lock(&DEX_globalmutex);
+    std::lock_guard<std::mutex> lock(DEX_globalmutex);
     result = _komodo_DEXlist(stopat,minpriority,tagA,tagB,destpub33,minA,maxA,minB,maxB,stophashstr);
-    pthread_mutex_unlock(&DEX_globalmutex);
     return(result);
 }
 
 UniValue komodo_DEXorderbook(int32_t revflag,int32_t maxentries,int32_t minpriority,char *tagA,char *tagB,char *destpub33,char *minA,char *maxA,char *minB,char *maxB)
 {
     UniValue result;
-    pthread_mutex_lock(&DEX_globalmutex);
+    std::lock_guard<std::mutex> lock(DEX_globalmutex);
     result = _komodo_DEXorderbook(revflag,maxentries,minpriority,tagA,tagB,destpub33,minA,maxA,minB,maxB);
-    pthread_mutex_unlock(&DEX_globalmutex);
     return(result);
 }
 
@@ -2364,9 +2357,8 @@ int32_t komodo_DEX_locatorsync(int32_t &needrequest,int32_t &written,FILE *fp,ui
     t = locator >> 32;
     h = locator & 0xffffffff;
     {
-        pthread_mutex_lock(&DEX_globalmutex);
+        std::lock_guard<std::mutex> lock(DEX_globalmutex);
         fragptr = _komodo_DEXfind(t % KOMODO_DEX_PURGETIME,h);
-        pthread_mutex_unlock(&DEX_globalmutex);
     }
     errflag = 0;
     if ( fragptr != 0 )
@@ -2432,7 +2424,7 @@ UniValue komodo_DEXsubscribe(int32_t &cmpflag,char *origfname,int32_t priority,u
         sprintf(tagBstr,"locators");
     }
     {
-        pthread_mutex_lock(&DEX_globalmutex);
+        std::lock_guard<std::mutex> lock(DEX_globalmutex);
         memset(checkhash.bytes,0,sizeof(checkhash));
         if ( (ptr= _komodo_DEX_latestptr(sliceid == 0 ? (char *)"files" : (char *)"slices",origfname,publisher,offset0)) != 0 )
         {
@@ -2463,7 +2455,6 @@ UniValue komodo_DEXsubscribe(int32_t &cmpflag,char *origfname,int32_t priority,u
                     break;
             }
         }
-        pthread_mutex_unlock(&DEX_globalmutex);
     }
     if ( ptr == 0 )
     {
@@ -3062,7 +3053,7 @@ UniValue komodo_DEX_notarize(char *coin,int32_t prevheight)
     pubkeystr[1] = '1';
     bits256_str(pubkeystr+2,DEX_pubkey);
     {
-        pthread_mutex_lock(&DEX_globalmutex);
+        std::lock_guard<std::mutex> lock(DEX_globalmutex);
         if ( (ptr= _komodo_DEX_latestptr(coin,(char *)"notarizations",pubkeystr,0)) != 0 )
         {
             if ( (decoded= komodo_DEX_datablobdecrypt(&senderpub,&allocated,&newlen,ptr,DEX_pubkey,coin)) != 0 && newlen == 40 )
@@ -3114,8 +3105,6 @@ UniValue komodo_DEX_notarize(char *coin,int32_t prevheight)
             if ( allocated != 0 )
                 free(allocated), allocated = 0;
         }
-        //fprintf(stderr,"fname.%s auto search %s %s %s shorthash.%08x sliceid.%d\n",fname,origfname,tagBstr,publisher,shorthash,sliceid);
-         pthread_mutex_unlock(&DEX_globalmutex);
     }
     return(result);
 }
@@ -3125,9 +3114,8 @@ void komodo_DEXmsg(CNode *pfrom,std::vector<uint8_t> request) // received a pack
     int32_t len; std::vector<uint8_t> response; bits256 hash; uint32_t timestamp = (uint32_t)time(NULL);
     if ( (len= request.size()) > 0 )
     {
-        pthread_mutex_lock(&DEX_globalmutex);
+        std::lock_guard<std::mutex> lock(DEX_globalmutex);
         _komodo_DEXprocess(timestamp,pfrom,&request[0],len);
-        pthread_mutex_unlock(&DEX_globalmutex);
     }
 }
 
@@ -3137,7 +3125,7 @@ void komodo_DEXpoll(CNode *pto) // from mainloop polling
     std::vector<uint8_t> packet; uint32_t i,now,numiters,shorthash,len,ptime,modval,peerpos;
     now = (uint32_t)time(NULL);
     ptime = now - KOMODO_DEX_PURGETIME + 6;
-    pthread_mutex_lock(&DEX_globalmutex);
+    std::lock_guard<std::mutex> lock(DEX_globalmutex);
     peerpos = _komodo_DEXpeerpos(now,pto->id);
     if ( ptime > purgetime )
     {
@@ -3168,6 +3156,5 @@ void komodo_DEXpoll(CNode *pto) // from mainloop polling
         }
         pto->dexlastping = now;
     }
-    pthread_mutex_unlock(&DEX_globalmutex);
 }
 

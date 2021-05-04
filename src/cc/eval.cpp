@@ -32,18 +32,18 @@ char *CClib_name();
 
 Eval* EVAL_TEST = 0;
 struct CCcontract_info CCinfos[0x100];
-extern pthread_mutex_t KOMODO_CC_mutex;
+extern std::mutex KOMODO_CC_mutex;
 
 bool RunCCEval(const CC *cond, const CTransaction &tx, unsigned int nIn,std::shared_ptr<CCheckCCEvalCodes> evalcodeChecker)
 {
     EvalRef eval;
-    pthread_mutex_lock(&KOMODO_CC_mutex);
-    bool out = eval->Dispatch(cond, tx, nIn, evalcodeChecker);
-    pthread_mutex_unlock(&KOMODO_CC_mutex);
-    if ( eval->state.IsValid() != out)
-        fprintf(stderr,"out %d vs %d isValid\n",(int32_t)out,(int32_t)eval->state.IsValid());
-    //assert(eval->state.IsValid() == out);
-
+    {
+        std::lock_guard<std::mutex> lock(KOMODO_CC_mutex);
+        bool out = eval->Dispatch(cond, tx, nIn, evalcodeChecker);
+        if ( eval->state.IsValid() != out)
+            fprintf(stderr,"out %d vs %d isValid\n",(int32_t)out,(int32_t)eval->state.IsValid());
+        //assert(eval->state.IsValid() == out);
+    }
     if (eval->state.IsValid()) return true;
 
     std::string lvl = eval->state.IsInvalid() ? "Invalid" : "Error!";

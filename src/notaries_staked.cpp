@@ -5,7 +5,7 @@
 #include "komodo_defs.h"
 #include <cstring>
 
-extern pthread_mutex_t staked_mutex;
+extern std::mutex staked_mutex;
 
 int8_t is_STAKED(const char *chain_name) 
 {
@@ -93,22 +93,16 @@ int8_t numStakedNotaries(uint8_t pubkeys[64][33],int8_t era) {
 }
 
 void UpdateNotaryAddrs(uint8_t pubkeys[64][33],int8_t numNotaries) {
-    static int didinit;
-    if ( didinit == 0 ) {
-        pthread_mutex_init(&staked_mutex,NULL);
-        didinit = 1;
-    }
     if ( pubkeys[0][0] == 0 )
     {
         // null pubkeys, era 0.
-        pthread_mutex_lock(&staked_mutex);
+        std::lock_guard<std::mutex> lock(staked_mutex);
         memset(NOTARYADDRS,0,sizeof(NOTARYADDRS));
-        pthread_mutex_unlock(&staked_mutex);
     }
     else
     {
         // staked era is set.
-        pthread_mutex_lock(&staked_mutex);
+        std::lock_guard<std::mutex> lock(staked_mutex);
         for (int i = 0; i<numNotaries; i++)
         {
             pubkey2addr((char *)NOTARYADDRS[i],(uint8_t *)pubkeys[i]);
@@ -118,7 +112,6 @@ void UpdateNotaryAddrs(uint8_t pubkeys[64][33],int8_t numNotaries) {
                 IS_STAKED_NOTARY = i;
             }
         }
-        pthread_mutex_unlock(&staked_mutex);
     }
 }
 

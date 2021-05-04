@@ -19,6 +19,7 @@
 #include "key_io.h"
 #include "cc/CCinclude.h"
 #include <string.h>
+#include <mutex>
 
 #ifdef _WIN32
 #include <sodium.h>
@@ -43,8 +44,8 @@ struct queueitem { struct queueitem *next,*prev; uint32_t allocsize,type;  };
 typedef struct queue
 {
 	struct queueitem *list;
-	pthread_mutex_t mutex;
-    char name[64],initflag;
+	std::mutex mutex;
+    char name[64];
 } queue_t;
 
 #include "mini-gmp.c"
@@ -1210,16 +1211,6 @@ void OS_randombytes(unsigned char *x,long xlen)
 }
 #endif
 
-void lock_queue(queue_t *queue)
-{
-    if ( queue->initflag == 0 )
-    {
-        portable_mutex_init(&queue->mutex);
-        queue->initflag = 1;
-    }
-	portable_mutex_lock(&queue->mutex);
-}
-
 void queue_enqueue(char *name,queue_t *queue,struct queueitem *item)
 {
     if ( queue->name[0] == 0 && name != 0 && name[0] != 0 )
@@ -1229,28 +1220,26 @@ void queue_enqueue(char *name,queue_t *queue,struct queueitem *item)
         printf("FATAL type error: queueing empty value\n");
         return;
     }
-    lock_queue(queue);
+    std::lock_guard<std::mutex> lock(queue->mutex);
     DL_APPEND(queue->list,item);
-    portable_mutex_unlock(&queue->mutex);
 }
 
 struct queueitem *queue_dequeue(queue_t *queue)
 {
     struct queueitem *item = 0;
-    lock_queue(queue);
+    std::lock_guard<std::mutex> lock(queue->mutex);
     if ( queue->list != 0 )
     {
         item = queue->list;
         DL_DELETE(queue->list,item);
     }
-	portable_mutex_unlock(&queue->mutex);
     return(item);
 }
 
 void *queue_delete(queue_t *queue,struct queueitem *copy,int32_t copysize)
 {
     struct queueitem *item = 0;
-    lock_queue(queue);
+    std::lock_guard<std::mutex> lock(queue->mutex);
     if ( queue->list != 0 )
     {
         DL_FOREACH(queue->list,item)
@@ -1262,20 +1251,18 @@ void *queue_delete(queue_t *queue,struct queueitem *copy,int32_t copysize)
 						#endif
             {
                 DL_DELETE(queue->list,item);
-                portable_mutex_unlock(&queue->mutex);
                 printf("name.(%s) deleted item.%p list.%p\n",queue->name,item,queue->list);
                 return(item);
             }
         }
     }
-	portable_mutex_unlock(&queue->mutex);
     return(0);
 }
 
 void *queue_free(queue_t *queue)
 {
     struct queueitem *item = 0;
-    lock_queue(queue);
+    std::lock_guard<std::mutex> lock(queue->mutex);
     if ( queue->list != 0 )
     {
         DL_FOREACH(queue->list,item)
@@ -1285,14 +1272,13 @@ void *queue_free(queue_t *queue)
         }
         //printf("name.(%s) dequeue.%p list.%p\n",queue->name,item,queue->list);
     }
-	portable_mutex_unlock(&queue->mutex);
     return(0);
 }
 
 void *queue_clone(queue_t *clone,queue_t *queue,int32_t size)
 {
     struct queueitem *ptr,*item = 0;
-    lock_queue(queue);
+    std::lock_guard<std::mutex> lock(queue->mutex);
     if ( queue->list != 0 )
     {
         DL_FOREACH(queue->list,item)
@@ -1303,7 +1289,6 @@ void *queue_clone(queue_t *clone,queue_t *queue,int32_t size)
         }
         //printf("name.(%s) dequeue.%p list.%p\n",queue->name,item,queue->list);
     }
-	portable_mutex_unlock(&queue->mutex);
     return(0);
 }
 
@@ -1311,9 +1296,8 @@ int32_t queue_size(queue_t *queue)
 {
     int32_t count = 0;
     struct queueitem *tmp;
-    lock_queue(queue);
+    std::lock_guard<std::mutex> lock(queue->mutex);
     DL_COUNT(queue->list,tmp,count);
-    portable_mutex_unlock(&queue->mutex);
 	return count;
 }
 
