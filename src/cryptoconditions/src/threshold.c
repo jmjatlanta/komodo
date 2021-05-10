@@ -219,7 +219,7 @@ static Fulfillment_t *thresholdToFulfillmentMixed(const CC *cond, FulfillmentFla
 
     for (int i=0; i<cond->size; i++) {
         CC *sub = cond->subconditions[i];
-        if (fulfillment = asnFulfillmentNew(sub, flags)) {
+        if ( (fulfillment = asnFulfillmentNew(sub, flags)) != NULL) {
             asn_set_add(&tf->subfulfillments, fulfillment);
         } else {
             asn_set_add(&tf->subconditions, asnConditionNew(sub));
