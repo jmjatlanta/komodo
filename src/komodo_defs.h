@@ -535,4 +535,7 @@ uint32_t komodo_segid32(char *coinaddr);
 void OS_randombytes(unsigned char *x, long xlen);
 #endif
 
+#define SATOSHIDEN ((uint64_t)100000000L)
+#define dstr(x) ((double)(x) / SATOSHIDEN)
+
 #endif

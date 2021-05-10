@@ -18,6 +18,9 @@
 #define KOMODO_NSPVSUPERLITE_H
 
 #include "komodo_DEX.h"
+extern "C" {
+#include "mini-gmp.h" // for bitcoin_base58decode()
+}
 
 // nSPV client. VERY simplistic "single threaded" networking model. for production GUI best to multithread, etc.
 // no caching, no optimizations, no reducing the number of ntzsproofs needed by detecting overlaps, etc.
@@ -25,7 +28,7 @@
 
 
 CAmount AmountFromValue(const UniValue& value);
-int32_t bitcoin_base58decode(uint8_t *data,char *coinaddr);
+int32_t bitcoin_base58decode(uint8_t *data,char *coinaddr); // from mini-gmp.c
 
 uint32_t NSPV_lastinfo,NSPV_logintime,NSPV_tiptime;
 CKey NSPV_key;
