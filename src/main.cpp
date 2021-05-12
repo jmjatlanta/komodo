@@ -46,10 +46,12 @@
 #include "undo.h"
 #include "util.h"
 #include "utilmoneystr.h"
+#include "key_io.h" // for DecodeDestination()
 #include "validationinterface.h"
 #include "wallet/asyncrpcoperation_sendmany.h"
 #include "wallet/asyncrpcoperation_shieldcoinbase.h"
 #include "notaries_staked.h"
+#include "komodo_globals.h"
 
 #include <cstring>
 #include <algorithm>
@@ -647,8 +649,6 @@ CCoinsViewCache *pcoinsTip = NULL;
 CBlockTreeDB *pblocktree = NULL;
 
 // Komodo globals
-
-#define KOMODO_ZCASH
 #include "komodo.h"
 
 UniValue komodo_snapshot(int top)
@@ -6349,9 +6349,17 @@ bool CheckDiskSpace(uint64_t nAdditionalBytes)
     return true;
 }
 
+/****
+ * Open a file
+ * NOTE: If fReadOnly is set to false and the file does not exist it will be created (and directory if necessary)
+ * @param pos the position to jump to
+ * @param prefix the file type
+ * @param fReadOnly true to open read-only. 
+ * @returns the opened file, set to the position in pos, or nullptr on error
+ */
 FILE* OpenDiskFile(const CDiskBlockPos &pos, const char *prefix, bool fReadOnly)
 {
-    static int32_t didinit[256];
+    static int32_t didinit[256]; // array of files, indexed by pos.nFile
     if (pos.IsNull())
         return NULL;
     boost::filesystem::path path = GetBlockPosFilename(pos, prefix);
@@ -6363,12 +6371,14 @@ FILE* OpenDiskFile(const CDiskBlockPos &pos, const char *prefix, bool fReadOnly)
         LogPrintf("Unable to open file %s\n", path.string());
         return NULL;
     }
-    if ( pos.nFile < sizeof(didinit)/sizeof(*didinit) && didinit[pos.nFile] == 0 && strcmp(prefix,(char *)"blk") == 0 )
+    if ( pos.nFile < sizeof(didinit)/sizeof(*didinit) // prevent out-of-bounds 
+            && didinit[pos.nFile] == 0 // we haven't initialized this file before
+            && strcmp(prefix,(char *)"blk") == 0 ) // this is a file of type "blk"
     {
         komodo_prefetch(file);
         didinit[pos.nFile] = 1;
     }
-    if (pos.nPos) {
+    if (pos.nPos) { // jump to a specific position in the file
         if (fseek(file, pos.nPos, SEEK_SET)) {
             LogPrintf("Unable to seek to position %u of %s\n", pos.nPos, path.string());
             fclose(file);
@@ -6378,14 +6388,33 @@ FILE* OpenDiskFile(const CDiskBlockPos &pos, const char *prefix, bool fReadOnly)
     return file;
 }
 
+/****
+ * Open the correct block file based on block position
+ * @param pos the position
+ * @param fReadOnly true to open file read-only
+ * @returns the file or nullptr on error
+ */
 FILE* OpenBlockFile(const CDiskBlockPos &pos, bool fReadOnly) {
     return OpenDiskFile(pos, "blk", fReadOnly);
 }
 
+/****
+ * Open the correct undo file based on block position
+ * @param pos the position
+ * @param fReadOnly true to open file read-only
+ * @returns the file or nullptr on error
+ */
 FILE* OpenUndoFile(const CDiskBlockPos &pos, bool fReadOnly) {
     return OpenDiskFile(pos, "rev", fReadOnly);
 }
 
+/****
+ * Retrieve the correct file (with path) based on block position and prefix
+ * NOTE: does not check if file exists
+ * @param pos the position
+ * @param prefix the file type
+ * @returns the full path to the file
+ */
 boost::filesystem::path GetBlockPosFilename(const CDiskBlockPos &pos, const char *prefix)
 {
     return GetDataDir() / "blocks" / strprintf("%s%05u.dat", prefix, pos.nFile);
@@ -7506,6 +7535,13 @@ void static ProcessGetData(CNode* pfrom)
 #include "komodo_nSPV_superlite.h"  // nSPV superlite client, issuing requests and handling nSPV responses
 #include "komodo_nSPV_wallet.h"     // nSPV_send and support functions, really all the rest is to support this
 
+/****
+ * A message was received from a node
+ * @param pfrom the sender
+ * @param strCommand the request type
+ * @param vRecv the data that came with the request
+ * @param nTimeReceived timestamp
+ */
 bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t nTimeReceived)
 {
     int32_t nProtocolVersion;

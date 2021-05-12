@@ -8,6 +8,7 @@
 int32_t komodo_faststateinit(struct komodo_state *sp,char *fname,char *symbol,char *dest);
 struct komodo_state *komodo_stateptrget(char *base);
 extern int32_t KOMODO_EXTERNAL_NOTARIES;
+extern komodo_state KOMODO_STATES[34];
 
 namespace TestEvents {
 
@@ -505,6 +506,18 @@ TEST(TestEvents, komodo_faststateinit_test)
         FAIL() << "Exception thrown";
     }
     boost::filesystem::remove_all(temp);
+}
+
+TEST(TestEvents, komodo_stateptrget_test)
+{
+    strcpy(ASSETCHAINS_SYMBOL, "JMJ");
+    komodo_state* kmd = komodo_stateptrget(nullptr); // this gets what's in position 33
+    komodo_state* hrk = komodo_stateptrget("HRK"); // this should get HRK
+    ASSERT_NE(kmd, hrk);
+    komodo_state* jmj = komodo_stateptrget("JMJ"); // ASSETCHAINS_SYMBOL seems to get put at index 0
+    ASSERT_EQ(jmj, &KOMODO_STATES[0]);
+    komodo_state* blah = komodo_stateptrget("blah"); // if we give an invalid symbol, we get index 0 as well
+    ASSERT_NE(jmj, blah);
 }
 
 } // namespace TestEvents

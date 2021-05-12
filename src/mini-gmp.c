@@ -65,7 +65,6 @@ see https://www.gnu.org/licenses/.  */
 
 #include "mini-gmp.h"
 
-
 /* Macros */
 #define GMP_LIMB_BITS (sizeof(mp_limb_t) * CHAR_BIT)
 
