@@ -13,6 +13,8 @@
  *                                                                            *
  ******************************************************************************/
 #pragma once
+#include <mutex>
+
 #include "komodo_defs.h"
 #include "komodo_structs.h"
 

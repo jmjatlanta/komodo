@@ -608,6 +608,7 @@ komodod_LDADD += $(LIBBITCOIN_WALLET)
 endif
 
 komodod_LDADD += \
+  $(LIBCJSON) \
   $(BOOST_LIBS) \
   $(BDB_LIBS) \
   $(SSL_LIBS) \
@@ -620,7 +621,6 @@ komodod_LDADD += \
   $(LIBVERUS_CRYPTO) \
   $(LIBVERUS_PORTABLE_CRYPTO) \
   $(LIBZCASH_LIBS) \
-  $(LIBCJSON) \
   -lcurl
  
 

@@ -37,6 +37,8 @@
 
 #include <univalue.h>
 
+#include "komodo_cutils.h" // is_hexstr()
+
 using namespace std;
 
 void EnsureWalletIsUnlocked();
