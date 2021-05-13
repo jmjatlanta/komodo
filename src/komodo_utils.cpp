@@ -2155,7 +2155,6 @@ fprintf(stderr,"extralen.%d before disable bits\n",extralen);
         //fprintf(stderr,"Got datadir.(%s)\n",dirname);
         if ( ASSETCHAINS_SYMBOL[0] != 0 )
         {
-            int32_t komodo_baseid(char *origbase);
             extern int COINBASE_MATURITY;
             if ( strcmp(ASSETCHAINS_SYMBOL,"KMD") == 0 )
             {
@@ -2353,7 +2352,7 @@ void komodo_nameset(char *symbol,char *dest,char *source)
  * @param base the symbol to look for (nullptr will return state object for KMD)
  * @returns the correct state object, KOMODO_STATES[0] if not found in CURRENCIES
  */
-struct komodo_state *komodo_stateptrget(char *base)
+struct komodo_state *komodo_stateptrget(const char *base)
 {
     int32_t baseid;
     if ( base == 0 || base[0] == 0 || strcmp(base,(char *)"KMD") == 0 )

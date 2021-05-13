@@ -177,6 +177,6 @@ extern char CURRENCIES[33][8]; // 33 currencies, KMD at index 32
  * @param origbase the currency to look for
  * @returns the index of the currency in the CURRENCIES array, or -1 if not found
  */
-int32_t komodo_baseid(char *origbase);
+int32_t komodo_baseid(const char *origbase);
 
 uint64_t komodo_current_supply(uint32_t nHeight);

@@ -136,7 +136,7 @@ void komodo_nameset(char *symbol,char *dest,char *source);
  * @param base the symbol to look for (nullptr will return state object for KMD)
  * @returns the correct state object, KOMODO_STATES[0] if not found in CURRENCIES
  */
-struct komodo_state *komodo_stateptrget(char *base);
+struct komodo_state *komodo_stateptrget(const char *base);
 
 /****
  * Retrieve a pointer to the state object

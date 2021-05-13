@@ -186,7 +186,7 @@ int32_t komodo_checkvout(int32_t vout,int32_t k,int32_t indallvouts); // declare
  * @param origbase the currency to look for
  * @returns the index of the currency in the CURRENCIES array, or -1 if not found
  */
-int32_t komodo_baseid(char *origbase)
+int32_t komodo_baseid(const char *origbase)
 {
     int32_t i; char base[64];
     // convert origbase to upper case

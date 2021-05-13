@@ -4,9 +4,9 @@
 #include <iterator>
 #include <boost/filesystem.hpp>
 #include <komodo_structs.h>
+#include <komodo_utils.h>
 
 int32_t komodo_faststateinit(struct komodo_state *sp,char *fname,char *symbol,char *dest);
-struct komodo_state *komodo_stateptrget(char *base);
 extern int32_t KOMODO_EXTERNAL_NOTARIES;
 extern komodo_state KOMODO_STATES[34];
 
@@ -516,7 +516,7 @@ TEST(TestEvents, komodo_stateptrget_test)
     ASSERT_NE(kmd, hrk);
     komodo_state* jmj = komodo_stateptrget("JMJ"); // ASSETCHAINS_SYMBOL seems to get put at index 0
     ASSERT_EQ(jmj, &KOMODO_STATES[0]);
-    komodo_state* blah = komodo_stateptrget("blah"); // if we give an invalid symbol, we get index 0 as well
+    komodo_state* blah = komodo_stateptrget("BLAH"); // if we give an invalid symbol, we get index 0 as well
     ASSERT_NE(jmj, blah);
 }
 
