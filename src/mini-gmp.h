@@ -303,8 +303,16 @@ int32_t mpz_init_set_str (mpz_t, const char *, int32_t);
 size_t mpz_out_str (FILE *, int32_t, const mpz_t);
 #endif
 
+#ifndef _BITS256
+#define _BITS256
+    union _bits256 { uint8_t bytes[32]; uint16_t ushorts[16]; uint32_t uints[8]; uint64_t ulongs[4]; uint64_t txid; };
+    typedef union _bits256 bits256;
+#endif
+
 void mpz_import (mpz_t, size_t, int32_t, size_t, int32_t, size_t, const void *);
 void *mpz_export (void *, size_t *, int32_t, size_t, int32_t, size_t, const mpz_t);
+int32_t bitcoin_base58decode(uint8_t *data,char *coinaddr);
+char *bitcoin_base58encode(char *coinaddr,uint8_t *data,int32_t datalen);
 #define GMP_LIMB_BITS (sizeof(mp_limb_t) * CHAR_BIT)
 #define GMP_NAIL_BITS 0
 #define GMP_NUMB_BITS     (GMP_LIMB_BITS - GMP_NAIL_BITS)
