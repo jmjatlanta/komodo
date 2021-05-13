@@ -14,6 +14,40 @@
  ******************************************************************************/
 #pragma once
 #include <mutex>
+#include "komodo_defs.h"
+
+void komodo_prefetch(FILE *fp);
+uint32_t komodo_heightstamp(int32_t height);
+void komodo_stateupdate(int32_t height,uint8_t notarypubs[][33],uint8_t numnotaries,uint8_t notaryid,uint256 txhash,uint64_t voutmask,uint8_t numvouts,uint32_t *pvals,uint8_t numpvals,int32_t kheight,uint32_t ktime,uint64_t opretvalue,uint8_t *opretbuf,uint16_t opretlen,uint16_t vout,uint256 MoM,int32_t MoMdepth);
+void komodo_init(int32_t height);
+int32_t komodo_MoMdata(int32_t *notarized_htp,uint256 *MoMp,uint256 *kmdtxidp,int32_t nHeight,uint256 *MoMoMp,int32_t *MoMoMoffsetp,int32_t *MoMoMdepthp,int32_t *kmdstartip,int32_t *kmdendip);
+int32_t komodo_notarizeddata(int32_t nHeight,uint256 *notarized_hashp,uint256 *notarized_desttxidp);
+char *komodo_issuemethod(char *userpass,char *method,char *params,uint16_t port);
+void komodo_init(int32_t height);
+int32_t komodo_chosennotary(int32_t *notaryidp,int32_t height,uint8_t *pubkey33,uint32_t timestamp);
+int32_t komodo_isrealtime(int32_t *kmdheightp);
+uint64_t komodo_paxtotal();
+int32_t komodo_longestchain();
+uint64_t komodo_maxallowed(int32_t baseid);
+int32_t komodo_bannedset(int32_t *indallvoutsp,uint256 *array,int32_t max);
+int32_t komodo_checkvout(int32_t vout,int32_t k,int32_t indallvouts);
+
+std::mutex komodo_mutex;
+pthread_mutex_t staked_mutex;
+
+#define KOMODO_ELECTION_GAP 2000    //((ASSETCHAINS_SYMBOL[0] == 0) ? 2000 : 100)
+#define KOMODO_ASSETCHAIN_MAXLEN 65
+
+struct pax_transaction *PAX;
+int32_t NUM_PRICES; uint32_t *PVALS;
+struct knotaries_entry *Pubkeys;
+
+struct komodo_state KOMODO_STATES[34];
+const uint32_t nStakedDecemberHardforkTimestamp = 1576840000; //December 2019 hardfork 12/20/2019 @ 11:06am (UTC)
+const int32_t nDecemberHardforkHeight = 1670000;   //December 2019 hardfork
+
+const uint32_t nS4Timestamp = 1592146800; //dPoW Season 4 2020 hardfork Sunday, June 14th, 2020 03:00:00 PM UTC
+const int32_t nS4HardforkHeight = 1922000;   //dPoW Season 4 2020 hardfork Sunday, June 14th, 2020 
 
 #include "komodo_defs.h"
 #include "komodo_structs.h"
