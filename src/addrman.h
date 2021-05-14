@@ -255,8 +255,9 @@ protected:
 
     //! Select an address to connect to
     //! @param newOnly select the addres from the "new table"
+    //! @param chanceFactor the chance of selection
     //! @returns an address selected at random
-    CAddrInfo Select_(bool newOnly);
+    CAddrInfo Select_(bool newOnly, double &chanceFactor);
 
     //! Wraps GetRandInt to allow tests to override RandomInt and make it deterministic.
     virtual int RandomInt(int nMax);
