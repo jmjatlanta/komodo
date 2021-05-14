@@ -374,7 +374,7 @@ CAddrInfo CAddrMan::Select_(bool newOnly)
             while (vvTried[nKBucket][nKBucketPos] == -1) {
                 nKBucket = (nKBucket + insecure_rand()) % ADDRMAN_TRIED_BUCKET_COUNT;
                 nKBucketPos = (nKBucketPos + insecure_rand()) % ADDRMAN_BUCKET_SIZE;
-                if (i++ > kRetriesBetweenExit == 0 && !nKey.IsNull())
+                if (i++ > kRetriesBetweenExit && !nKey.IsNull())
                     return CAddrInfo();
             }
             int nId = vvTried[nKBucket][nKBucketPos];
@@ -394,7 +394,7 @@ CAddrInfo CAddrMan::Select_(bool newOnly)
             while (vvNew[nUBucket][nUBucketPos] == -1) {
                 nUBucket = (nUBucket + insecure_rand()) % ADDRMAN_NEW_BUCKET_COUNT;
                 nUBucketPos = (nUBucketPos + insecure_rand()) % ADDRMAN_BUCKET_SIZE;
-                if (i++ > kRetriesBetweenExit == 0 && !nKey.IsNull())
+                if (i++ > kRetriesBetweenExit && !nKey.IsNull())
                     return CAddrInfo();
             }
             int nId = vvNew[nUBucket][nUBucketPos];
@@ -419,8 +419,8 @@ CAddrInfo CAddrMan::Select(bool newOnly)
 {
     CAddrInfo addrRet;
     {
-        int numRetries = 0;
-        while(!addrRet.IsValid() && numRetries < 200000 ) // 200k is a magic number so unit tests can pass
+        int numRetries = 200; // 200 is a magic number so unit tests can pass
+        while(!addrRet.IsValid() && numRetries > 0 ) 
         {
             std::lock_guard<std::mutex> lock(cs);
             Check();
