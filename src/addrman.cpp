@@ -356,8 +356,7 @@ CAddrInfo CAddrMan::Select_(bool newOnly)
         return CAddrInfo();
 
     // Track number of attempts to find a table entry, before giving up to avoid infinite loop
-    const int kMaxRetries = 200000;         // magic number so unit tests can pass
-    const int kRetriesBetweenSleep = 1000;
+    const int kRetriesBetweenExit = 1000;
     const int kRetrySleepInterval = 100;    // milliseconds
 
     if (newOnly && nNew == 0)
@@ -375,10 +374,8 @@ CAddrInfo CAddrMan::Select_(bool newOnly)
             while (vvTried[nKBucket][nKBucketPos] == -1) {
                 nKBucket = (nKBucket + insecure_rand()) % ADDRMAN_TRIED_BUCKET_COUNT;
                 nKBucketPos = (nKBucketPos + insecure_rand()) % ADDRMAN_BUCKET_SIZE;
-                if (i++ > kMaxRetries)
+                if (i++ > kRetriesBetweenExit == 0 && !nKey.IsNull())
                     return CAddrInfo();
-                if (i % kRetriesBetweenSleep == 0 && !nKey.IsNull())
-                    MilliSleep(kRetrySleepInterval);
             }
             int nId = vvTried[nKBucket][nKBucketPos];
             assert(mapInfo.count(nId) == 1);
@@ -397,10 +394,8 @@ CAddrInfo CAddrMan::Select_(bool newOnly)
             while (vvNew[nUBucket][nUBucketPos] == -1) {
                 nUBucket = (nUBucket + insecure_rand()) % ADDRMAN_NEW_BUCKET_COUNT;
                 nUBucketPos = (nUBucketPos + insecure_rand()) % ADDRMAN_BUCKET_SIZE;
-                if (i++ > kMaxRetries)
+                if (i++ > kRetriesBetweenExit == 0 && !nKey.IsNull())
                     return CAddrInfo();
-                if (i % kRetriesBetweenSleep == 0 && !nKey.IsNull())
-                    MilliSleep(kRetrySleepInterval);
             }
             int nId = vvNew[nUBucket][nUBucketPos];
             assert(mapInfo.count(nId) == 1);
@@ -412,6 +407,29 @@ CAddrInfo CAddrMan::Select_(bool newOnly)
     }
     
     return CAddrInfo();
+}
+
+
+/**
+ * Choose a random address to connect to.
+ * @param newOnly select only from the list of new addresses
+ * @returns an address 
+ */
+CAddrInfo CAddrMan::Select(bool newOnly)
+{
+    CAddrInfo addrRet;
+    {
+        int numRetries = 0;
+        while(!addrRet.IsValid() && numRetries < 200000 ) // 200k is a magic number so unit tests can pass
+        {
+            std::lock_guard<std::mutex> lock(cs);
+            Check();
+            addrRet = Select_(newOnly);
+            Check();
+            --numRetries;
+        }
+    }
+    return addrRet;
 }
 
 #ifdef DEBUG_ADDRMAN

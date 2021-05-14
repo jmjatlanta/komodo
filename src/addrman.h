@@ -36,6 +36,7 @@
 #include <set>
 #include <stdint.h>
 #include <vector>
+#include <mutex>
 
 /**
  * Extended statistics about a CAddress
@@ -194,7 +195,7 @@ class CAddrMan
 friend class CAddrManTest;
 private:
     //! critical section to protect the inner data structures
-    mutable CCriticalSection cs;
+    mutable std::mutex cs;
 
     //! last used nId
     int nIdCount;
@@ -252,7 +253,9 @@ protected:
     //! Mark an entry as attempted to connect.
     void Attempt_(const CService &addr, int64_t nTime);
 
-    //! Select an address to connect to, if newOnly is set to true, only the new table is selected from.
+    //! Select an address to connect to
+    //! @param newOnly select the addres from the "new table"
+    //! @returns an address selected at random
     CAddrInfo Select_(bool newOnly);
 
     //! Wraps GetRandInt to allow tests to override RandomInt and make it deterministic.
@@ -322,7 +325,7 @@ public:
         template<typename Stream>
         void Serialize(Stream &s) const
     {
-        LOCK(cs);
+        std::lock_guard<std::mutex> lock(cs);
 
         unsigned char nVersion = 2;
         s << nVersion;
@@ -379,7 +382,7 @@ public:
     template<typename Stream>
     void Unserialize(Stream& s)
     {
-        LOCK(cs);
+        std::lock_guard<std::mutex> lock(cs);
 
         Clear();
         unsigned char nVersion;
@@ -501,7 +504,7 @@ public:
 
     void Clear()
     {
-        LOCK(cs);
+        std::lock_guard<std::mutex> lock(cs);
         std::vector<int>().swap(vRandom);
         nKey = GetRandHash();
         for (size_t bucket = 0; bucket < ADDRMAN_NEW_BUCKET_COUNT; bucket++) {
@@ -543,7 +546,7 @@ public:
     {
 #ifdef DEBUG_ADDRMAN
         {
-            LOCK(cs);
+            std::lock_guard<std::mutex> lock(cs);
             int err;
             if ((err=Check_()))
                 LogPrintf("ADDRMAN CONSISTENCY CHECK FAILED!!! err=%i\n", err);
@@ -556,7 +559,7 @@ public:
     {
         bool fRet = false;
         {
-            LOCK(cs);
+            std::lock_guard<std::mutex> lock(cs);
             Check();
             fRet |= Add_(addr, source, nTimePenalty);
             Check();
@@ -571,7 +574,7 @@ public:
     {
         int nAdd = 0;
         {
-            LOCK(cs);
+            std::lock_guard<std::mutex> lock(cs);
             Check();
             for (std::vector<CAddress>::const_iterator it = vAddr.begin(); it != vAddr.end(); it++)
                 nAdd += Add_(*it, source, nTimePenalty) ? 1 : 0;
@@ -586,7 +589,7 @@ public:
     void Good(const CService &addr, int64_t nTime = GetTime())
     {
         {
-            LOCK(cs);
+            std::lock_guard<std::mutex> lock(cs);
             Check();
             Good_(addr, nTime);
             Check();
@@ -597,7 +600,7 @@ public:
     void Attempt(const CService &addr, int64_t nTime = GetTime())
     {
         {
-            LOCK(cs);
+            std::lock_guard<std::mutex> lock(cs);
             Check();
             Attempt_(addr, nTime);
             Check();
@@ -605,19 +608,11 @@ public:
     }
 
     /**
-     * Choose an address to connect to.
+     * Choose a random address to connect to.
+     * @param newOnly select only from the list of new addresses
+     * @returns an address 
      */
-    CAddrInfo Select(bool newOnly = false)
-    {
-        CAddrInfo addrRet;
-        {
-            LOCK(cs);
-            Check();
-            addrRet = Select_(newOnly);
-            Check();
-        }
-        return addrRet;
-    }
+    CAddrInfo Select(bool newOnly = false);
 
     //! Return a bunch of addresses, selected at random.
     std::vector<CAddress> GetAddr()
@@ -625,7 +620,7 @@ public:
         Check();
         std::vector<CAddress> vAddr;
         {
-            LOCK(cs);
+            std::lock_guard<std::mutex> lock(cs);
             GetAddr_(vAddr);
         }
         Check();
@@ -636,7 +631,7 @@ public:
     void Connected(const CService &addr, int64_t nTime = GetTime())
     {
         {
-            LOCK(cs);
+            std::lock_guard<std::mutex> lock(cs);
             Check();
             Connected_(addr, nTime);
             Check();
