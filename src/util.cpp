@@ -353,6 +353,12 @@ static void InterpretNegativeSetting(string name, map<string, string>& mapSettin
     }
 }
 
+/****
+ * Parse command line parameters, 
+ * place anything that begins with "-" in mapArgs and mapMultiArgs globals
+ * @param argc number of arguments
+ * @param argv the arguments
+ */
 void ParseParameters(int argc, const char* const argv[])
 {
     mapArgs.clear();
@@ -387,7 +393,7 @@ void ParseParameters(int argc, const char* const argv[])
     }
 
     // New 0.6 features:
-    BOOST_FOREACH(const PAIRTYPE(string,string)& entry, mapArgs)
+    for(const auto& entry : mapArgs)
     {
         // interpret -nofoo as -foo=0 (and -nofoo=0 as -foo=1) as long as -foo not set
         InterpretNegativeSetting(entry.first, mapArgs);
@@ -970,6 +976,9 @@ void RenameThread(const char* name)
 #endif
 }
 
+/***
+ * Set up the correct locale (aids in filesystem paths)
+ */
 void SetupEnvironment()
 {
     // On most POSIX systems (e.g. Linux, but not BSD) the environment's locale
@@ -989,6 +998,10 @@ void SetupEnvironment()
     boost::filesystem::path::imbue(loc);
 }
 
+/*****
+ * Initialize networking/socket libraries (i.e. Windows winsock)
+ * @returns false on failure
+ */
 bool SetupNetworking()
 {
 #ifdef _WIN32

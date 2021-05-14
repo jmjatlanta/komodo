@@ -177,10 +177,12 @@ vector<unsigned char> ParseHexO(const UniValue& o, string strKey)
     return ParseHexV(find_value(o, strKey), strKey);
 }
 
-/**
- * Note: This interface may still be subject to change.
+/*****
+ * Get help on a particular command
+ * NOTE: This interface may still be subject to change.
+ * @param strCommand the command (will show all commands if empty)
+ * @returns contextual help
  */
-
 std::string CRPCTable::help(const std::string& strCommand) const
 {
     string strRet;
@@ -848,12 +850,19 @@ std::string JSONRPCExecBatch(const UniValue& vReq)
     return ret.write() + "\n";
 }
 
+/****
+ * Execute an RPC method
+ * @param strMethod the method
+ * @param params additional parameters to go along with the method
+ * @returns the results
+ */
 UniValue CRPCTable::execute(const std::string &strMethod, const UniValue &params) const
 {
-    // Return immediately if in warmup
+    // Return help text even if chain is not fully warmed up, 
+    // otherwise return immediately
     {
         LOCK(cs_rpcWarmup);
-        if (fRPCInWarmup)
+        if (fRPCInWarmup && strMethod != "help")
             throw JSONRPCError(RPC_IN_WARMUP, rpcWarmupStatus);
     }
 
