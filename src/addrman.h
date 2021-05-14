@@ -195,7 +195,7 @@ class CAddrMan
 friend class CAddrManTest;
 private:
     //! critical section to protect the inner data structures
-    mutable std::mutex cs;
+    mutable std::recursive_mutex cs;
 
     //! last used nId
     int nIdCount;
@@ -326,7 +326,7 @@ public:
         template<typename Stream>
         void Serialize(Stream &s) const
     {
-        std::lock_guard<std::mutex> lock(cs);
+        std::lock_guard<std::recursive_mutex> lock(cs);
 
         unsigned char nVersion = 2;
         s << nVersion;
@@ -383,7 +383,7 @@ public:
     template<typename Stream>
     void Unserialize(Stream& s)
     {
-        std::lock_guard<std::mutex> lock(cs);
+        std::lock_guard<std::recursive_mutex> lock(cs);
 
         Clear();
         unsigned char nVersion;
@@ -505,7 +505,7 @@ public:
 
     void Clear()
     {
-        std::lock_guard<std::mutex> lock(cs);
+        std::lock_guard<std::recursive_mutex> lock(cs);
         std::vector<int>().swap(vRandom);
         nKey = GetRandHash();
         for (size_t bucket = 0; bucket < ADDRMAN_NEW_BUCKET_COUNT; bucket++) {
@@ -547,7 +547,7 @@ public:
     {
 #ifdef DEBUG_ADDRMAN
         {
-            std::lock_guard<std::mutex> lock(cs);
+            std::lock_guard<std::recursive_mutex> lock(cs);
             int err;
             if ((err=Check_()))
                 LogPrintf("ADDRMAN CONSISTENCY CHECK FAILED!!! err=%i\n", err);
@@ -560,7 +560,7 @@ public:
     {
         bool fRet = false;
         {
-            std::lock_guard<std::mutex> lock(cs);
+            std::lock_guard<std::recursive_mutex> lock(cs);
             Check();
             fRet |= Add_(addr, source, nTimePenalty);
             Check();
@@ -575,7 +575,7 @@ public:
     {
         int nAdd = 0;
         {
-            std::lock_guard<std::mutex> lock(cs);
+            std::lock_guard<std::recursive_mutex> lock(cs);
             Check();
             for (std::vector<CAddress>::const_iterator it = vAddr.begin(); it != vAddr.end(); it++)
                 nAdd += Add_(*it, source, nTimePenalty) ? 1 : 0;
@@ -590,7 +590,7 @@ public:
     void Good(const CService &addr, int64_t nTime = GetTime())
     {
         {
-            std::lock_guard<std::mutex> lock(cs);
+            std::lock_guard<std::recursive_mutex> lock(cs);
             Check();
             Good_(addr, nTime);
             Check();
@@ -601,7 +601,7 @@ public:
     void Attempt(const CService &addr, int64_t nTime = GetTime())
     {
         {
-            std::lock_guard<std::mutex> lock(cs);
+            std::lock_guard<std::recursive_mutex> lock(cs);
             Check();
             Attempt_(addr, nTime);
             Check();
@@ -621,7 +621,7 @@ public:
         Check();
         std::vector<CAddress> vAddr;
         {
-            std::lock_guard<std::mutex> lock(cs);
+            std::lock_guard<std::recursive_mutex> lock(cs);
             GetAddr_(vAddr);
         }
         Check();
@@ -632,7 +632,7 @@ public:
     void Connected(const CService &addr, int64_t nTime = GetTime())
     {
         {
-            std::lock_guard<std::mutex> lock(cs);
+            std::lock_guard<std::recursive_mutex> lock(cs);
             Check();
             Connected_(addr, nTime);
             Check();

@@ -420,7 +420,7 @@ CAddrInfo CAddrMan::Select(bool newOnly)
         double chanceFactor = 1.0;
         while(!addrRet.IsValid() && numRetries > 0 ) 
         {
-            std::lock_guard<std::mutex> lock(cs);
+            std::lock_guard<std::recursive_mutex> lock(cs);
             Check();
             addrRet = Select_(newOnly, chanceFactor);
             Check();
