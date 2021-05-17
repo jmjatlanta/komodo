@@ -12,7 +12,7 @@
  * Removal or modification of this copyright notice is prohibited.            *
  *                                                                            *
  ******************************************************************************/
-
+#include "CCtokens.h"
 #include "gamescc.h"
 #ifdef BUILD_PRICES
 #include "games/prices.c"
@@ -1225,7 +1225,16 @@ UniValue games_register(uint64_t txfee,struct CCcontract_info *cp,cJSON *params)
     // vin3+ -> buyin
     // vout0 -> keystrokes/completion baton
     CMutableTransaction mtx = CreateNewContextualCMutableTransaction(Params().GetConsensus(), komodo_nextheight());
-    UniValue result(UniValue::VOBJ); char destaddr[64],coinaddr[64]; uint256 tokenid,gametxid,origplayergame,playertxid,hashBlock; int32_t err,maxplayers,gameheight,n,numvouts,vout=1; int64_t inputsum,buyin,CCchange=0; CPubKey pk,mypk,gamespk,burnpk; CTransaction tx,playertx; std::vector<uint8_t> playerdata; std::string rawtx,symbol,pname; bits256 t;
+    UniValue result(UniValue::VOBJ); 
+    char destaddr[64],coinaddr[64]; 
+    uint256 tokenid,gametxid,origplayergame,playertxid,hashBlock; 
+    int32_t err,maxplayers,gameheight,n,numvouts,vout=1; 
+    int64_t inputsum,buyin,CCchange=0; 
+    CPubKey pk,mypk,gamespk,burnpk; 
+    CTransaction tx,playertx; 
+    std::vector<uint8_t> playerdata; 
+    std::string rawtx,symbol,pname; 
+    bits256 t;
     
     if ( txfee == 0 )
         txfee = 10000;
@@ -1264,10 +1273,11 @@ UniValue games_register(uint64_t txfee,struct CCcontract_info *cp,cJSON *params)
                 if ( tokenid != zeroid )
                 {
                     mtx.vin.push_back(CTxIn(tokenid,0)); // spending cc marker as token is burned
-                    char unspendableTokenAddr[64]; uint8_t tokenpriv[32]; struct CCcontract_info *cpTokens, tokensC;
-                    cpTokens = CCinit(&tokensC, EVAL_TOKENS);
-                    CPubKey unspPk = GetUnspendable(cpTokens, tokenpriv);
-                    GetCCaddress(cpTokens, unspendableTokenAddr, unspPk);
+                    char unspendableTokenAddr[64]; 
+                    uint8_t tokenpriv[32];
+                    CCTokensContract_info tokensC; 
+                    CPubKey unspPk = GetUnspendable(&tokensC, tokenpriv);
+                    GetCCaddress(&tokensC, unspendableTokenAddr, unspPk);
                     CCaddr2set(cp, EVAL_TOKENS, unspPk, tokenpriv, unspendableTokenAddr);
                 }
                 mtx.vout.push_back(MakeCC1of2vout(cp->evalcode,buyin + inputsum - txfee,gamespk,mypk));
@@ -1510,7 +1520,6 @@ UniValue games_finish(uint64_t txfee,struct CCcontract_info *cp,cJSON *params,ch
     // get any playerdata, get all keystrokes, replay game and compare final state
     CMutableTransaction mtx = CreateNewContextualCMutableTransaction(Params().GetConsensus(), komodo_nextheight());
     UniValue result(UniValue::VOBJ); std::string rawtx,symbol,pname; CTransaction gametx; uint64_t seed; int64_t buyin,batonvalue,inputsum,cashout=0,CCchange=0; int32_t i,err,gameheight,tmp,numplayers,regslot,n,num,numkeys,maxplayers,batonht,batonvout; char mygamesaddr[64],str[512]; gamesevent *keystrokes = 0; std::vector<uint8_t> playerdata,newdata,nodata; uint256 batontxid,playertxid,gametxid; CPubKey mypk,gamespk; uint8_t player[10000],mypriv[32],funcid;
-    struct CCcontract_info *cpTokens, tokensC;
     
     if ( txfee == 0 )
         txfee = 10000;
@@ -1567,8 +1576,8 @@ UniValue games_finish(uint64_t txfee,struct CCcontract_info *cp,cJSON *params,ch
                         }
                         else
                         {
-                            cpTokens = CCinit(&tokensC, EVAL_TOKENS);
-                            mtx.vout.push_back(MakeCC1vout(EVAL_TOKENS, txfee, GetUnspendable(cpTokens,NULL)));            // marker to token cc addr, burnable and validated
+                            CCTokensContract_info tokensC;
+                            mtx.vout.push_back(MakeCC1vout(EVAL_TOKENS, txfee, GetUnspendable(&tokensC,NULL)));            // marker to token cc addr, burnable and validated
                             mtx.vout.push_back(MakeTokensCC1vout(cp->evalcode,1,mypk));
                             cashout = games_cashout(&P);
                             fprintf(stderr,"\ncashout %.8f extracted %s\n",(double)cashout/COIN,str);

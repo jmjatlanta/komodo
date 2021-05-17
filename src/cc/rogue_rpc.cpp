@@ -16,7 +16,7 @@
 
 #include "cJSON.h"
 #include "CCinclude.h"
-
+#include "CCtokens.h"
 #define ROGUE_REGISTRATION 5
 #define ROGUE_REGISTRATIONSIZE (100 * 10000)
 #define ROGUE_MAXPLAYERS 64 // need to send unused fees back to globalCC address to prevent leeching
@@ -848,7 +848,12 @@ UniValue rogue_register(uint64_t txfee,struct CCcontract_info *cp,cJSON *params)
     // vin3+ -> buyin
     // vout0 -> keystrokes/completion baton
     CMutableTransaction mtx = CreateNewContextualCMutableTransaction(Params().GetConsensus(), komodo_nextheight());
-    UniValue result(UniValue::VOBJ); char destaddr[64],coinaddr[64]; uint256 tokenid,gametxid,origplayergame,playertxid,hashBlock; int32_t err,maxplayers,gameheight,n,numvouts,vout=1; int64_t inputsum,buyin,CCchange=0; CPubKey pk,mypk,roguepk,burnpk; CTransaction tx,playertx; std::vector<uint8_t> playerdata; std::string rawtx,symbol,pname; bits256 t;
+    UniValue result(UniValue::VOBJ); char destaddr[64],coinaddr[64]; 
+    uint256 tokenid,gametxid,origplayergame,playertxid,hashBlock; 
+    int32_t err,maxplayers,gameheight,n,numvouts,vout=1; 
+    int64_t inputsum,buyin,CCchange=0; CPubKey pk,mypk,roguepk,burnpk; 
+    CTransaction tx,playertx; std::vector<uint8_t> playerdata; 
+    std::string rawtx,symbol,pname; bits256 t;
 
     if ( txfee == 0 )
         txfee = 10000;
@@ -887,10 +892,10 @@ UniValue rogue_register(uint64_t txfee,struct CCcontract_info *cp,cJSON *params)
                 if ( tokenid != zeroid )
                 {
                     mtx.vin.push_back(CTxIn(tokenid,0)); // spending cc marker as token is burned
-                    char unspendableTokenAddr[64]; uint8_t tokenpriv[32]; struct CCcontract_info *cpTokens, tokensC;
-                    cpTokens = CCinit(&tokensC, EVAL_TOKENS);
-                    CPubKey unspPk = GetUnspendable(cpTokens, tokenpriv);
-                    GetCCaddress(cpTokens, unspendableTokenAddr, unspPk);
+                    char unspendableTokenAddr[64]; uint8_t tokenpriv[32]; 
+                    CCTokensContract_info tokensC;
+                    CPubKey unspPk = GetUnspendable(&tokensC, tokenpriv);
+                    GetCCaddress(&tokensC, unspendableTokenAddr, unspPk);
                     CCaddr2set(cp, EVAL_TOKENS, unspPk, tokenpriv, unspendableTokenAddr);
                 }
                 mtx.vout.push_back(MakeCC1of2vout(cp->evalcode,buyin + inputsum - txfee,roguepk,mypk));
@@ -1222,7 +1227,6 @@ UniValue rogue_finishgame(uint64_t txfee,struct CCcontract_info *cp,cJSON *param
     // get any playerdata, get all keystrokes, replay game and compare final state
     CMutableTransaction mtx = CreateNewContextualCMutableTransaction(Params().GetConsensus(), komodo_nextheight());
     UniValue result(UniValue::VOBJ); std::string rawtx,symbol,pname; CTransaction gametx; uint64_t seed,mult; int64_t buyin,batonvalue,inputsum,cashout=0,CCchange=0; int32_t i,err,gameheight,tmp,numplayers,regslot,n,num,dungeonlevel,numkeys,maxplayers,batonht,batonvout; char myrogueaddr[64],*keystrokes = 0; std::vector<uint8_t> playerdata,newdata,nodata; uint256 batontxid,playertxid,gametxid; CPubKey mypk,roguepk; uint8_t player[10000],mypriv[32],funcid;
-    struct CCcontract_info *cpTokens, tokensC;
 
     if ( txfee == 0 )
         txfee = 10000;
@@ -1281,8 +1285,8 @@ UniValue rogue_finishgame(uint64_t txfee,struct CCcontract_info *cp,cJSON *param
                         }
                         else
                         {
-                            cpTokens = CCinit(&tokensC, EVAL_TOKENS);
-                            mtx.vout.push_back(MakeCC1vout(EVAL_TOKENS, txfee, GetUnspendable(cpTokens,NULL)));            // marker to token cc addr, burnable and validated
+                            CCTokensContract_info tokensC;
+                            mtx.vout.push_back(MakeCC1vout(EVAL_TOKENS, txfee, GetUnspendable(&tokensC,NULL)));            // marker to token cc addr, burnable and validated
                             mtx.vout.push_back(MakeTokensCC1vout(cp->evalcode,1,mypk));
                             cashout = rogue_cashout(&P);
                             fprintf(stderr,"\nextracted $$$gold.%d -> %.8f ROGUE hp.%d strength.%d/%d level.%d exp.%d dl.%d n.%d amulet.%d\n",P.gold,(double)cashout/COIN,P.hitpoints,P.strength&0xffff,P.strength>>16,P.level,P.experience,P.dungeonlevel,n,P.amulet);

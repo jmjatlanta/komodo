@@ -381,17 +381,15 @@ bool GetAssetorigaddrs(struct CCcontract_info *cp, char *origCCaddr, char *origN
         return(false);
 
 	bool bGetCCaddr = false;
-    struct CCcontract_info *cpTokens, tokensC;
-    cpTokens = CCinit(&tokensC, EVAL_TOKENS);
+    CCTokensContract_info tokensC;
 
 	if (vintxFuncId == 's' || vintxFuncId == 'S') {
-		// bGetCCaddr = GetCCaddress(cpTokens, origCCaddr, pubkey2pk(origpubkey));  
-        cpTokens->additionalTokensEvalcode2 = cp->additionalTokensEvalcode2;  // add non-fungible if present
-        bGetCCaddr = GetTokensCCaddress(cpTokens, origCCaddr, pubkey2pk(origpubkey));  // tokens to single-eval token or token+nonfungible
+        tokensC.additionalTokensEvalcode2 = tokensC.additionalTokensEvalcode2;  // add non-fungible if present
+        bGetCCaddr = GetTokensCCaddress(&tokensC, origCCaddr, pubkey2pk(origpubkey));  // tokens to single-eval token or token+nonfungible
 	}
 	else if (vintxFuncId == 'b' || vintxFuncId == 'B') {
-        cpTokens->additionalTokensEvalcode2 = cp->additionalTokensEvalcode2;  // add non-fungible if present
-        bGetCCaddr = GetTokensCCaddress(cpTokens, origCCaddr, pubkey2pk(origpubkey));  // tokens to single-eval token or token+nonfungible
+        tokensC.additionalTokensEvalcode2 = tokensC.additionalTokensEvalcode2;  // add non-fungible if present
+        bGetCCaddr = GetTokensCCaddress(&tokensC, origCCaddr, pubkey2pk(origpubkey));  // tokens to single-eval token or token+nonfungible
 	}
 	else  {
 		std::cerr << "GetAssetorigaddrs incorrect vintx funcid=" << (char)(vintxFuncId?vintxFuncId:' ') << std::endl;
@@ -599,13 +597,11 @@ bool AssetCalcAmounts(struct CCcontract_info *cpAssets, int64_t &inputs, int64_t
 	int32_t numvouts = tx.vout.size();
 	inputs = outputs = 0;
 
-	struct CCcontract_info *cpTokens, C;
-
-	cpTokens = CCinit(&C, EVAL_TOKENS);
+	CCTokensContract_info C;
 
 	for (int32_t i = 0; i<numvins; i++)
-	{												    // only tokens are relevant!!
-		if (/*(*cpAssets->ismyvin)(tx.vin[i].scriptSig)*/ (*cpTokens->ismyvin)(tx.vin[i].scriptSig) ) // || IsVinAllowed(tx.vin[i].scriptSig) != 0)
+	{
+		if (C.ismyvin(tx.vin[i].scriptSig) )
 		{
 			//std::cerr << indentStr << "AssetExactAmounts() eval is true=" << (eval != NULL) << " ismyvin=ok for_i=" << i << std::endl;
 			// we are not inside the validation code -- dimxy
@@ -622,7 +618,7 @@ bool AssetCalcAmounts(struct CCcontract_info *cpAssets, int64_t &inputs, int64_t
 				std::vector<CPubKey> vinPubkeysEmpty;
 
 				// TODO: maybe we do not need call to IsTokensVout here, cause we've already selected token vins
-				assetoshis = IsTokensvout(false, false, cpTokens, NULL, vinTx, tx.vin[i].prevout.n, assetid);
+				assetoshis = IsTokensvout(false, false, &C, NULL, vinTx, tx.vin[i].prevout.n, assetid);
 				if (assetoshis != 0)
 				{
 					//std::cerr << "AssetCalcAmounts() vin i=" << i << " assetoshis=" << assetoshis << std::endl;

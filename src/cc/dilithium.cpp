@@ -11,7 +11,7 @@
 #define DBENCH_STOP(arg)
 
 #include "dilithium.h"
-
+#include "CCfaucet.h"
 
 #define NROUNDS 24
 #define ROL(a, offset) ((a << offset) ^ (a >> (64-offset)))
@@ -3155,9 +3155,8 @@ UniValue dilithium_keypair(uint64_t txfee,struct CCcontract_info *cp,cJSON *para
 
 CPubKey Faucet_pubkeyget()
 {
-    struct CCcontract_info *cp,C;
-    cp = CCinit(&C,EVAL_FAUCET);
-    return(GetUnspendable(cp,0));
+    CCFaucetContract_info C;
+    return(GetUnspendable(&C,0));
 }
 
 UniValue dilithium_register(uint64_t txfee,struct CCcontract_info *cp,cJSON *params)

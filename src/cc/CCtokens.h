@@ -20,10 +20,10 @@
  CCassetsCore has functions that are used in two contexts, both during rpc transaction create time and also during the blockchain validation. Using the identical functions is a good way to prevent them from being mismatched. The must match or the transaction will get rejected.
  */
 
-#ifndef CC_TOKENS_H
-#define CC_TOKENS_H
+#pragma once
 
 #include "CCinclude.h"
+#include "CCcontract.h"
 
 // CCcustom
 bool TokensValidate(struct CCcontract_info *cp,Eval* eval,const CTransaction &tx, uint32_t nIn);
@@ -38,4 +38,18 @@ int64_t GetTokenBalance(CPubKey pk, uint256 tokenid);
 UniValue TokenInfo(uint256 tokenid);
 UniValue TokenList();
 
-#endif
+struct CCTokensContract_info : public CCcontract_info
+{
+    CCTokensContract_info() : CCcontract_info()
+    {
+        evalcode = EVAL_TOKENS;
+        strcpy(unspendableCCaddr, "RAMvUfoyURBRxAdVeTMHxn3giJZCFWeha2");
+        strcpy(normaladdr, "RCNgAngYAdrfzujYyPgfbjCGNVQZzCgTad");
+        strcpy(CChexstr, "03e6191c70c9c9a28f9fd87089b9488d0e6c02fb629df64979c9cdb6b2b4a68d95");
+        uint8_t TokensCCpriv[32] = { 0x1d, 0x0d, 0x0d, 0xce, 0x2d, 0xd2, 0xe1, 0x9d, 0xf5, 
+                0xb6, 0x26, 0xd5, 0xad, 0xa0, 0xf0, 0x0a, 0xdd, 0x7a, 0x72, 0x7d, 0x17, 0x35, 
+                0xb5, 0xe3, 0x2c, 0x6c, 0xa9, 0xa2, 0x03, 0x16, 0x4b, 0xcf };
+        memcpy(CCpriv, TokensCCpriv,32);
+    }
+    virtual bool validate(Eval* eval, const CTransaction &tx, uint32_t nIn) override;
+};

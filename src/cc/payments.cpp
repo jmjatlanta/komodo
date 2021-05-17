@@ -318,7 +318,7 @@ int32_t payments_gettokenallocations(int32_t top, int32_t bottom, const std::vec
     return(0);
 }
 
-bool PaymentsValidate(struct CCcontract_info *cp,Eval* eval,const CTransaction &tx, uint32_t nIn)
+bool CCPaymentsContract_info::validate(Eval* eval,const CTransaction &tx, uint32_t nIn)
 {
     char temp[128], txidaddr[64]={0}; std::string scriptpubkey; uint256 createtxid, blockhash, tokenid; CTransaction plantx; int8_t funcid=0, fixedAmount=0;
     int32_t i,lockedblocks,minrelease,blocksleft,dust = 0, top,bottom=0,minimum=10000; int64_t change,totalallocations,actualtxfee,amountReleased=0; std::vector<uint256> txidoprets; bool fHasOpret = false,fIsMerge = false; CPubKey txidpk,Paymentspk;
@@ -326,7 +326,7 @@ bool PaymentsValidate(struct CCcontract_info *cp,Eval* eval,const CTransaction &
     mpz_t mpzTotalAllocations,mpzAllocation,mpzCheckamount;
     mpz_init(mpzCheckamount); mpz_init(mpzTotalAllocations);
     // Check change is in vout[0], and also fetch the ccopret to determine what type of tx this is. txidaddr is unknown, recheck this later.
-    if ( (change= IsPaymentsvout(cp,tx,0,txidaddr,ccopret)) != 0 && ccopret.size() > 2 )
+    if ( (change= IsPaymentsvout(this,tx,0,txidaddr,ccopret)) != 0 && ccopret.size() > 2 )
     {
         // get the checktxid and the amount released if doing release tx. 
         if ( DecodePaymentsMergeOpRet(ccopret,createtxid) == 'M' )
@@ -347,14 +347,14 @@ bool PaymentsValidate(struct CCcontract_info *cp,Eval* eval,const CTransaction &
                 return(eval->Invalid("negative values"));
             if ( minimum < 10000 )
                 return(eval->Invalid("minimum must be over 10000"));
-            Paymentspk = GetUnspendable(cp,0);
+            Paymentspk = GetUnspendable(this,0);
             txidpk = CCtxidaddr(txidaddr,createtxid);
-            GetCCaddress1of2(cp,txidaddr,Paymentspk,txidpk);
+            GetCCaddress1of2(this,txidaddr,Paymentspk,txidpk);
             //fprintf(stderr, "lockedblocks.%i minrelease.%i totalallocations.%i txidopret1.%s txidopret2.%s\n",lockedblocks, minrelease, totalallocations, txidoprets[0].ToString().c_str(), txidoprets[1].ToString().c_str() );
             if ( !CheckTxFee(tx, PAYMENTS_TXFEE+1, chainActive.LastTip()->GetHeight(), chainActive.LastTip()->nTime, actualtxfee) )
                 return eval->Invalid("txfee is too high");
             // Check that the change vout is playing the txid address. 
-            if ( IsPaymentsvout(cp,tx,0,txidaddr,ccopret) == 0 )
+            if ( IsPaymentsvout(this,tx,0,txidaddr,ccopret) == 0 )
                 return eval->Invalid("change pays wrong address");
 
             if ( !fIsMerge )
@@ -504,7 +504,7 @@ bool PaymentsValidate(struct CCcontract_info *cp,Eval* eval,const CTransaction &
                     Getscriptaddress(fromaddr,txin.vout[vin.prevout.n].scriptPubKey);
                     if ( fIsMerge && txin.vout[vin.prevout.n].nValue < COIN )
                         dust++;
-                    if ( IsPaymentsvout(cp,txin,vin.prevout.n,cp->unspendableCCaddr,vinccopret) != 0 )
+                    if ( IsPaymentsvout(this,txin,vin.prevout.n,unspendableCCaddr,vinccopret) != 0 )
                     {
                         // if from global payments address get ccopret to detemine pays correct plan.  
                         uint256 checktxid; 
@@ -514,7 +514,7 @@ bool PaymentsValidate(struct CCcontract_info *cp,Eval* eval,const CTransaction &
                             return(eval->Invalid("vin is not paymentsCC type"));
                         }
                     }
-                    else if ( IsPaymentsvout(cp,txin,vin.prevout.n,txidaddr,vinccopret) != 0 )
+                    else if ( IsPaymentsvout(this,txin,vin.prevout.n,txidaddr,vinccopret) != 0 )
                     {
                         // if in txid address apply merge offset if applicable. 
                         if ( fIsMerge && vinccopret.size() > 2 && DecodePaymentsMergeOpRet(vinccopret,checktxid) == 'M' )
