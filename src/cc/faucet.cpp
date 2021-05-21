@@ -194,7 +194,7 @@ UniValue FaucetGet(const CPubKey& pk, uint64_t txfee)
 
     if ( txfee == 0 )
         txfee = 10000;
-    faucetpk = GetUnspendable(&C,0);
+    faucetpk = C.GetUnspendable();
     CPubKey mypk = pk.IsValid()?pk:pubkey2pk(Mypubkey());
     if ( (inputs= AddFaucetInputs(&C,mtx,faucetpk,nValue+txfee,60)) > 0 )
     {
@@ -236,7 +236,7 @@ UniValue FaucetFund(const CPubKey& pk, uint64_t txfee,int64_t funds)
     if ( txfee == 0 )
         txfee = 10000;
     CPubKey mypk = pk.IsValid()?pk:pubkey2pk(Mypubkey());
-    faucetpk = GetUnspendable(&C,0);
+    faucetpk = C.GetUnspendable();
     if ( AddNormalinputs(mtx,mypk,funds+txfee,64,pk.IsValid()) > 0 )
     {
         mtx.vout.push_back(MakeCC1vout(EVAL_FAUCET,funds,faucetpk));
@@ -249,7 +249,7 @@ UniValue FaucetInfo()
 {
     CCFaucetContract_info C; 
     CMutableTransaction mtx = CreateNewContextualCMutableTransaction(Params().GetConsensus(), komodo_nextheight());
-    CPubKey faucetpk = GetUnspendable(&C,nullptr);
+    CPubKey faucetpk = C.GetUnspendable();
     int64_t funding = AddFaucetInputs(&C,mtx,faucetpk,0,0);
     UniValue result(UniValue::VOBJ); 
     result.push_back(Pair("result","success"));

@@ -5636,7 +5636,7 @@ int32_t ensure_CCrequirements(uint8_t evalcode)
 UniValue CCaddress(struct CCcontract_info *cp,char *name,std::vector<unsigned char> &pubkey)
 {
     UniValue result(UniValue::VOBJ); char destaddr[64],str[64]; CPubKey mypk,pk;
-    pk = GetUnspendable(cp,0);
+    pk = cp->GetUnspendable();
     GetCCaddress(cp,destaddr,pk);
     if ( strcmp(destaddr,cp->unspendableCCaddr) != 0 )
     {
@@ -6060,7 +6060,7 @@ UniValue pricesaddress(const UniValue& params, bool fHelp, const CPubKey& mypk)
     result = CCaddress(&C,(char *)"Prices",pubkey);
     if (mypk.IsValid()) pk=mypk;
     else pk = pubkey2pk(Mypubkey());
-    pricespk = GetUnspendable(&C,0);
+    pricespk = C.GetUnspendable();
 
     CCPricesContract_info C2;
     GetCCaddress(&C2,myaddr,pk);
@@ -7269,7 +7269,7 @@ UniValue faucetfund(const UniValue& params, bool fHelp, const CPubKey& mypk)
         char coinaddr[64]; 
         CTxOut v;
         CCFaucetContract_info C;
-        v = MakeCC1vout(EVAL_FAUCET,funds,GetUnspendable(&C,0));
+        v = MakeCC1vout(EVAL_FAUCET,funds,C.GetUnspendable());
         Getscriptaddress(coinaddr,CScript() << ParseHex(HexStr(pubkey2pk(Mypubkey()))) << OP_CHECKSIG);
         return(NSPV_spend(coinaddr,(char *)HexStr(v.scriptPubKey.begin()+1,v.scriptPubKey.end()-1).c_str(),funds));
     }

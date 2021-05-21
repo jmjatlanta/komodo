@@ -636,7 +636,7 @@ template <typename Helper> UniValue _HeirFund(int64_t txfee, int64_t amount, std
         // add a marker for finding all plans in HeirList()
         // TODO: change marker either to cc or normal txidaddr unspendable
 		CCHeirContract_info heirC;  
-        CPubKey heirUnspendablePubKey = GetUnspendable(&heirC, 0);
+        CPubKey heirUnspendablePubKey = heirC.GetUnspendable();
         // mtx.vout.push_back(CTxOut(txfee, CScript() << ParseHex(HexStr(heirUnspendablePubKey)) << OP_CHECKSIG));  <-- bad marker cause it was spendable by anyone
 		mtx.vout.push_back(MakeCC1vout(EVAL_HEIR, markerfee, heirUnspendablePubKey));		// this marker spending is disabled in the validation code
             
@@ -1219,7 +1219,7 @@ void _HeirList(struct CCcontract_info *cp, UniValue &result)
     std::vector<std::pair<CAddressUnspentKey, CAddressUnspentValue>> unspentOutputs;
     char markeraddr[64];
 
-	GetCCaddress(cp, markeraddr, GetUnspendable(cp, NULL));
+	GetCCaddress(cp, markeraddr, cp->GetUnspendable());
     SetCCunspents(unspentOutputs, markeraddr,true);
     
     //std::cerr << "HeirList() finding heir marker from unspendable addr=" << markeraddr << " unspentOutputs.size()=" << unspentOutputs.size() << '\n';

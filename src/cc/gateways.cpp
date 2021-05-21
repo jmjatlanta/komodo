@@ -163,7 +163,7 @@ CScript EncodeGatewaysBindOpRet(uint8_t funcid,uint256 tokenid,std::string coin,
     std::vector<CPubKey> pubkeys;
     vscript_t vopret;
     
-    gatewayspk = GetUnspendable(&C,0);
+    gatewayspk = C.GetUnspendable();
     pubkeys.push_back(gatewayspk);
     vopret = E_MARSHAL(ss << evalcode << funcid << coin << totalsupply << oracletxid << M << N << gatewaypubkeys << taddr << prefix << prefix2 << wiftype);
     return(EncodeTokenOpRet(tokenid,pubkeys, std::make_pair(OPRETID_GATEWAYSDATA, vopret)));
@@ -259,7 +259,7 @@ CScript EncodeGatewaysWithdrawOpRet(uint8_t funcid,uint256 tokenid,uint256 bindt
     std::vector<CPubKey> pubkeys;
     vscript_t vopret;
 
-    gatewayspk = GetUnspendable(&C,0);
+    gatewayspk = C.GetUnspendable();
     pubkeys.push_back(gatewayspk);
     vopret = /*opret << OP_RETURN << */ E_MARSHAL(ss << evalcode << funcid << bindtxid << refcoin << withdrawpub << amount);        
     return(EncodeTokenOpRet(tokenid,pubkeys, std::make_pair(OPRETID_GATEWAYSDATA, vopret)));
@@ -539,7 +539,7 @@ bool CCGatewaysContract_info::validate(Eval *eval,const CTransaction &tx, uint32
         // }
         // else
         // {        
-            gatewayspk = GetUnspendable(this,0);      
+            gatewayspk = GetUnspendable();      
             GetTokensCCaddress(this, gatewaystokensaddr, gatewayspk);      
             if ( (funcid = DecodeGatewaysOpRet(tx.vout[numvouts-1].scriptPubKey)) != 0)
             {
@@ -903,7 +903,7 @@ UniValue GatewaysBind(const CPubKey& pk, uint64_t txfee,std::string coin,uint256
         txfee = 10000;
     mypk = pk.IsValid()?pk:pubkey2pk(Mypubkey());
     _GetCCaddress(myTokenCCaddr,EVAL_TOKENS,mypk);
-    gatewayspk = GetUnspendable(&gatewaysC,0);
+    gatewayspk = gatewaysC.GetUnspendable();
     if ( _GetCCaddress(destaddr,EVAL_GATEWAYS,gatewayspk) == 0 )
         CCERR_RESULT("gatewayscc",CCLOG_INFO, stream << "Gateway bind." << coin << " (" << tokenid.GetHex() << ") cant create globaladdr");
     if ( (fullsupply=CCfullsupply(tokenid)) != totalsupply )
@@ -993,7 +993,7 @@ UniValue GatewaysClaim(const CPubKey& pk, uint64_t txfee,uint256 bindtxid,std::s
         txfee = 10000;
     mypk = pk.IsValid()?pk:pubkey2pk(Mypubkey());
     CCGatewaysContract_info C;
-    gatewayspk = GetUnspendable(&C,0);
+    gatewayspk = C.GetUnspendable();
     if ( myGetTransaction(bindtxid,tx,hashBlock) == 0 || (numvouts= tx.vout.size()) <= 0 )
         CCERR_RESULT("gatewayscc",CCLOG_INFO, stream << "cant find bindtxid " << bindtxid.GetHex());
     if ( DecodeGatewaysBindOpRet(depositaddr,tx.vout[numvouts-1].scriptPubKey,tokenid,coin,totalsupply,oracletxid,M,N,pubkeys,taddr,prefix,prefix2,wiftype) != 'B' || refcoin != coin )
@@ -1034,7 +1034,7 @@ UniValue GatewaysWithdraw(const CPubKey& pk, uint64_t txfee,uint256 bindtxid,std
     if ( txfee == 0 )
         txfee = 10000;
     mypk = pk.IsValid()?pk:pubkey2pk(Mypubkey());
-    gatewayspk = GetUnspendable(&C, 0);
+    gatewayspk = C.GetUnspendable();
     if ( myGetTransaction(bindtxid,tx,hashBlock) == 0 || (numvouts= tx.vout.size()) <= 0 )
         CCERR_RESULT("gatewayscc",CCLOG_INFO, stream << "cant find bindtxid " << bindtxid.GetHex());
     if ( DecodeGatewaysBindOpRet(depositaddr,tx.vout[numvouts-1].scriptPubKey,tokenid,coin,totalsupply,oracletxid,M,N,pubkeys,taddr,prefix,prefix2,wiftype) != 'B' || refcoin != coin )
@@ -1090,7 +1090,7 @@ UniValue GatewaysPartialSign(const CPubKey& pk, uint64_t txfee,uint256 lasttxid,
     if ( txfee == 0 )
         txfee = 10000;
     mypk = pk.IsValid()?pk:pubkey2pk(Mypubkey());
-    gatewayspk = GetUnspendable(&C,0);
+    gatewayspk = C.GetUnspendable();
     if (myGetTransaction(lasttxid,tx,hashBlock)==0 || (numvouts= tx.vout.size())<=0
         || (funcid=DecodeGatewaysOpRet(tx.vout[numvouts-1].scriptPubKey))==0 || (funcid!='W' && funcid!='P'))
         CCERR_RESULT("gatewayscc",CCLOG_INFO, stream << "can't find last tx " << lasttxid.GetHex());
@@ -1143,7 +1143,7 @@ UniValue GatewaysCompleteSigning(const CPubKey& pk, uint64_t txfee,uint256 lastt
     uint8_t K=0,M,N,taddr,prefix,prefix2,wiftype; std::vector<CPubKey> pubkeys;
 
     mypk = pk.IsValid()?pk:pubkey2pk(Mypubkey());
-    gatewayspk = GetUnspendable(&C,0);
+    gatewayspk = C.GetUnspendable();
     if ( txfee == 0 )
         txfee = 10000;
     if (myGetTransaction(lasttxid,tx,hashBlock)==0 || (numvouts= tx.vout.size())<=0
@@ -1235,7 +1235,7 @@ UniValue GatewaysPendingDeposits(const CPubKey& pk, uint256 bindtxid,std::string
     std::vector<std::pair<CAddressUnspentKey, CAddressUnspentValue> > unspentOutputs;
 
     mypk = pk.IsValid()?pk:pubkey2pk(Mypubkey());
-    gatewayspk = GetUnspendable(&C,0);
+    gatewayspk = C.GetUnspendable();
     _GetCCaddress(coinaddr,EVAL_GATEWAYS,mypk);
     if ( myGetTransaction(bindtxid,tx,hashBlock) == 0 || (numvouts= tx.vout.size()) <= 0 )
     {  
@@ -1289,7 +1289,7 @@ UniValue GatewaysPendingWithdraws(const CPubKey& pk, uint256 bindtxid,std::strin
     std::vector<std::pair<CAddressUnspentKey, CAddressUnspentValue> > unspentOutputs;
 
     mypk = pk.IsValid()?pk:pubkey2pk(Mypubkey());
-    gatewayspk = GetUnspendable(&C,0);
+    gatewayspk = C.GetUnspendable();
     _GetCCaddress(coinaddr,EVAL_GATEWAYS,gatewayspk);
     GetTokensCCaddress(&C,tokensaddr,gatewayspk);
     if ( myGetTransaction(bindtxid,tx,hashBlock) == 0 || (numvouts= tx.vout.size()) <= 0 )
@@ -1378,7 +1378,7 @@ UniValue GatewaysProcessedWithdraws(const CPubKey& pk, uint256 bindtxid,std::str
     std::vector<std::pair<CAddressUnspentKey, CAddressUnspentValue> > unspentOutputs;
 
     mypk = pk.IsValid()?pk:pubkey2pk(Mypubkey());
-    gatewayspk = GetUnspendable(&C,0);
+    gatewayspk = C.GetUnspendable();
     _GetCCaddress(coinaddr,EVAL_GATEWAYS,gatewayspk);
     if ( myGetTransaction(bindtxid,tx,hashBlock) == 0 || (numvouts= tx.vout.size()) <= 0 )
     {
@@ -1511,7 +1511,7 @@ UniValue GatewaysInfo(uint256 bindtxid)
     int32_t i; int64_t numvouts,totalsupply,remaining; std::vector<CPubKey> msigpubkeys;
   
     CCGatewaysContract_info C;
-    Gatewayspk = GetUnspendable(&C,0);
+    Gatewayspk = C.GetUnspendable();
     GetTokensCCaddress(&C,gatewaystokens,Gatewayspk);
     if ( myGetTransaction(bindtxid,tx,hashBlock) == 0 || (numvouts= tx.vout.size()) <= 0 )
     {   

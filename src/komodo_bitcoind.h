@@ -2748,7 +2748,7 @@ int32_t komodo_staked(CMutableTransaction &txNew,uint32_t nBits,uint32_t *blockt
             uint256 txid; int32_t vout,ht,unlockht; CAmount nValue; char coinaddr[64]; CPubKey mypk,Marmarapk,pk;
             std::vector<std::pair<CAddressUnspentKey, CAddressUnspentValue> > unspentOutputs;
             mypk = pubkey2pk(Mypubkey());
-            Marmarapk = GetUnspendable(&C,0);
+            Marmarapk = C.GetUnspendable();
             GetCCaddress1of2(&C,coinaddr,Marmarapk,mypk);
             SetCCunspents(unspentOutputs,coinaddr,true);
             for (std::vector<std::pair<CAddressUnspentKey, CAddressUnspentValue> >::const_iterator it=unspentOutputs.begin(); it!=unspentOutputs.end(); it++)

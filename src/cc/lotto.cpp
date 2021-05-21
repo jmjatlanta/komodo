@@ -257,7 +257,7 @@ UniValue LottoInfo(uint256 lottoid)
     result.push_back(Pair("ticketsize",ticketsize));
     result.push_back(Pair("odds",odds));
     CCLottoContract_info C;
-    lottopk = GetUnspendable(&C,0);
+    lottopk = C.GetUnspendable();
     lockedfunds = LottoPlanFunds(sbits,&C,lottopk,lottoid);
     sprintf(numstr,"%.8f",(double)lockedfunds/COIN);
     result.push_back(Pair("jackpot",numstr));
@@ -292,7 +292,7 @@ std::string LottoCreate(uint64_t txfee,char *planstr,int64_t funding,int32_t tic
     if ( txfee == 0 )
         txfee = 10000;
     CCLottoContract_info C;
-    lottopk = GetUnspendable(&C,0);
+    lottopk = C.GetUnspendable();
     mypk = pubkey2pk(Mypubkey());
     sbits = stringbits(planstr);
     if ( AddNormalinputs(mtx,mypk,funding+txfee,60) > 0 )
@@ -312,7 +312,7 @@ std::string LottoTicket(uint64_t txfee,uint256 lottoid,int64_t numtickets)
     CCLottoContract_info C;
     if ( txfee == 0 )
         txfee = 10000;
-    lottopk = GetUnspendable(&C,0);
+    lottopk = C.GetUnspendable();
     mypk = pubkey2pk(Mypubkey());
     if ( (inputs= AddLottoInputs(&C,mtx,lottopk,nValue+txfee,60)) > 0 )
     {
@@ -335,7 +335,7 @@ std::string LottoWinner(uint64_t txfee)
         txfee = 10000;
     mypk = pubkey2pk(Mypubkey());
     CCLottoContract_info C;
-    lottopk = GetUnspendable(&C,0);
+    lottopk = C.GetUnspendable();
     if ( AddNormalinputs(mtx,mypk,txfee,64) > 0 )
     {
         mtx.vout.push_back(MakeCC1vout(EVAL_LOTTO,winnings,lottopk));

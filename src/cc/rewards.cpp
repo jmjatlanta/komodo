@@ -410,7 +410,7 @@ UniValue RewardsInfo(uint256 rewardsid)
     sprintf(numstr,"%.8f",(double)mindeposit/COIN);
     result.push_back(Pair("mindeposit",numstr));
     CCRewardsContract_info C;
-    rewardspk = GetUnspendable(&C,0);
+    rewardspk = C.GetUnspendable();
     funding = RewardsPlanFunds(lockedfunds,sbits,&C,rewardspk,rewardsid);
     sprintf(numstr,"%.8f",(double)funding/COIN);
     result.push_back(Pair("funding",numstr));
@@ -459,7 +459,7 @@ std::string RewardsCreateFunding(uint64_t txfee,char *planstr,int64_t funds,int6
         txfee = 10000;
     mypk = pubkey2pk(Mypubkey());
     CCRewardsContract_info C;
-    rewardspk = GetUnspendable(&C,0);
+    rewardspk = C.GetUnspendable();
     sbits = stringbits(planstr);
     if ( RewardsPlanExists(&C,sbits,rewardspk,a,b,c,d) != 0 )
     {
@@ -490,7 +490,7 @@ std::string RewardsAddfunding(uint64_t txfee,char *planstr,uint256 fundingtxid,i
         txfee = 10000;
     mypk = pubkey2pk(Mypubkey());
     CCRewardsContract_info C;
-    rewardspk = GetUnspendable(&C,0);
+    rewardspk = C.GetUnspendable();
     sbits = stringbits(planstr);
     if ( RewardsPlanExists(&C,sbits,rewardspk,a,b,c,d) == 0 )
     {
@@ -527,7 +527,7 @@ std::string RewardsLock(uint64_t txfee,char *planstr,uint256 fundingtxid,int64_t
         txfee = 10000;
     mypk = pubkey2pk(Mypubkey());
     CCRewardsContract_info C;
-    rewardspk = GetUnspendable(&C,0);
+    rewardspk = C.GetUnspendable();
     sbits = stringbits(planstr);
     if ( RewardsPlanExists(&C,sbits,rewardspk,APR,minseconds,maxseconds,mindeposit) == 0 )
     {
@@ -566,7 +566,7 @@ std::string RewardsUnlock(uint64_t txfee,char *planstr,uint256 fundingtxid,uint2
     if ( txfee == 0 )
         txfee = 10000;
     CCRewardsContract_info C;
-    rewardspk = GetUnspendable(&C,0);
+    rewardspk = C.GetUnspendable();
     mypk = pubkey2pk(Mypubkey());
     sbits = stringbits(planstr);
     if ( locktxid == fundingtxid )

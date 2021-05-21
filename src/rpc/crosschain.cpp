@@ -382,7 +382,7 @@ UniValue migrate_createburntransaction(const UniValue& params, bool fHelp, const
             throw runtime_error("No token inputs found (please try to consolidate tokens)\n"); 
 
         // make payouts  (which will be in the import tx with token):
-        mtx.vout.push_back(MakeCC1vout(EVAL_TOKENS, txfee, GetUnspendable(&tokensC, NULL)));  // new marker to token cc addr, burnable and validated, vout position now changed to 0 (from 1)
+        mtx.vout.push_back(MakeCC1vout(EVAL_TOKENS, txfee, tokensC.GetUnspendable()));  // new marker to token cc addr, burnable and validated, vout position now changed to 0 (from 1)
         mtx.vout.push_back(MakeTokensCC1vout(destEvalCode, burnAmount, destPubKey));
 
         std::vector<std::pair<uint8_t, vscript_t>> voprets;

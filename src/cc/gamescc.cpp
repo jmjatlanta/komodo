@@ -1128,7 +1128,7 @@ UniValue games_newgame(uint64_t txfee,struct CCcontract_info *cp,cJSON *params)
     if ( maxplayers < 1 || maxplayers > GAMES_MAXPLAYERS )
         return(cclib_error(result,"illegal maxplayers"));
     mypk = pubkey2pk(Mypubkey());
-    gamespk = GetUnspendable(cp,0);
+    gamespk = cp->GetUnspendable();
     games_univalue(result,"newgame",maxplayers,buyin);
     required = (3*txfee + maxplayers*(GAMES_REGISTRATIONSIZE+txfee));
     if ( (inputsum= AddCClibInputs(cp,mtx,gamespk,required,16,cp->unspendableCCaddr,1)) >= required )
@@ -1151,7 +1151,7 @@ UniValue games_pending(uint64_t txfee,struct CCcontract_info *cp,cJSON *params)
 {
     UniValue result(UniValue::VOBJ),a(UniValue::VARR); int64_t buyin; uint256 txid,hashBlock; CTransaction tx; int32_t openslots,maxplayers,numplayers,gameheight,nextheight,vout,numvouts; CPubKey gamespk; char coinaddr[64];
     std::vector<std::pair<CAddressUnspentKey, CAddressUnspentValue> > unspentOutputs;
-    gamespk = GetUnspendable(cp,0);
+    gamespk = cp->GetUnspendable();
     GetCCaddress(cp,coinaddr,gamespk);
     SetCCunspents(unspentOutputs,coinaddr,true);
     nextheight = komodo_nextheight();
@@ -1192,7 +1192,7 @@ UniValue games_gameinfo(uint64_t txfee,struct CCcontract_info *cp,cJSON *params)
                 result.push_back(Pair("result","success"));
                 result.push_back(Pair("gameheight",(int64_t)gameheight));
                 mypk = pubkey2pk(Mypubkey());
-                gamespk = GetUnspendable(cp,0);
+                gamespk = cp->GetUnspendable();
                 GetCCaddress1of2(cp,myaddr,gamespk,mypk);
                 seed = games_gamefields(result,maxplayers,buyin,txid,myaddr);
                 result.push_back(Pair("seed",(int64_t)seed));
@@ -1240,7 +1240,7 @@ UniValue games_register(uint64_t txfee,struct CCcontract_info *cp,cJSON *params)
         txfee = 10000;
     mypk = pubkey2pk(Mypubkey());
     burnpk = pubkey2pk(ParseHex(CC_BURNPUBKEY));
-    gamespk = GetUnspendable(cp,0);
+    gamespk = cp->GetUnspendable();
     games_univalue(result,"register",-1,-1);
     playertxid = tokenid = zeroid;
     if ( params != 0 && (n= cJSON_GetArraySize(params)) > 0 )
@@ -1276,7 +1276,7 @@ UniValue games_register(uint64_t txfee,struct CCcontract_info *cp,cJSON *params)
                     char unspendableTokenAddr[64]; 
                     uint8_t tokenpriv[32];
                     CCTokensContract_info tokensC; 
-                    CPubKey unspPk = GetUnspendable(&tokensC, tokenpriv);
+                    CPubKey unspPk = tokensC.GetUnspendable(tokenpriv);
                     GetCCaddress(&tokensC, unspendableTokenAddr, unspPk);
                     CCaddr2set(cp, EVAL_TOKENS, unspPk, tokenpriv, unspendableTokenAddr);
                 }
@@ -1334,7 +1334,7 @@ UniValue games_keystrokes(uint64_t txfee,struct CCcontract_info *cp,cJSON *param
         result.push_back(Pair("keystrokes",keystrokestr));
         keystrokes = ParseHex(keystrokestr);
         mypk = pubkey2pk(Mypubkey());
-        gamespk = GetUnspendable(cp,0);
+        gamespk = cp->GetUnspendable();
         GetCCaddress1of2(cp,destaddr,gamespk,mypk);
         if ( games_isvalidgame(cp,gameheight,tx,buyin,maxplayers,gametxid,1) == 0 )
         {
@@ -1361,7 +1361,7 @@ UniValue games_keystrokes(uint64_t txfee,struct CCcontract_info *cp,cJSON *param
 gamesevent *games_extractgame(int32_t makefiles,char *str,int32_t *numkeysp,std::vector<uint8_t> &newdata,uint64_t &seed,uint256 &playertxid,struct CCcontract_info *cp,uint256 gametxid,char *gamesaddr)
 {
     CPubKey gamespk; int32_t i,num,retval,maxplayers,gameheight,batonht,batonvout,numplayers,regslot,numkeys,err; std::string symbol,pname; CTransaction gametx; int64_t buyin,batonvalue; char fname[64]; gamesevent *keystrokes = 0; std::vector<uint8_t> playerdata; uint256 batontxid; FILE *fp; uint8_t newplayer[10000]; struct games_player P,endP;
-    gamespk = GetUnspendable(cp,0);
+    gamespk = cp->GetUnspendable();
     *numkeysp = 0;
     seed = 0;
     num = numkeys = 0;
@@ -1437,7 +1437,7 @@ UniValue games_extract(uint64_t txfee,struct CCcontract_info *cp,cJSON *params)
 {
     UniValue result(UniValue::VOBJ); CPubKey pk,gamespk; int32_t i,n,numkeys,flag = 0; uint64_t seed; char str[512],gamesaddr[64],*pubstr,*hexstr; gamesevent *keystrokes = 0; std::vector<uint8_t> newdata; uint256 gametxid,playertxid; FILE *fp; uint8_t pub33[33];
     pk = pubkey2pk(Mypubkey());
-    gamespk = GetUnspendable(cp,0);
+    gamespk = cp->GetUnspendable();
     result.push_back(Pair("name","games"));
     result.push_back(Pair("method","extract"));
     gamesaddr[0] = 0;
@@ -1524,7 +1524,7 @@ UniValue games_finish(uint64_t txfee,struct CCcontract_info *cp,cJSON *params,ch
     if ( txfee == 0 )
         txfee = 10000;
     mypk = pubkey2pk(Mypubkey());
-    gamespk = GetUnspendable(cp,0);
+    gamespk = cp->GetUnspendable();
     GetCCaddress1of2(cp,mygamesaddr,gamespk,mypk);
     result.push_back(Pair("name","games"));
     result.push_back(Pair("method",method));
@@ -1577,7 +1577,7 @@ UniValue games_finish(uint64_t txfee,struct CCcontract_info *cp,cJSON *params,ch
                         else
                         {
                             CCTokensContract_info tokensC;
-                            mtx.vout.push_back(MakeCC1vout(EVAL_TOKENS, txfee, GetUnspendable(&tokensC,NULL)));            // marker to token cc addr, burnable and validated
+                            mtx.vout.push_back(MakeCC1vout(EVAL_TOKENS, txfee, tokensC.GetUnspendable()));            // marker to token cc addr, burnable and validated
                             mtx.vout.push_back(MakeTokensCC1vout(cp->evalcode,1,mypk));
                             cashout = games_cashout(&P);
                             fprintf(stderr,"\ncashout %.8f extracted %s\n",(double)cashout/COIN,str);
@@ -1647,7 +1647,7 @@ UniValue games_players(uint64_t txfee,struct CCcontract_info *cp,cJSON *params)
 {
     UniValue result(UniValue::VOBJ),a(UniValue::VARR); int64_t buyin; uint256 tokenid,gametxid,txid,hashBlock; CTransaction playertx,tx; int32_t maxplayers,vout,numvouts; std::vector<uint8_t> playerdata; CPubKey gamespk,mypk,pk; std::string symbol,pname; char coinaddr[64];
     std::vector<std::pair<CAddressUnspentKey, CAddressUnspentValue> > unspentOutputs;
-    gamespk = GetUnspendable(cp,0);
+    gamespk = cp->GetUnspendable();
     mypk = pubkey2pk(Mypubkey());
     GetTokensCCaddress(cp,coinaddr,mypk);
     SetCCunspents(unspentOutputs,coinaddr,true);
@@ -1674,7 +1674,7 @@ UniValue games_games(uint64_t txfee,struct CCcontract_info *cp,cJSON *params)
 {
     UniValue result(UniValue::VOBJ),a(UniValue::VARR),b(UniValue::VARR); uint256 txid,hashBlock,gametxid,tokenid,playertxid; int32_t vout,maxplayers,gameheight,numvouts; CPubKey gamespk,mypk; char coinaddr[64]; CTransaction tx,gametx; int64_t buyin;
     std::vector<uint256> txids;
-    gamespk = GetUnspendable(cp,0);
+    gamespk = cp->GetUnspendable();
     mypk = pubkey2pk(Mypubkey());
     GetCCaddress1of2(cp,coinaddr,gamespk,mypk);
     SetCCtxids(txids,coinaddr,true,cp->evalcode,zeroid,'R');
@@ -1731,7 +1731,7 @@ UniValue games_fund(uint64_t txfee,struct CCcontract_info *cp,cJSON *params)
     if ( params != 0 && cJSON_GetArraySize(params) == 1 )
     {
         amount = jdouble(jitem(params,0),0) * COIN + 0.0000000049;
-        gamespk = GetUnspendable(cp,0);
+        gamespk = cp->GetUnspendable();
         mypk = pubkey2pk(Mypubkey());
         if ( amount > GAMES_TXFEE )
         {
@@ -1766,7 +1766,7 @@ int32_t games_playerdata_validate(int64_t *cashoutp,uint256 &playertxid,struct C
     static uint32_t good,bad; static uint256 prevgame;
     char str[512],gamesaddr[64],str2[67],fname[64]; gamesevent *keystrokes; int32_t i,numkeys; std::vector<uint8_t> newdata; uint64_t seed; CPubKey gamespk; struct games_player P;
     *cashoutp = 0;
-    gamespk = GetUnspendable(cp,0);
+    gamespk = cp->GetUnspendable();
     GetCCaddress1of2(cp,gamesaddr,gamespk,pk);
     if ( (keystrokes= games_extractgame(0,str,&numkeys,newdata,seed,playertxid,cp,gametxid,gamesaddr)) != 0 )
     {

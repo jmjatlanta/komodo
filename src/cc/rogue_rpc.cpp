@@ -803,7 +803,7 @@ UniValue rogue_newgame(uint64_t txfee,struct CCcontract_info *cp,cJSON *params)
     if ( maxplayers < 1 || maxplayers > ROGUE_MAXPLAYERS )
         return(cclib_error(result,"illegal maxplayers"));
     mypk = pubkey2pk(Mypubkey());
-    roguepk = GetUnspendable(cp,0);
+    roguepk = cp->GetUnspendable();
     rogue_univalue(result,"newgame",maxplayers,buyin);
     required = (3*txfee + maxplayers*(ROGUE_REGISTRATIONSIZE+txfee));
     if ( (inputsum= AddCClibInputs(cp,mtx,roguepk,required,16,cp->unspendableCCaddr,1)) >= required )
@@ -859,7 +859,7 @@ UniValue rogue_register(uint64_t txfee,struct CCcontract_info *cp,cJSON *params)
         txfee = 10000;
     mypk = pubkey2pk(Mypubkey());
     burnpk = pubkey2pk(ParseHex(CC_BURNPUBKEY));
-    roguepk = GetUnspendable(cp,0);
+    roguepk = cp->GetUnspendable();
     rogue_univalue(result,"register",-1,-1);
     playertxid = tokenid = zeroid;
     if ( params != 0 && (n= cJSON_GetArraySize(params)) > 0 )
@@ -894,7 +894,7 @@ UniValue rogue_register(uint64_t txfee,struct CCcontract_info *cp,cJSON *params)
                     mtx.vin.push_back(CTxIn(tokenid,0)); // spending cc marker as token is burned
                     char unspendableTokenAddr[64]; uint8_t tokenpriv[32]; 
                     CCTokensContract_info tokensC;
-                    CPubKey unspPk = GetUnspendable(&tokensC, tokenpriv);
+                    CPubKey unspPk = tokensC.GetUnspendable(tokenpriv);
                     GetCCaddress(&tokensC, unspendableTokenAddr, unspPk);
                     CCaddr2set(cp, EVAL_TOKENS, unspPk, tokenpriv, unspendableTokenAddr);
                 }
@@ -952,7 +952,7 @@ UniValue rogue_keystrokes(uint64_t txfee,struct CCcontract_info *cp,cJSON *param
         result.push_back(Pair("keystrokes",keystrokestr));
         keystrokes = ParseHex(keystrokestr);
         mypk = pubkey2pk(Mypubkey());
-        roguepk = GetUnspendable(cp,0);
+        roguepk = cp->GetUnspendable();
         GetCCaddress1of2(cp,destaddr,roguepk,mypk);
         if ( rogue_isvalidgame(cp,gameheight,tx,buyin,maxplayers,gametxid,1) == 0 )
         {
@@ -979,7 +979,7 @@ UniValue rogue_keystrokes(uint64_t txfee,struct CCcontract_info *cp,cJSON *param
 char *rogue_extractgame(int32_t makefiles,char *str,int32_t *numkeysp,std::vector<uint8_t> &newdata,uint64_t &seed,uint256 &playertxid,struct CCcontract_info *cp,uint256 gametxid,char *rogueaddr)
 {
     CPubKey roguepk; int32_t i,num,retval,maxplayers,gameheight,batonht,batonvout,numplayers,regslot,numkeys,err; std::string symbol,pname; CTransaction gametx; int64_t buyin,batonvalue; char fname[64],*keystrokes = 0; std::vector<uint8_t> playerdata; uint256 batontxid; FILE *fp; uint8_t newplayer[10000]; struct rogue_player P,endP;
-    roguepk = GetUnspendable(cp,0);
+    roguepk = cp->GetUnspendable();
     *numkeysp = 0;
     seed = 0;
     num = numkeys = 0;
@@ -1065,7 +1065,7 @@ UniValue rogue_extract(uint64_t txfee,struct CCcontract_info *cp,cJSON *params)
 {
     UniValue result(UniValue::VOBJ); CPubKey pk,roguepk; int32_t i,n,numkeys,flag = 0; uint64_t seed; char str[512],rogueaddr[64],*pubstr,*hexstr,*keystrokes = 0; std::vector<uint8_t> newdata; uint256 gametxid,playertxid; FILE *fp; uint8_t pub33[33];
     pk = pubkey2pk(Mypubkey());
-    roguepk = GetUnspendable(cp,0);
+    roguepk = cp->GetUnspendable();
     result.push_back(Pair("name","rogue"));
     result.push_back(Pair("method","extract"));
     rogueaddr[0] = 0;
@@ -1137,7 +1137,7 @@ int32_t rogue_playerdata_validate(int64_t *cashoutp,uint256 &playertxid,struct C
     static uint32_t good,bad; static uint256 prevgame;
     char str[512],*keystrokes,rogueaddr[64],str2[67],fname[64]; int32_t i,dungeonlevel,numkeys; std::vector<uint8_t> newdata; uint64_t seed,mult = 10; CPubKey roguepk; struct rogue_player P;
     *cashoutp = 0;
-    roguepk = GetUnspendable(cp,0);
+    roguepk = cp->GetUnspendable();
     GetCCaddress1of2(cp,rogueaddr,roguepk,pk);
     if ( (keystrokes= rogue_extractgame(0,str,&numkeys,newdata,seed,playertxid,cp,gametxid,rogueaddr)) != 0 )
     {
@@ -1231,7 +1231,7 @@ UniValue rogue_finishgame(uint64_t txfee,struct CCcontract_info *cp,cJSON *param
     if ( txfee == 0 )
         txfee = 10000;
     mypk = pubkey2pk(Mypubkey());
-    roguepk = GetUnspendable(cp,0);
+    roguepk = cp->GetUnspendable();
     GetCCaddress1of2(cp,myrogueaddr,roguepk,mypk);
     result.push_back(Pair("name","rogue"));
     result.push_back(Pair("method",method));
@@ -1286,7 +1286,7 @@ UniValue rogue_finishgame(uint64_t txfee,struct CCcontract_info *cp,cJSON *param
                         else
                         {
                             CCTokensContract_info tokensC;
-                            mtx.vout.push_back(MakeCC1vout(EVAL_TOKENS, txfee, GetUnspendable(&tokensC,NULL)));            // marker to token cc addr, burnable and validated
+                            mtx.vout.push_back(MakeCC1vout(EVAL_TOKENS, txfee, tokensC.GetUnspendable()));            // marker to token cc addr, burnable and validated
                             mtx.vout.push_back(MakeTokensCC1vout(cp->evalcode,1,mypk));
                             cashout = rogue_cashout(&P);
                             fprintf(stderr,"\nextracted $$$gold.%d -> %.8f ROGUE hp.%d strength.%d/%d level.%d exp.%d dl.%d n.%d amulet.%d\n",P.gold,(double)cashout/COIN,P.hitpoints,P.strength&0xffff,P.strength>>16,P.level,P.experience,P.dungeonlevel,n,P.amulet);
@@ -1371,7 +1371,7 @@ UniValue rogue_gameinfo(uint64_t txfee,struct CCcontract_info *cp,cJSON *params)
                 result.push_back(Pair("result","success"));
                 result.push_back(Pair("gameheight",(int64_t)gameheight));
                 mypk = pubkey2pk(Mypubkey());
-                roguepk = GetUnspendable(cp,0);
+                roguepk = cp->GetUnspendable();
                 GetCCaddress1of2(cp,myrogueaddr,roguepk,mypk);
                 //fprintf(stderr,"myrogueaddr.%s\n",myrogueaddr);
                 seed = rogue_gamefields(result,maxplayers,buyin,txid,myrogueaddr);
@@ -1401,7 +1401,7 @@ UniValue rogue_pending(uint64_t txfee,struct CCcontract_info *cp,cJSON *params)
 {
     UniValue result(UniValue::VOBJ),a(UniValue::VARR); int64_t buyin; uint256 txid,hashBlock; CTransaction tx; int32_t openslots,maxplayers,numplayers,gameheight,nextheight,vout,numvouts; CPubKey roguepk; char coinaddr[64];
     std::vector<std::pair<CAddressUnspentKey, CAddressUnspentValue> > unspentOutputs;
-    roguepk = GetUnspendable(cp,0);
+    roguepk = cp->GetUnspendable();
     GetCCaddress(cp,coinaddr,roguepk);
     SetCCunspents(unspentOutputs,coinaddr,true);
     nextheight = komodo_nextheight();
@@ -1430,7 +1430,7 @@ UniValue rogue_players(uint64_t txfee,struct CCcontract_info *cp,cJSON *params)
 {
     UniValue result(UniValue::VOBJ),a(UniValue::VARR); int64_t buyin; uint256 tokenid,gametxid,txid,hashBlock; CTransaction playertx,tx; int32_t maxplayers,vout,numvouts; std::vector<uint8_t> playerdata; CPubKey roguepk,mypk,pk; std::string symbol,pname; char coinaddr[64];
     std::vector<std::pair<CAddressUnspentKey, CAddressUnspentValue> > unspentOutputs;
-    roguepk = GetUnspendable(cp,0);
+    roguepk = cp->GetUnspendable();
     mypk = pubkey2pk(Mypubkey());
     GetTokensCCaddress(cp,coinaddr,mypk);
     SetCCunspents(unspentOutputs,coinaddr,true);
@@ -1458,7 +1458,7 @@ UniValue rogue_games(uint64_t txfee,struct CCcontract_info *cp,cJSON *params)
     UniValue result(UniValue::VOBJ),a(UniValue::VARR),b(UniValue::VARR); uint256 txid,hashBlock,gametxid,tokenid,playertxid; int32_t vout,maxplayers,gameheight,numvouts; CPubKey roguepk,mypk; char coinaddr[64]; CTransaction tx,gametx; int64_t buyin;
     std::vector<uint256> txids;
     //std::vector<std::pair<CAddressUnspentKey, CAddressUnspentValue> > unspentOutputs;
-    roguepk = GetUnspendable(cp,0);
+    roguepk = cp->GetUnspendable();
     mypk = pubkey2pk(Mypubkey());
     GetCCaddress1of2(cp,coinaddr,roguepk,mypk);
     //SetCCunspents(unspentOutputs,coinaddr);

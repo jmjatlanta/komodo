@@ -336,8 +336,8 @@ void *dicefinish(void *_ptr)
     mypk = Mypubkey();
     pubkey2addr(coinaddr,mypk.data());
     CCDiceContract_info C;
-    dicepk = GetUnspendable(&C,0);
-    GetCCaddress(&C,CCaddr,GetUnspendable(&C,0));
+    dicepk = C.GetUnspendable();
+    GetCCaddress(&C,CCaddr,C.GetUnspendable());
     fprintf(stderr,"start dicefinish thread %s CCaddr.%s\n",coinaddr,CCaddr);
     if ( (newht= KOMODO_INSYNC) == 0 )
         sleep(7);
@@ -1277,7 +1277,7 @@ CCDiceContract_info *Diceinit(CScript &fundingPubKey,uint256 reffundingtxid, CCD
     if ( txfee == 0 )
         txfee = 10000;
     mypk = pubkey2pk(Mypubkey());
-    dicepk = GetUnspendable(&C,0);
+    dicepk = C.GetUnspendable();
     sbits = stringbits(planstr);
     if ( reffundingtxid == zeroid )
         cmpflag = 0;
@@ -1324,7 +1324,7 @@ UniValue DiceInfo(uint256 diceid)
     result.push_back(Pair("maxodds",maxodds));
     result.push_back(Pair("timeoutblocks",timeoutblocks));
     CCDiceContract_info C;    
-    dicepk = GetUnspendable(&C,0);
+    dicepk = C.GetUnspendable();
     int32_t entropytxs;
     funding = DicePlanFunds(entropyval,entropytxid,sbits,&C,dicepk,diceid,entropytxs,false);
     sprintf(numstr,"%.8f",(double)funding/COIN);

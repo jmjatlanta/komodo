@@ -190,7 +190,7 @@ CScript Marmara_scriptPubKey(int32_t height,CPubKey pk)
 {
     CTxOut ccvout; CPubKey Marmarapk;
     CCMaramaContract_info C;
-    Marmarapk = GetUnspendable(&C,0);
+    Marmarapk = C.GetUnspendable();
     if ( height > 0 && (height & 1) == 0 && pk.size() == 33 )
     {
         ccvout = MakeCC1of2vout(EVAL_MARMARA,0,Marmarapk,pk);
@@ -211,7 +211,7 @@ int32_t MarmaraValidateCoinbase(int32_t height,CTransaction tx)
 {
     CPubKey Marmarapk,pk; int32_t ht,unlockht; CTxOut ccvout;
     CCMaramaContract_info C;
-    Marmarapk = GetUnspendable(&C,0);
+    Marmarapk = C.GetUnspendable();
     if ( 0 )
     {
         int32_t d,histo[365*2+30];
@@ -259,7 +259,7 @@ bool MarmaraPoScheck(char *destaddr,CScript opret,CTransaction staketx)
     {
         funcid = DecodeMaramaraCoinbaseOpRet(opret,pk,height,unlockht);
         CCMaramaContract_info C;
-        Marmarapk = GetUnspendable(&C,0);
+        Marmarapk = C.GetUnspendable();
         GetCCaddress1of2(&C,coinaddr,Marmarapk,pk);
         return(strcmp(destaddr,coinaddr) == 0);
     }
@@ -345,7 +345,7 @@ int64_t AddMarmaraCoinbases(struct CCcontract_info *cp,CMutableTransaction &mtx,
 {
     char coinaddr[64]; CPubKey Marmarapk,pk; int64_t nValue,totalinputs = 0; uint256 txid,hashBlock; CTransaction vintx; int32_t unlockht,ht,vout,unlocks,n = 0;
     std::vector<std::pair<CAddressUnspentKey, CAddressUnspentValue> > unspentOutputs;
-    Marmarapk = GetUnspendable(cp,0);
+    Marmarapk = cp->GetUnspendable();
     GetCCaddress1of2(cp,coinaddr,Marmarapk,poolpk);
     SetCCunspents(unspentOutputs,coinaddr,true);
     unlocks = MarmaraUnlockht(firstheight);
@@ -436,7 +436,7 @@ UniValue MarmaraLock(uint64_t txfee,int64_t amount,int32_t height)
         height++;
     mypk = pubkey2pk(Mypubkey());
     CCMaramaContract_info C;
-    Marmarapk = GetUnspendable(&C,0);
+    Marmarapk = C.GetUnspendable();
     Getscriptaddress(coinaddr,CScript() << ParseHex(HexStr(mypk)) << OP_CHECKSIG);
     if ( (val= CCaddress_balance(coinaddr,0)) < amount )
         val -= txfee;
@@ -555,7 +555,7 @@ UniValue MarmaraSettlement(uint64_t txfee,uint256 refbatontxid)
         txfee = 10000;
     mypk = pubkey2pk(Mypubkey());
     CCMaramaContract_info C;
-    Marmarapk = GetUnspendable(&C,0);
+    Marmarapk = C.GetUnspendable();
     remaining = change = 0;
     height = chainActive.LastTip()->GetHeight();
     if ( (n= MarmaraGetbatontxid(creditloop,batontxid,refbatontxid)) > 0 )
@@ -671,7 +671,7 @@ int32_t MarmaraGetCreditloops(int64_t &totalamount,std::vector<uint256> &issuanc
 {
     char coinaddr[64]; CPubKey Marmarapk,senderpk; int64_t amount; uint256 createtxid,txid,hashBlock; CTransaction tx; int32_t numvouts,vout,matures,n=0; std::string currency;
     std::vector<std::pair<CAddressUnspentKey, CAddressUnspentValue> > unspentOutputs;
-    Marmarapk = GetUnspendable(cp,0);
+    Marmarapk = cp->GetUnspendable();
     GetCCaddress(cp,coinaddr,Marmarapk);
     SetCCunspents(unspentOutputs,coinaddr,true);
     // do all txid, conditional on spent/unspent
@@ -769,7 +769,7 @@ UniValue MarmaraIssue(uint64_t txfee,uint8_t funcid,CPubKey receiverpk,int64_t a
         txfee = 10000;
     // make sure less than maxlength
     CCMaramaContract_info C;
-    Marmarapk = GetUnspendable(&C,0);
+    Marmarapk = C.GetUnspendable();
     mypk = pubkey2pk(Mypubkey());
     if ( MarmaraGetcreatetxid(createtxid,approvaltxid) < 0 )
         errorstr = (char *)"cant get createtxid from approvaltxid";
@@ -988,7 +988,7 @@ UniValue MarmaraPoolPayout(uint64_t txfee,int32_t firstheight,double perc,char *
     if ( txfee == 0 )
         txfee = 10000;
     CCMaramaContract_info C;
-    Marmarapk = GetUnspendable(&C,0);
+    Marmarapk = C.GetUnspendable();
     if ( (array= cJSON_Parse(jsonstr)) != 0 && (n= cJSON_GetArraySize(array)) > 0 )
     {
         for (i=0; i<n; i++)
@@ -1075,7 +1075,7 @@ UniValue MarmaraInfo(CPubKey refpk,int32_t firstheight,int32_t lastheight,int64_
     CPubKey Marmarapk;
 
     CCMaramaContract_info C;
-    Marmarapk = GetUnspendable(&C,0);
+    Marmarapk = C.GetUnspendable();
     result.push_back(Pair("result","success"));
     Getscriptaddress(coinaddr,CScript() << ParseHex(HexStr(Mypubkey())) << OP_CHECKSIG);
     result.push_back(Pair("myaddress",coinaddr));

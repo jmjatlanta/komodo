@@ -323,7 +323,7 @@ bool GetCCaddress(struct CCcontract_info *cp,char *destaddr,CPubKey pk)
 {
     destaddr[0] = 0;
     if ( pk.size() == 0 )
-        pk = GetUnspendable(cp,0);
+        pk = cp->GetUnspendable();
     return(_GetCCaddress(destaddr,cp->evalcode,pk));
 }
 
@@ -344,7 +344,7 @@ bool GetTokensCCaddress(struct CCcontract_info *cp, char *destaddr, CPubKey pk)
 {
 	destaddr[0] = 0;
 	if (pk.size() == 0)
-		pk = GetUnspendable(cp, 0);
+		pk = cp->GetUnspendable();
 	return(_GetTokensCCaddress(destaddr, cp->evalcode, cp->additionalTokensEvalcode2, pk));
 }
 
@@ -501,13 +501,6 @@ bool Myprivkey(uint8_t myprivkey[])
     }
     fprintf(stderr,"privkey for the -pubkey= address is not in the wallet, importprivkey!\n");
     return(false);
-}
-
-CPubKey GetUnspendable(CCcontract_info *cp,uint8_t *unspendablepriv)
-{
-    if ( unspendablepriv != 0 )
-        memcpy(unspendablepriv,cp->CCpriv,32);
-    return(pubkey2pk(ParseHex(cp->CChexstr)));
 }
 
 /***

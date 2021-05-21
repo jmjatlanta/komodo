@@ -110,7 +110,7 @@ UniValue AssetOrders(uint256 refassetid, CPubKey pk, uint8_t additionalEvalCode)
     std::vector<std::pair<CAddressUnspentKey, CAddressUnspentValue> > unspentOutputsTokens, unspentOutputsDualEvalTokens, unspentOutputsCoins;
 
 	char assetsUnspendableAddr[64];
-	GetCCaddress(&assetsC, assetsUnspendableAddr, GetUnspendable(&assetsC, NULL));
+	GetCCaddress(&assetsC, assetsUnspendableAddr, assetsC.GetUnspendable());
 	SetCCunspents(unspentOutputsCoins, assetsUnspendableAddr,true);
 
 	char assetsTokensUnspendableAddr[64];
@@ -120,7 +120,7 @@ UniValue AssetOrders(uint256 refassetid, CPubKey pk, uint8_t additionalEvalCode)
         if (vopretNonfungible.size() > 0)
             assetsC.additionalTokensEvalcode2 = vopretNonfungible.begin()[0];
     }
-	GetTokensCCaddress(&assetsC, assetsTokensUnspendableAddr, GetUnspendable(&assetsC, NULL));
+	GetTokensCCaddress(&assetsC, assetsTokensUnspendableAddr, assetsC.GetUnspendable());
 	SetCCunspents(unspentOutputsTokens, assetsTokensUnspendableAddr,true);
 
     // tokenbids:
@@ -140,7 +140,7 @@ UniValue AssetOrders(uint256 refassetid, CPubKey pk, uint8_t additionalEvalCode)
 
         // try also dual eval tokenasks (and we do not need bids):
         assetsC.additionalTokensEvalcode2 = additionalEvalCode;
-        GetTokensCCaddress(&assetsC, assetsDualEvalTokensUnspendableAddr, GetUnspendable(&assetsC, NULL));
+        GetTokensCCaddress(&assetsC, assetsDualEvalTokensUnspendableAddr, assetsC.GetUnspendable());
         SetCCunspents(unspentOutputsDualEvalTokens, assetsDualEvalTokensUnspendableAddr,true);
 
         for (std::vector<std::pair<CAddressUnspentKey, CAddressUnspentValue> >::const_iterator itDualEvalTokens = unspentOutputsDualEvalTokens.begin();
@@ -195,7 +195,7 @@ std::string CreateBuyOffer(int64_t txfee, int64_t bidamount, uint256 assetid, in
 			return ("");
 		}
 
-		CPubKey unspendableAssetsPubkey = GetUnspendable(&C, 0);
+		CPubKey unspendableAssetsPubkey = C.GetUnspendable();
         mtx.vout.push_back(MakeCC1vout(EVAL_ASSETS, bidamount, unspendableAssetsPubkey));
         mtx.vout.push_back(MakeCC1vout(EVAL_ASSETS, txfee, mypk));
 		std::vector<CPubKey> voutTokenPubkeys;  // should be empty - no token vouts
@@ -249,7 +249,7 @@ std::string CreateSell(int64_t txfee,int64_t askamount,uint256 assetid,int64_t p
                 // set its evalcode
                 assetsC.additionalTokensEvalcode2 = vopretNonfungible.begin()[0];
 
-			CPubKey unspendableAssetsPubkey = GetUnspendable(&assetsC, NULL);
+			CPubKey unspendableAssetsPubkey = assetsC.GetUnspendable();
             mtx.vout.push_back(MakeTokensCC1vout(EVAL_ASSETS, assetsC.additionalTokensEvalcode2, askamount, unspendableAssetsPubkey));
             mtx.vout.push_back(MakeCC1vout(EVAL_ASSETS, txfee, mypk));  //marker (seems, it is not for tokenorders)
             if (inputs > askamount)
@@ -405,7 +405,7 @@ std::string CancelSell(int64_t txfee,uint256 assetid,uint256 asktxid)
 			uint8_t unspendableAssetsPrivkey[32];
 			char unspendableAssetsAddr[64];
 			// init assets 'unspendable' privkey and pubkey
-			CPubKey unspendableAssetsPk = GetUnspendable(&assetsC, unspendableAssetsPrivkey);
+			CPubKey unspendableAssetsPk = assetsC.GetUnspendable(unspendableAssetsPrivkey);
 			GetCCaddress(&assetsC, unspendableAssetsAddr, unspendableAssetsPk);
 
 			// add additional eval-tokens unspendable assets privkey:
@@ -473,7 +473,7 @@ std::string FillBuyOffer(int64_t txfee,uint256 assetid,uint256 bidtxid,int64_t f
                     CCchange = (inputs - fillamount);
                 
 				uint8_t unspendableAssetsPrivkey[32];
-				CPubKey unspendableAssetsPk = GetUnspendable(&assetsC, unspendableAssetsPrivkey);
+				CPubKey unspendableAssetsPk = assetsC.GetUnspendable(unspendableAssetsPrivkey);
 
 				mtx.vout.push_back(MakeCC1vout(EVAL_ASSETS, bidamount - paid_amount, unspendableAssetsPk));     // vout0 coins remainder
                 mtx.vout.push_back(CTxOut(paid_amount,CScript() << ParseHex(HexStr(mypk)) << OP_CHECKSIG));		// vout1 coins to normal
@@ -579,7 +579,7 @@ std::string FillSell(int64_t txfee, uint256 assetid, uint256 assetid2, uint256 a
 
             // vout.0 tokens remainder to unspendable cc addr:
             mtx.vout.push_back(MakeTokensCC1vout(EVAL_ASSETS, additionalTokensEvalcode2, orig_assetoshis - received_assetoshis, 
-                    GetUnspendable(&assetsC, NULL))); 
+                    assetsC.GetUnspendable())); 
             //vout.1 purchased tokens to self token single-eval or dual-eval token+nonfungible cc addr:
             mtx.vout.push_back(MakeTokensCC1vout(additionalTokensEvalcode2 == 0 ? EVAL_TOKENS : additionalTokensEvalcode2, received_assetoshis, mypk));					
             
@@ -604,7 +604,7 @@ std::string FillSell(int64_t txfee, uint256 assetid, uint256 assetid2, uint256 a
             uint8_t unspendableAssetsPrivkey[32];
             char unspendableAssetsAddr[64];
             // init assets 'unspendable' privkey and pubkey
-            CPubKey unspendableAssetsPk = GetUnspendable(&assetsC, unspendableAssetsPrivkey);
+            CPubKey unspendableAssetsPk = assetsC.GetUnspendable(unspendableAssetsPrivkey);
             GetCCaddress(&assetsC, unspendableAssetsAddr, unspendableAssetsPk);
 
             // add additional eval-tokens unspendable assets privkey:

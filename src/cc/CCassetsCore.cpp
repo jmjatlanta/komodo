@@ -437,7 +437,7 @@ int64_t AssetValidateCCvin(struct CCcontract_info *cp,Eval* eval,char *origCCadd
 	// if fillSell or cancelSell --> should spend tokens from dual-eval token-assets unspendable addr
     else if( (funcid == 'S' || funcid == 'x') && 
 		(Getscriptaddress(destaddr, vinTx.vout[tx.vin[vini].prevout.n].scriptPubKey) == 0 || 
-		!GetTokensCCaddress(cp, unspendableAddr, GetUnspendable(cp, NULL)) || 
+		!GetTokensCCaddress(cp, unspendableAddr, cp->GetUnspendable()) || 
 		strcmp(destaddr, unspendableAddr) != 0))
     {
         fprintf(stderr,"AssetValidateCCvin() cc addr %s is not dual token-evalcode=0x%02x asset unspendable addr %s\n", destaddr, (int)cp->evalcode, unspendableAddr);
@@ -446,7 +446,7 @@ int64_t AssetValidateCCvin(struct CCcontract_info *cp,Eval* eval,char *origCCadd
 	// if fillBuy or cancelBuy --> should spend coins from asset unspendable addr
 	else if ((funcid == 'B' || funcid == 'o') && 
 		(Getscriptaddress(destaddr, vinTx.vout[tx.vin[vini].prevout.n].scriptPubKey) == 0 ||
-		!GetCCaddress(cp, unspendableAddr, GetUnspendable(cp, NULL)) ||
+		!GetCCaddress(cp, unspendableAddr, cp->GetUnspendable()) ||
 		strcmp(destaddr, unspendableAddr) != 0))
 	{
 		fprintf(stderr, "AssetValidateCCvin() cc addr %s is not evalcode=0x%02x asset unspendable addr %s\n", destaddr, (int)cp->evalcode, unspendableAddr);

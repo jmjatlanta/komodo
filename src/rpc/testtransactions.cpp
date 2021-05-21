@@ -165,7 +165,7 @@ UniValue test_burntx(const UniValue& params, bool fHelp, const CPubKey& mypk)
 
     uint8_t tokenpriv[33];
     char unspendableTokenAddr[64];
-    CPubKey unspPk = GetUnspendable(&C, tokenpriv);
+    CPubKey unspPk = C.GetUnspendable(tokenpriv);
     GetCCaddress(&C, unspendableTokenAddr, unspPk);
     CCaddr2set(&C, EVAL_TOKENS, unspPk, tokenpriv, unspendableTokenAddr);
     return(FinalizeCCTx(0, &C, mtx, myPubkey, 10000, EncodeTokenOpRet(tokenid, voutPubkeys, std::make_pair(0, vscript_t()))));

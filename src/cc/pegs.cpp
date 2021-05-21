@@ -131,7 +131,7 @@ CScript EncodePegsFundOpRet(uint256 tokenid,uint256 pegstxid,CPubKey srcpub,int6
     std::vector<CPubKey> pubkeys; vscript_t vopret;
 
     CCPegsContract_info C;
-    pegspk = GetUnspendable(&C,0);
+    pegspk = C.GetUnspendable();
     pubkeys.push_back(srcpub);
     pubkeys.push_back(pegspk);
     LOGSTREAM("pegscc", CCLOG_DEBUG1, stream  << "EncodePegsFundOpRet [" << account.first << "," << account.second << "]" << std::endl);
@@ -206,7 +206,7 @@ CScript EncodePegsExchangeOpRet(uint256 tokenid,uint256 pegstxid,CPubKey pk1,CPu
     std::vector<CPubKey> pubkeys; vscript_t vopret; CPubKey pegspk;
 
     CCPegsContract_info C;
-    pegspk = GetUnspendable(&C,0);
+    pegspk = C.GetUnspendable();
     pubkeys.push_back(pk1);
     pubkeys.push_back(pk2);
     vopret = E_MARSHAL(ss << evalcode << funcid << pegstxid << pk1 << amount << account);        
@@ -479,7 +479,7 @@ char PegsFindAccount(struct CCcontract_info *cp,CPubKey pk,uint256 pegstxid, uin
     ImportProof proof; CTransaction burntx; std::vector<CTxOut> payouts;
 
     accounttxid=zeroid;
-    pegspk = GetUnspendable(cp,0);
+    pegspk = cp->GetUnspendable();
     GetCCaddress1of2(cp,coinaddr,pk,pegspk);
     SetCCunspents(unspentOutputs,coinaddr,true);
     for (std::vector<std::pair<CAddressUnspentKey, CAddressUnspentValue> >::const_iterator it=unspentOutputs.begin(); it!=unspentOutputs.end(); it++)
@@ -594,7 +594,7 @@ double PegsGetGlobalRatio(uint256 pegstxid)
     std::map<uint256,std::pair<int64_t,int64_t>> globalaccounts;
 
     CCPegsContract_info C;
-    pegspk = GetUnspendable(&C,0);
+    pegspk = C.GetUnspendable();
     GetCCaddress1of2(&C,coinaddr,pegspk,pegspk);
     SetCCunspents(unspentOutputs,coinaddr,true);
     for (std::vector<std::pair<CAddressUnspentKey, CAddressUnspentValue> >::const_iterator it=unspentOutputs.begin(); it!=unspentOutputs.end(); it++)
@@ -658,7 +658,7 @@ std::string PegsFindBestAccount(struct CCcontract_info *cp,uint256 pegstxid, uin
     std::pair<int64_t,int64_t> tmpaccount;
 
     accounttxid=zeroid;
-    pegspk = GetUnspendable(cp,0);
+    pegspk = cp->GetUnspendable();
     GetCCaddress1of2(cp,coinaddr,pegspk,pegspk);
     SetCCunspents(unspentOutputs,coinaddr,true);
     for (std::vector<std::pair<CAddressUnspentKey, CAddressUnspentValue> >::const_iterator it=unspentOutputs.begin(); it!=unspentOutputs.end(); it++)
@@ -695,7 +695,7 @@ UniValue PegsCreate(const CPubKey& pk,uint64_t txfee,int64_t amount, std::vector
         txfee = 10000;
     mypk = pk.IsValid()?pk:pubkey2pk(Mypubkey());
     CCPegsContract_info C;
-    pegspk = GetUnspendable(&C,0);
+    pegspk = C.GetUnspendable();
     for(auto txid : bindtxids)
     {
         if (myGetTransaction(txid,tx,hashBlock)==0 || (numvouts=tx.vout.size())<=0)
@@ -722,7 +722,7 @@ UniValue PegsFund(const CPubKey& pk,uint64_t txfee,uint256 pegstxid, uint256 tok
         txfee = 10000;
     mypk = pk.IsValid()?pk:pubkey2pk(Mypubkey());
     CCPegsContract_info C;
-    pegspk = GetUnspendable(&C,0);
+    pegspk = C.GetUnspendable();
     if (myGetTransaction(pegstxid,tx,hashBlock)==0 || (numvouts=tx.vout.size())<=0)
         CCERR_RESULT("pegscc",CCLOG_INFO, stream << "cant find pegstxid " << pegstxid.GetHex());
     if (DecodePegsCreateOpRet(tx.vout[numvouts-1].scriptPubKey,bindtxids)!='C')
@@ -790,7 +790,7 @@ UniValue PegsGet(const CPubKey& pk,uint64_t txfee,uint256 pegstxid, uint256 toke
         txfee = 10000;
     mypk = pk.IsValid()?pk:pubkey2pk(Mypubkey());
     CCPegsContract_info C;
-    pegspk = GetUnspendable(&C,0);
+    pegspk = C.GetUnspendable();
     if (myGetTransaction(pegstxid,tx,hashBlock)==0 || (numvouts=tx.vout.size())<=0)
         CCERR_RESULT("pegscc",CCLOG_INFO, stream << "cant find pegstxid " << pegstxid.GetHex());
     if (DecodePegsCreateOpRet(tx.vout[numvouts-1].scriptPubKey,bindtxids)!='C')
@@ -843,7 +843,7 @@ UniValue PegsRedeem(const CPubKey& pk,uint64_t txfee,uint256 pegstxid, uint256 t
         txfee = 10000;
     mypk = pk.IsValid()?pk:pubkey2pk(Mypubkey());
     CCPegsContract_info C;
-    pegspk = GetUnspendable(&C,0);
+    pegspk = C.GetUnspendable();
     if (myGetTransaction(pegstxid,tx,hashBlock)==0 || (numvouts=tx.vout.size())<=0)
         CCERR_RESULT("pegscc",CCLOG_INFO, stream << "cant find pegstxid " << pegstxid.GetHex());
     if (DecodePegsCreateOpRet(tx.vout[numvouts-1].scriptPubKey,bindtxids)!='C')
@@ -925,7 +925,7 @@ UniValue PegsExchange(const CPubKey& pk,uint64_t txfee,uint256 pegstxid, uint256
         txfee = 10000;
     mypk = pk.IsValid()?pk:pubkey2pk(Mypubkey());
     CCPegsContract_info C;
-    pegspk = GetUnspendable(&C,0);
+    pegspk = C.GetUnspendable();
     if (myGetTransaction(pegstxid,tx,hashBlock)==0 || (numvouts=tx.vout.size())<=0)
         CCERR_RESULT("pegscc",CCLOG_INFO, stream << "cant find pegstxid " << pegstxid.GetHex());
     if (DecodePegsCreateOpRet(tx.vout[numvouts-1].scriptPubKey,bindtxids)!='C')
@@ -1012,7 +1012,7 @@ UniValue PegsLiquidate(const CPubKey& pk,uint64_t txfee,uint256 pegstxid, uint25
         txfee = 10000;
     mypk = pk.IsValid()?pk:pubkey2pk(Mypubkey());
     CCPegsContract_info C;
-    pegspk = GetUnspendable(&C,0);
+    pegspk = C.GetUnspendable();
     if (myGetTransaction(pegstxid,tx,hashBlock)==0 || (numvouts=tx.vout.size())<=0)
         CCERR_RESULT("pegscc",CCLOG_INFO, stream << "cant find pegstxid " << pegstxid.GetHex());
     if (DecodePegsCreateOpRet(tx.vout[numvouts-1].scriptPubKey,bindtxids)!='C')
@@ -1094,7 +1094,7 @@ UniValue PegsAccountHistory(const CPubKey& pk,uint256 pegstxid)
     result.push_back(Pair("name","pegsaccounthistory"));
     mypk = pk.IsValid()?pk:pubkey2pk(Mypubkey());
     CCPegsContract_info C;
-    pegspk = GetUnspendable(&C,0);
+    pegspk = C.GetUnspendable();
     GetCCaddress1of2(&C,coinaddr,mypk,pegspk);
     SetCCtxids(txids,coinaddr,true,EVAL_PEGS,pegstxid,0);
     for (std::vector<uint256>::const_iterator it=txids.begin(); it!=txids.end(); it++)
@@ -1132,7 +1132,7 @@ UniValue PegsAccountInfo(const CPubKey& pk,uint256 pegstxid)
     result.push_back(Pair("name","pegsaccountinfo"));
     mypk = pk.IsValid()?pk:pubkey2pk(Mypubkey());
     CCPegsContract_info C;
-    pegspk = GetUnspendable(&C,0);
+    pegspk = C.GetUnspendable();
     GetCCaddress1of2(&C,coinaddr,mypk,pegspk);
     SetCCunspents(unspentOutputs,coinaddr,true);
     for (std::vector<std::pair<CAddressUnspentKey, CAddressUnspentValue> >::const_iterator it=unspentOutputs.begin(); it!=unspentOutputs.end(); it++)
@@ -1178,7 +1178,7 @@ UniValue PegsWorstAccounts(uint256 pegstxid)
     result.push_back(Pair("result","success"));
     result.push_back(Pair("name","pegsworstaccounts"));
     CCPegsContract_info C;
-    pegspk = GetUnspendable(&C,0);
+    pegspk = C.GetUnspendable();
     GetCCaddress1of2(&C,coinaddr,pegspk,pegspk);
     SetCCunspents(unspentOutputs,coinaddr,true);
     for (std::vector<std::pair<CAddressUnspentKey, CAddressUnspentValue> >::const_iterator it=unspentOutputs.begin(); it!=unspentOutputs.end(); it++)
@@ -1233,7 +1233,7 @@ UniValue PegsInfo(uint256 pegstxid)
     result.push_back(Pair("result","success"));
     result.push_back(Pair("name","pegsinfo"));
     CCPegsContract_info C;
-    pegspk = GetUnspendable(&C,0);
+    pegspk = C.GetUnspendable();
     GetCCaddress1of2(&C,coinaddr,pegspk,pegspk);
     SetCCunspents(unspentOutputs,coinaddr,true);
     for (std::vector<std::pair<CAddressUnspentKey, CAddressUnspentValue> >::const_iterator it=unspentOutputs.begin(); it!=unspentOutputs.end(); it++)

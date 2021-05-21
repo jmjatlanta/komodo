@@ -1,6 +1,25 @@
 #include "eval.h"
 #include "CCutils.h" // GetCryptoCondition()
-#include "CCcontract.h"
+#include "CCinclude.h" // pubkey2pk
+#include "utilstrencodings.h" // ParseHex
+
+/****
+ * Constructor that sets the most common values
+ * @param evalcode the type of contract
+ * @param unspendable the unspendable CC address
+ * @param normalAddr the normal address
+ * @param hex the hex string
+ * @param priv the binary private key
+ */
+CCcontract_info::CCcontract_info(const uint8_t evalcode, const char *unspendable, const char *normalAddr, const char *hex, const uint8_t *priv)
+        : CCcontract_info()
+{
+    this->evalcode = evalcode;
+    strcpy(unspendableCCaddr, unspendable);
+    strcpy(normaladdr, normalAddr);
+    strcpy(CChexstr, hex);
+    memcpy(CCpriv, priv,32);    
+}
 
 /// checks if the value of evalcode in cp object is present in the scriptSig parameter, 
 /// that is, the vin for this scriptSig will be validated by the cc contract (Antara module) defined by the eval code in this CCcontract_info object
@@ -40,4 +59,16 @@ bool CCcontract_info::validate(Eval* eval, const CTransaction &tx, uint32_t nIn)
 {
     throw std::logic_error("validation not supported for eval code");
     return false; // just to keep the compiler quiet
+}
+
+/***
+ * Get an unspendable public key
+ * @param unspendablepriv filled with the private key
+ * @param returns the public key
+ */
+CPubKey CCcontract_info::GetUnspendable(uint8_t *unspendablepriv)
+{
+    if ( unspendablepriv != 0 )
+        memcpy(unspendablepriv,CCpriv,32);
+    return(pubkey2pk(ParseHex(CChexstr)));
 }

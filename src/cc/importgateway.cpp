@@ -317,7 +317,7 @@ bool CCImportGatewayContract_info::validate(Eval *eval,const CTransaction &tx, u
         // }
         // else
         // {  
-            importgatewaypk = GetUnspendable(this,0);      
+            importgatewaypk = GetUnspendable();      
             GetCCaddress(this, importgatewayaddr, importgatewaypk);              
             if ( (funcid = DecodeImportGatewayOpRet(tx.vout[numvouts-1].scriptPubKey)) != 0)
             {
@@ -520,7 +520,7 @@ std::string ImportGatewayBind(uint64_t txfee,std::string coin,uint256 oracletxid
         txfee = 10000;
     mypk = pubkey2pk(Mypubkey());
     _GetCCaddress(myTokenCCaddr,EVAL_TOKENS,mypk);
-    importgatewaypk = GetUnspendable(&C,0);
+    importgatewaypk = C.GetUnspendable();
     if ( _GetCCaddress(destaddr,EVAL_IMPORTGATEWAY,importgatewaypk) == 0 )
     {
         CCerror = strprintf("ImportGateway bind.%s can't create globaladdr",coin.c_str());
@@ -656,7 +656,7 @@ std::string ImportGatewayWithdraw(uint64_t txfee,uint256 bindtxid,std::string re
         txfee = 10000;
     mypk = pubkey2pk(Mypubkey());
     CCImportGatewayContract_info C;
-    importgatewaypk = GetUnspendable(&C, 0);
+    importgatewaypk = C.GetUnspendable();
 
     if( myGetTransaction(bindtxid,tx,hashBlock) == 0 || (numvouts= tx.vout.size()) <= 0 )
     {
@@ -729,7 +729,7 @@ std::string ImportGatewayPartialSign(uint64_t txfee,uint256 lasttxid,std::string
     if ( txfee == 0 )
         txfee = 10000;
     mypk = pubkey2pk(Mypubkey());
-    importgatewaypk = GetUnspendable(&C,0);
+    importgatewaypk = C.GetUnspendable();
     if (myGetTransaction(lasttxid,tx,hashBlock)==0 || (numvouts= tx.vout.size())<=0
         || (funcid=DecodeImportGatewayOpRet(tx.vout[numvouts-1].scriptPubKey))==0 || (funcid!='W' && funcid!='P'))
     {
@@ -840,7 +840,7 @@ std::string ImportGatewayCompleteSigning(uint64_t txfee,uint256 lasttxid,std::st
 
     mypk = pubkey2pk(Mypubkey());
     CCImportGatewayContract_info C;
-    importgatewaypk = GetUnspendable(&C,0);
+    importgatewaypk = C.GetUnspendable();
     if ( txfee == 0 )
         txfee = 10000;
     if (myGetTransaction(lasttxid,tx,hashBlock)==0 || (numvouts= tx.vout.size())<=0
@@ -1032,7 +1032,7 @@ UniValue ImportGatewayPendingWithdraws(uint256 bindtxid,std::string refcoin)
 
     mypk = pubkey2pk(Mypubkey());
     CCImportGatewayContract_info C;
-    importgatewaypk = GetUnspendable(&C,0);
+    importgatewaypk = C.GetUnspendable();
     _GetCCaddress(coinaddr,EVAL_IMPORTGATEWAY,importgatewaypk);
     if ( myGetTransaction(bindtxid,tx,hashBlock) == 0 || (numvouts= tx.vout.size()) <= 0 )
     {
@@ -1120,7 +1120,7 @@ UniValue ImportGatewayProcessedWithdraws(uint256 bindtxid,std::string refcoin)
 
     mypk = pubkey2pk(Mypubkey());
     CCImportGatewayContract_info C;
-    importgatewaypk = GetUnspendable(&C,0);
+    importgatewaypk = C.GetUnspendable();
     _GetCCaddress(coinaddr,EVAL_IMPORTGATEWAY,importgatewaypk);
     if ( myGetTransaction(bindtxid,tx,hashBlock) == 0 || (numvouts= tx.vout.size()) <= 0 )
     {        
@@ -1254,7 +1254,7 @@ UniValue ImportGatewayInfo(uint256 bindtxid)
     CPubKey ImportGatewaypk; int32_t i; int64_t numvouts,remaining; std::vector<CPubKey> msigpubkeys;
   
     CCImportGatewayContract_info C;
-    ImportGatewaypk = GetUnspendable(&C,0);
+    ImportGatewaypk = C.GetUnspendable();
     GetTokensCCaddress(&C,gatewaystokens,ImportGatewaypk);
     if ( myGetTransaction(bindtxid,tx,hashBlock) == 0 || (numvouts= tx.vout.size()) <= 0 )
     {        

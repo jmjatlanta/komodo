@@ -391,22 +391,6 @@ void GetNonfungibleData(uint256 tokenid, vscript_t &vopretNonfungible);
 /// @private
 bool ExtractTokensCCVinPubkeys(const CTransaction &tx, std::vector<CPubKey> &vinPubkeys);
 
-// CCcustom
-
-/// Returns global pubkey for the evalcode and sets private key for the global pubkey
-/// @param cp CCcontract_info structure initialized for a evalcode
-/// @param[out] unspendablepriv if not null then in this parameter private key is returned. Must have at least 32 byte size
-/// @returns global contract pubkey.\n
-/// Example: 
-/// \code
-/// struct CCcontract_info *cp, C;
-/// uint8_t ccAssetsPriv[32]
-/// cp = CCinit(&C, EVAL_ASSETS);
-/// CPubKey ccAssetsPk = GetUnspendable(cp, ccAssetsPriv);
-/// \endcode
-/// Now ccAssetsPk has Antara 'Assets' module global pubkey and ccAssetsPriv has its publicly available private key
-CPubKey GetUnspendable(CCcontract_info *cp,uint8_t *unspendablepriv);
-
 // CCutils
 
 /// finds normal address for private key

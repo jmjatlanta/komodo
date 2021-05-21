@@ -63,7 +63,7 @@ UniValue FinalizeCCTxExt(bool remote, uint64_t CCmask, struct CCcontract_info *c
     UniValue sigData(UniValue::VARR),result(UniValue::VOBJ);
     const UniValue sigDataNull = NullUniValue;
 
-    globalpk = GetUnspendable(cp,0);
+    globalpk = cp->GetUnspendable();
     n = mtx.vout.size();
     for (i=0; i<n; i++)
     {
@@ -91,7 +91,7 @@ UniValue FinalizeCCTxExt(bool remote, uint64_t CCmask, struct CCcontract_info *c
     mycond = MakeCCcond1(cp->evalcode,mypk);
 
 	// to spend from single-eval evalcode 'unspendable' cc addr
-	unspendablepk = GetUnspendable(cp, unspendablepriv);
+	unspendablepk = cp->GetUnspendable(unspendablepriv);
 	GetCCaddress(cp, unspendable, unspendablepk);
 	othercond = MakeCCcond1(cp->evalcode, unspendablepk);
     GetCCaddress1of2(cp,CC1of2CCaddr,unspendablepk,unspendablepk);

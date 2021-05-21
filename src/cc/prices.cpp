@@ -252,7 +252,7 @@ static bool ValidateBetTx(struct CCcontract_info *cp, Eval *eval, const CTransac
     if( prices_betopretdecode(bettx.vout.back().scriptPubKey, pk, firstheight, positionsize, leverage, firstprice, vec, tokenid) != 'B')
         return eval->Invalid("cannot decode opreturn for bet tx");
 
-    pricespk = GetUnspendable(cp, 0);
+    pricespk = cp->GetUnspendable();
 
     if (MakeCC1vout(cp->evalcode, bettx.vout[0].nValue, pk) != bettx.vout[0])
         return eval->Invalid("cannot validate vout0 in bet tx with pk from opreturn");
@@ -305,7 +305,7 @@ static bool ValidateAddFundingTx(struct CCcontract_info *cp, Eval *eval, const C
     if (prices_addopretdecode(addfundingtx.vout.back().scriptPubKey, bettxid, pk, amount) != 'A')
         return eval->Invalid("cannot decode opreturn for add funding tx");
 
-    pricespk = GetUnspendable(cp, 0);
+    pricespk = cp->GetUnspendable();
     uint8_t vintxFuncId = PricesCheckOpret(vintx, vintxOpret);
     if (vintxFuncId != 'A' && vintxFuncId != 'B') { // if vintx is bettx
         return eval->Invalid("incorrect vintx funcid");
@@ -351,7 +351,7 @@ static bool ValidateCostbasisTx(struct CCcontract_info *cp, Eval *eval, const CT
     if (prices_costbasisopretdecode(costbasistx.vout.back().scriptPubKey, bettxid, pk, height, costbasisInOpret) != 'C')
         return eval->Invalid("cannot decode opreturn for costbasis tx");
 
-    pricespk = GetUnspendable(cp, 0);
+    pricespk = cp->GetUnspendable();
     if (CTxOut(costbasistx.vout[0].nValue, CScript() << ParseHex(HexStr(pk)) << OP_CHECKSIG) != costbasistx.vout[0])  //might go to any pk who calculated costbasis
         return eval->Invalid("cannot validate vout0 in costbasis tx with pk from opreturn");
     if (MakeCC1vout(cp->evalcode, costbasistx.vout[1].nValue, pricespk) != costbasistx.vout[1])
@@ -423,7 +423,7 @@ static bool ValidateFinalTx(struct CCcontract_info *cp, Eval *eval, const CTrans
     if (bettx.GetHash() != bettxid)
         return eval->Invalid("incorrect bettx id");
 
-    pricespk = GetUnspendable(cp, 0);
+    pricespk = cp->GetUnspendable();
 
     if (CTxOut(finaltx.vout[0].nValue, CScript() << ParseHex(HexStr(pk)) << OP_CHECKSIG) != finaltx.vout[0])
         return eval->Invalid("cannot validate vout0 in final tx with pk from opreturn");
@@ -1471,7 +1471,7 @@ UniValue PricesBet(int64_t txfee, int64_t amount, int16_t leverage, std::vector<
     if (txfee == 0)
         txfee = PRICES_TXFEE;
     mypk = pubkey2pk(Mypubkey());
-    pricespk = GetUnspendable(&C, 0);
+    pricespk = C.GetUnspendable();
 
     if (prices_syntheticvec(vec, synthetic) < 0 || (firstprice = prices_syntheticprice(vec, nextheight - 1, 1, leverage)) < 0 || vec.size() == 0 || vec.size() > 4096)
     {
@@ -1530,7 +1530,7 @@ UniValue PricesAddFunding(int64_t txfee, uint256 bettxid, int64_t amount)
         txfee = PRICES_TXFEE;
     mypk = pubkey2pk(Mypubkey());
     CCPricesContract_info C;
-    pricespk = GetUnspendable(&C, 0);
+    pricespk = C.GetUnspendable();
 
     if (!myGetTransaction(bettxid, bettx, hashBlock) || 
         bettx.vout.size() <= 3 ||
@@ -1650,7 +1650,7 @@ UniValue PricesRefillFund(int64_t amount)
     if (AddNormalinputs(mtx, mypk, amount + txfee, 64) >= amount + txfee)
     {            
         CCPricesContract_info C;
-        pricespk = GetUnspendable(&C, 0);
+        pricespk = C.GetUnspendable();
         mtx.vout.push_back(MakeCC1vout(C.evalcode, amount, pricespk));    // vout1 added amount
         rawtx = FinalizeCCTx(0, &C, mtx, mypk, txfee, CScript());
         return(prices_rawtxresult(result, rawtx, 0));
@@ -1816,7 +1816,7 @@ UniValue PricesRekt(int64_t txfee, uint256 bettxid, int32_t rektheight)
         txfee = PRICES_TXFEE;
     mypk = pubkey2pk(Mypubkey());
     CCPricesContract_info C;
-    pricespk = GetUnspendable(&C, 0);
+    pricespk = C.GetUnspendable();
     GetCCaddress(&C, destaddr, pricespk);
 
     BetInfo betinfo;
@@ -1928,7 +1928,7 @@ UniValue PricesCashout(int64_t txfee, uint256 bettxid)
 
     mypk = pubkey2pk(Mypubkey());
     CCPricesContract_info C;
-    pricespk = GetUnspendable(&C, 0);
+    pricespk = C.GetUnspendable();
     GetCCaddress(&C, destaddr, pricespk);
 
     BetInfo betinfo;

@@ -162,7 +162,7 @@ std::string FSMCreate(uint64_t txfee,std::string name,std::string states)
     CCFSMContract_info C;
     if ( txfee == 0 )
         txfee = 10000;
-    fsmpk = GetUnspendable(&C,0);
+    fsmpk = C.GetUnspendable();
     mypk = pubkey2pk(Mypubkey());
     if ( (inputs= AddFSMInputs(&C,mtx,fsmpk,nValue+txfee,60)) > 0 )
     {
@@ -181,7 +181,7 @@ std::string FSMInfo(uint256 fsmtxid)
     CMutableTransaction mtx = CreateNewContextualCMutableTransaction(Params().GetConsensus(), komodo_nextheight());
     CPubKey mypk = pubkey2pk(Mypubkey());
     CCFSMContract_info C;
-    CPubKey fsmpk = GetUnspendable(&C,0);
+    CPubKey fsmpk = C.GetUnspendable();
     return "";
 }
 

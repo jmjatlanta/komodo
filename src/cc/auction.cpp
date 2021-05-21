@@ -155,7 +155,7 @@ std::string AuctionBid(uint64_t txfee,uint256 itemhash,int64_t amount)
     CCAuctionContract_info C;
     if ( txfee == 0 )
         txfee = 10000;
-    Auctionpk = GetUnspendable(&C,0);
+    Auctionpk = C.GetUnspendable();
     mypk = pubkey2pk(Mypubkey());
     if ( (inputs= AddAuctionInputs(&C,mtx,Auctionpk,nValue+txfee,60)) > 0 )
     {
@@ -176,7 +176,7 @@ std::string AuctionDeliver(uint64_t txfee,uint256 itemhash,uint256 bidtxid)
     CCAuctionContract_info C;
     if ( txfee == 0 )
         txfee = 10000;
-    Auctionpk = GetUnspendable(&C,0);
+    Auctionpk = C.GetUnspendable();
     mypk = pubkey2pk(Mypubkey());
     if ( (inputs= AddAuctionInputs(&C,mtx,Auctionpk,nValue+txfee,60)) > 0 )
     {
@@ -198,7 +198,7 @@ std::string AuctionPost(uint64_t txfee,uint256 itemhash,int64_t minbid,char *tit
     if ( txfee == 0 )
         txfee = 10000;
     mypk = pubkey2pk(Mypubkey());
-    Auctionpk = GetUnspendable(&C,0);
+    Auctionpk = C.GetUnspendable();
     if ( AddNormalinputs(mtx,mypk,txfee,64) > 0 )
     {
         mtx.vout.push_back(MakeCC1vout(EVAL_AUCTION,funds,Auctionpk));

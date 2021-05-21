@@ -626,7 +626,7 @@ bool CCOraclesContract_info::validate(Eval* eval,const CTransaction &tx, uint32_
         GetOpReturnData(tx.vout[numvouts-1].scriptPubKey,vopret);
         if ( vopret.size() > 2 )
         {   
-            oraclespk=GetUnspendable(this,0);
+            oraclespk=GetUnspendable();
             Getscriptaddress(oraclesaddr,CScript() << ParseHex(HexStr(oraclespk)) << OP_CHECKSIG);
             script = (uint8_t *)vopret.data();
             switch ( script[1] )
@@ -851,7 +851,7 @@ UniValue OracleCreate(const CPubKey& pk, int64_t txfee,std::string name,std::str
         txfee = 10000;
     mypk = pk.IsValid()?pk:pubkey2pk(Mypubkey());
     CCOraclesContract_info C;
-    Oraclespk = GetUnspendable(&C,0);
+    Oraclespk = C.GetUnspendable();
     if ( AddNormalinputs(mtx,mypk,2*txfee,3,pk.IsValid()) > 0 )
     {
         mtx.vout.push_back(CTxOut(txfee,CScript() << ParseHex(HexStr(Oraclespk)) << OP_CHECKSIG));
@@ -899,7 +899,7 @@ UniValue OracleRegister(const CPubKey& pk, int64_t txfee,uint256 oracletxid,int6
         CCERR_RESULT("oraclescc",CCLOG_INFO, stream << "datafee must be txfee or more");
     mypk = pk.IsValid()?pk:pubkey2pk(Mypubkey());
     CCOraclesContract_info C;
-    oraclespk = GetUnspendable(&C,0);
+    oraclespk = C.GetUnspendable();
     batonpk = OracleBatonPk(batonaddr,&C);
     markerpubkey = CCtxidaddr(markeraddr,oracletxid);
     if (AddNormalinputs(mtx,mypk,3*txfee,4,pk.IsValid()))

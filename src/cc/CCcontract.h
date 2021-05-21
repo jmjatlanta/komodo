@@ -7,7 +7,27 @@
 /// CC contract (Antara module) info structure that contains data used for signing and validation of cc contract transactions
 struct CCcontract_info
 {
+    /***
+     * Default ctor, sets everything to 0
+     */
     CCcontract_info() { memset(this, 0, sizeof(CCcontract_info)); }
+    /****
+     * Constructor that sets the most common values
+     * @param evalcode the type of contract
+     * @param unspendable the unspendable CC address
+     * @param normalAddr the normal address
+     * @param hex the hex string
+     * @param priv the 32 byte binary private key
+     */
+    CCcontract_info(const uint8_t evalcode, const char *unspendable, const char *normalAddr, const char *hex, const uint8_t *priv);
+
+    /***
+     * Get an unspendable public key
+     * @param unspendablepriv filled with the private key
+     * @param returns the public key
+     */
+    CPubKey GetUnspendable(uint8_t *unspendablepriv = nullptr);
+
     virtual ~CCcontract_info() {}
     uint8_t evalcode;  //!< cc contract eval code, set by ctor
     uint8_t additionalTokensEvalcode2 = 0;  //!< additional eval code for spending from three-eval-code vouts with EVAL_TOKENS, evalcode, additionalTokensEvalcode2 
