@@ -1500,8 +1500,11 @@ bool VerifyScript(
         return set_error(serror, SCRIPT_ERR_SIG_PUSHONLY);
     }
 
-    vector<vector<unsigned char> > stack, stackCopy;
-    if (IsCryptoConditionsEnabled() && scriptPubKey.IsPayToCryptoCondition()) {
+    std::vector<std::vector<unsigned char> > stack;
+
+    // handle CryptoConditions in scriptPubKey
+    if (IsCryptoConditionsEnabled() && scriptPubKey.IsPayToCryptoCondition()) 
+    {
         if (!EvalCryptoConditionSig(stack, scriptSig, serror))
             // serror is set
             return false;
@@ -1509,8 +1512,11 @@ bool VerifyScript(
     else if (!EvalScript(stack, scriptSig, flags, checker, consensusBranchId, serror))
         // serror is set
         return false;
+
+    std::vector<std::vector<unsigned char>> stackCopy;
     if (flags & SCRIPT_VERIFY_P2SH)
         stackCopy = stack;
+
     if (!EvalScript(stack, scriptPubKey, flags, checker, consensusBranchId, serror))
         // serror is set
         return false;
@@ -1544,9 +1550,17 @@ bool VerifyScript(
         CScript pubKey2(pubKeySerialized.begin(), pubKeySerialized.end());
         popstack(stack);
 
-        if (!EvalScript(stack, pubKey2, flags, checker, consensusBranchId, serror))
+        // handle CryptoConditions in scriptSig
+        if (IsCryptoConditionsEnabled() && pubKey2.IsPayToCryptoCondition()) 
+        {
+            if (!EvalCryptoConditionSig(stack, pubKey2, serror))
+                // serror is set
+                return false;
+        }
+        else if (!EvalScript(stack, pubKey2, flags, checker, consensusBranchId, serror))
             // serror is set
             return false;
+
         if (stack.empty())
         {
             //printf("interpreter stack is empty #2, comment this debugging message\nscriptSig: %s\nscriptPubKey: %s\n",scriptSig.ToString().c_str(),scriptPubKey.ToString().c_str());

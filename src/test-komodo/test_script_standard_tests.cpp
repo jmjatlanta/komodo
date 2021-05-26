@@ -7,9 +7,9 @@
 #include "script/standard.h"
 #include "utilstrencodings.h"
 
-namespace TestScriptStandartTests {
+namespace TestScriptStandardTests {
 
-    class TestScriptStandartTests : public ::testing::Test {};
+    class TestScriptStandardTests : public ::testing::Test {};
 
     inline std::string txnouttypeToString(txnouttype t)
     {
@@ -45,7 +45,7 @@ namespace TestScriptStandartTests {
         return res;
     }
 
-    TEST(TestScriptStandartTests, script_standard_Solver_success) {
+    TEST(TestScriptStandardTests, script_standard_Solver_success) {
 
         CKey keys[3];
         CPubKey pubkeys[3];
@@ -132,7 +132,7 @@ namespace TestScriptStandartTests {
 
     }
 
-    TEST(TestScriptStandartTests, script_standard_Solver_failure) {
+    TEST(TestScriptStandardTests, script_standard_Solver_failure) {
         CKey key;
         CPubKey pubkey;
         key.MakeNewKey(true);
@@ -185,7 +185,7 @@ namespace TestScriptStandartTests {
         /* witness tests are absent, bcz Komodo doesn't support witness */
     }
 
-    TEST(TestScriptStandartTests, script_standard_ExtractDestination) {
+    TEST(TestScriptStandardTests, script_standard_ExtractDestination) {
 
         CKey key;
         CPubKey pubkey;
@@ -228,7 +228,7 @@ namespace TestScriptStandartTests {
         ASSERT_TRUE(!ExtractDestination(s, address));
     }
 
-    TEST(TestScriptStandartTests, script_standard_ExtractDestinations) {
+    TEST(TestScriptStandardTests, script_standard_ExtractDestinations) {
 
         CKey keys[3];
         CPubKey pubkeys[3];
@@ -295,7 +295,7 @@ namespace TestScriptStandartTests {
 
     }
 
-    TEST(TestScriptStandartTests, script_standard_GetScriptFor_) {
+    TEST(TestScriptStandardTests, script_standard_GetScriptFor_) {
 
         CKey keys[3];
         CPubKey pubkeys[3];
@@ -341,7 +341,7 @@ namespace TestScriptStandartTests {
         ASSERT_TRUE(result == expected);
     }
 
-    TEST(TestScriptStandartTests, script_standard_IsMine) {
+    TEST(TestScriptStandardTests, script_standard_IsMine) {
 
         CKey keys[2];
         CPubKey pubkeys[2];
@@ -530,7 +530,7 @@ namespace TestScriptStandartTests {
 
     }
 
-    TEST(TestScriptStandartTests, script_standard_Malpill) {
+    TEST(TestScriptStandardTests, script_standard_Malpill) {
 
         static const std::string log_tab = "             ";
 
@@ -623,4 +623,44 @@ namespace TestScriptStandartTests {
         }
     }
 
-}
+    TEST(TestScriptStandardTests, p2sh_simple)
+    {
+        // test P2SH by adding 2 numbers that total 99
+        CScript redeemScript;
+        redeemScript << OP_ADD << 99 << OP_EQUAL;
+
+        // standard P2SH (see BIP16)
+        CScript scriptPubKey;
+        scriptPubKey << OP_HASH160 << ToByteVector(CScriptID(redeemScript)) << OP_EQUAL;
+
+        CScript scriptSig;
+        scriptSig << 1 << 98;
+        scriptSig.push_back(redeemScript.size()); // add next n bytes to stack;
+        scriptSig += redeemScript;
+
+        ScriptError err;
+        EXPECT_TRUE(VerifyScript(scriptSig, scriptPubKey, SCRIPT_VERIFY_P2SH, BaseSignatureChecker(), 1, &err));
+        EXPECT_EQ(err, SCRIPT_ERR_OK);
+    }
+
+    TEST(TestScriptStandardTests, p2sh_cryptoconditions)
+    {
+        // test P2SH by adding 2 numbers that total 99
+        CScript redeemScript;
+        redeemScript << OP_ADD << 99 << OP_EQUAL;
+
+        // standard P2SH (see BIP16)
+        CScript scriptPubKey;
+        scriptPubKey << OP_HASH160 << ToByteVector(CScriptID(redeemScript)) << OP_EQUAL;
+
+        CScript scriptSig;
+        scriptSig << 1 << 98;
+        scriptSig.push_back(redeemScript.size()); // add next n bytes to stack;
+        scriptSig += redeemScript;
+
+        ScriptError err;
+        EXPECT_TRUE(VerifyScript(scriptSig, scriptPubKey, SCRIPT_VERIFY_P2SH, BaseSignatureChecker(), 1, &err));
+        EXPECT_EQ(err, SCRIPT_ERR_OK);
+    }
+
+} // namespace TestScriptStandardTests
