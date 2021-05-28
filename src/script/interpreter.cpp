@@ -1550,14 +1550,7 @@ bool VerifyScript(
         CScript pubKey2(pubKeySerialized.begin(), pubKeySerialized.end());
         popstack(stack);
 
-        // handle CryptoConditions in scriptSig
-        if (IsCryptoConditionsEnabled() && pubKey2.IsPayToCryptoCondition()) 
-        {
-            if (!EvalCryptoConditionSig(stack, pubKey2, serror))
-                // serror is set
-                return false;
-        }
-        else if (!EvalScript(stack, pubKey2, flags, checker, consensusBranchId, serror))
+        if (!EvalScript(stack, pubKey2, flags, checker, consensusBranchId, serror))
             // serror is set
             return false;
 

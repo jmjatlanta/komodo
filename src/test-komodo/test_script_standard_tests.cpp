@@ -6,6 +6,10 @@
 #include "script/script_error.h"
 #include "script/standard.h"
 #include "utilstrencodings.h"
+#include "cc/CChtlc.h"
+#include "testutils.h"
+
+extern CKey notaryKey;
 
 namespace TestScriptStandardTests {
 
@@ -643,24 +647,54 @@ namespace TestScriptStandardTests {
         EXPECT_EQ(err, SCRIPT_ERR_OK);
     }
 
-    TEST(TestScriptStandardTests, p2sh_cryptoconditions)
+    TEST(TestScriptStandardTests, p2sh_htlc)
     {
-        // test P2SH by adding 2 numbers that total 99
-        CScript redeemScript;
-        redeemScript << OP_ADD << 99 << OP_EQUAL;
+        // turn on CryptoConditions
+        ASSETCHAINS_CC = 1;
+        // force validation although not synced
+        KOMODO_CONNECTING = 0;
 
-        // standard P2SH (see BIP16)
-        CScript scriptPubKey;
-        scriptPubKey << OP_HASH160 << ToByteVector(CScriptID(redeemScript)) << OP_EQUAL;
+        // make a CryptoCondition
+        CC* cc = MakeCCcond1(EVAL_HTLC, notaryKey.GetPubKey());
+        //std::cout << cc_conditionToJSONString(cc) << std::endl;
 
-        CScript scriptSig;
-        scriptSig << 1 << 98;
-        scriptSig.push_back(redeemScript.size()); // add next n bytes to stack;
+        // sign it
+        CMutableTransaction tx;
+        tx.vin.resize(1);
+        PrecomputedTransactionData mutable_txdata(tx);
+        uint256 sighash = SignatureHash(CCPubKey(cc), tx, 0, SIGHASH_ALL, 0, 0, &mutable_txdata);
+        int out = cc_signTreeSecp256k1Msg32(cc, notaryKey.begin(), sighash.begin());
+        tx.vin[0].scriptSig = CCSig(cc);
+
+        // see if it works
+        CAmount amount;
+        ScriptError error;
+        CTransaction txTo(tx);
+        PrecomputedTransactionData txdata(txTo);
+        auto checker = ServerTransactionSignatureChecker(&txTo, 0, amount, false, txdata);
+        EXPECT_TRUE(VerifyScript(CCSig(cc), CCPubKey(cc), 0, checker, 0, &error));
+
+        // attempt to turn it into a P2SH
+        CScript redeemScript = CCPubKey(cc);
+
+        CScript scriptSig = CCSig(cc);
+        // push the redeemScript onto the stack instead of evaluating it
+        size_t redeemScriptSize = redeemScript.size();
+        if (redeemScriptSize < 76)
+            scriptSig.push_back( (uint8_t)redeemScriptSize );
+        else
+        {
+            redeemScript.push_back(OP_PUSHDATA1);
+            redeemScript.push_back( redeemScriptSize );
+        }
         scriptSig += redeemScript;
 
-        ScriptError err;
-        EXPECT_TRUE(VerifyScript(scriptSig, scriptPubKey, SCRIPT_VERIFY_P2SH, BaseSignatureChecker(), 1, &err));
-        EXPECT_EQ(err, SCRIPT_ERR_OK);
+        CScript scriptPubKey;
+        scriptPubKey << OP_HASH160 << ToByteVector(CScriptID(redeemScript)) << OP_EQUAL;       
+        EXPECT_TRUE(VerifyScript(scriptSig, scriptPubKey, SCRIPT_VERIFY_P2SH, checker, 1, &error));
+
+        EXPECT_EQ(error, SCRIPT_ERR_OK);
+        cc_free(cc);
     }
 
 } // namespace TestScriptStandardTests

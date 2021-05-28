@@ -32,13 +32,19 @@
 #include "CCGateways.h"
 #include "CCtokens.h"
 #include "CCImportGateway.h"
+#include "CChtlc.h"
 
 /*
  CCcustom has most of the functions that need to be extended to create a new CC contract.
  
- A CC scriptPubKey can only be spent if it is properly signed and validated. By constraining the vins and vouts, it is possible to implement a variety of functionality. CC vouts have an otherwise non-standard form, but it is properly supported by the enhanced bitcoin protocol code as a "cryptoconditions" output and the same pubkey will create a different address.
+ A CC scriptPubKey can only be spent if it is properly signed and validated. By constraining the vins and vouts, 
+ it is possible to implement a variety of functionality. CC vouts have an otherwise non-standard form, 
+ but it is properly supported by the enhanced bitcoin protocol code as a "cryptoconditions" output and the same 
+ pubkey will create a different address.
  
- This allows creation of a special address(es) for each contract type, which has the privkey public. That allows anybody to properly sign and spend it, but with the constraints on what is allowed in the validation code, the contract functionality can be implemented.
+ This allows creation of a special address(es) for each contract type, which has the privkey public. That allows 
+ anybody to properly sign and spend it, but with the constraints on what is allowed in the validation code, the 
+ contract functionality can be implemented.
  
  what needs to be done to add a new contract:
  1. add EVAL_CODE to eval.h
@@ -48,14 +54,20 @@
  5. add rpc calls to rpcserver.cpp and rpcserver.h and in one of the rpc.cpp files
  6. add the new .cpp files to src/Makefile.am
  
- IMPORTANT: make sure that all CC inputs and CC outputs are properly accounted for and reconcile to the satoshi. The built in utxo management will enforce overall vin/vout constraints but it wont know anything about the CC constraints. That is what your Validate function needs to do.
+ IMPORTANT: make sure that all CC inputs and CC outputs are properly accounted for and reconcile to the satoshi. 
+ The built in utxo management will enforce overall vin/vout constraints but it wont know anything about the CC 
+ constraints. That is what your Validate function needs to do.
  
- Generally speaking, there will be normal coins that change into CC outputs, CC outputs that go back to being normal coins, CC outputs that are spent to new CC outputs.
+ Generally speaking, there will be normal coins that change into CC outputs, CC outputs that go back to being 
+ normal coins, CC outputs that are spent to new CC outputs.
  
- Make sure both the CC coins and normal coins are preserved and follow the rules that make sense. It is a good idea to define specific roles for specific vins and vouts to reduce the complexity of validation.
+ Make sure both the CC coins and normal coins are preserved and follow the rules that make sense. It is a good idea 
+ to define specific roles for specific vins and vouts to reduce the complexity of validation.
  */
 
-// to create a new CCaddr, add to rpcwallet the CCaddress and start with -pubkey= with the pubkey of the new address, with its wif already imported. set normaladdr and CChexstr. run CCaddress and it will print the privkey along with autocorrect the CCaddress. which should then update the CCaddr here
+// to create a new CCaddr, add to rpcwallet the CCaddress and start with -pubkey= with the pubkey of the new address, 
+// with its wif already imported. set normaladdr and CChexstr. run CCaddress and it will print the privkey along with 
+// autocorrect the CCaddress. which should then update the CCaddr here
 
 // Assets, aka Tokens
 #define FUNCNAME IsAssetsInput
@@ -253,6 +265,18 @@ uint8_t ImportGatewayCCpriv[32] = { 0x65, 0xef, 0x27, 0xeb, 0x3d, 0xb0, 0xb4, 0x
 #undef FUNCNAME
 #undef EVALCODE
 
+#define FUNCNAME IsHTLCInput
+#define EVALCODE EVAL_HTLC
+const char *HTLCCCaddr = "REGFHStKZrUQLT3G3AnJYiiC3Cc19uZVXp";
+const char *HTLCNormaladdr = "RNCkPLHQ79fXnwrfrW5cfNkAxXztKrveRB";
+char HTLCCChexstr[67] = { "0264b45b5f8ce902491a332a2a5652502a9f5db4b3529792759be7f58e34985640" };
+uint8_t HTLCCCpriv[32] = {0x15, 0x8c, 0x13, 0xa6, 0xdf, 0x1d, 0x62, 0x9a, 0x8b, 0x4d, 0xc3, 
+                0xcb, 0xea, 0x54, 0xfa, 0xf0, 0xa7, 0x4f, 0x9b, 0x3f, 0xe0, 0xd1, 0x24, 0xf5,
+                0x71, 0xf3, 0xc9, 0x77, 0x93, 0x8c, 0xec, 0xe1 };
+#include "CCcustom.inc"
+#undef FUNCNAME
+#undef EVALCODE
+
 int32_t CClib_initcp(struct CCcontract_info *cp,uint8_t evalcode)
 {
     CPubKey pk; int32_t i; uint8_t pub33[33],check33[33],hash[32]; char CCaddr[64],checkaddr[64],str[67];
@@ -426,7 +450,16 @@ struct CCcontract_info *CCinit(struct CCcontract_info *cp, uint8_t evalcode)
             cp->validate = GatewaysValidate;
             cp->ismyvin = IsGatewaysInput;
             break;
-
+        case EVAL_HTLC:
+        {
+            strcpy(cp->unspendableCCaddr, HTLCCCaddr);
+            strcpy(cp->normaladdr, HTLCNormaladdr);
+            strcpy(cp->CChexstr, HTLCCChexstr);
+            memcpy(cp->CCpriv, HTLCCCpriv, 32);
+            cp->validate = HTLCValidate;
+            cp->ismyvin = HTLCIsMyVin;
+            break;
+        }
 		case EVAL_TOKENS:
 			strcpy(cp->unspendableCCaddr, TokensCCaddr);
 			strcpy(cp->normaladdr, TokensNormaladdr);

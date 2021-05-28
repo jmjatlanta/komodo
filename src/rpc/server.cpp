@@ -569,6 +569,11 @@ static const CRPCCommand vRPCCommands[] =
     //{ "tokens",       "tokenfillswap",    &tokenfillswap,     true },
     { "tokens",       "tokenconvert", &tokenconvert, true },
 
+    // HTLC
+    { "htlc", "htlcaddress", &htlcaddress, true },
+    { "htlc", "htlclist", &htlclist, true },
+    { "htlc", "htlcinfo", &htlcinfo, true },
+
     // pegs
     { "pegs",       "pegscreate",     &pegscreate,      true },
     { "pegs",       "pegsfund",         &pegsfund,      true },
