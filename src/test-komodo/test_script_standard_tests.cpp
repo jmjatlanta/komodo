@@ -666,7 +666,7 @@ namespace TestScriptStandardTests {
         int out = cc_signTreeSecp256k1Msg32(cc, notaryKey.begin(), sighash.begin());
         tx.vin[0].scriptSig = CCSig(cc);
 
-        // see if it works
+        // see if it works as a regular transaction
         CAmount amount;
         ScriptError error;
         CTransaction txTo(tx);
