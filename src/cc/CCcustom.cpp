@@ -265,18 +265,6 @@ uint8_t ImportGatewayCCpriv[32] = { 0x65, 0xef, 0x27, 0xeb, 0x3d, 0xb0, 0xb4, 0x
 #undef FUNCNAME
 #undef EVALCODE
 
-#define FUNCNAME IsHTLCInput
-#define EVALCODE EVAL_HTLC
-const char *HTLCCCaddr = "REGFHStKZrUQLT3G3AnJYiiC3Cc19uZVXp";
-const char *HTLCNormaladdr = "RNCkPLHQ79fXnwrfrW5cfNkAxXztKrveRB";
-char HTLCCChexstr[67] = { "0264b45b5f8ce902491a332a2a5652502a9f5db4b3529792759be7f58e34985640" };
-uint8_t HTLCCCpriv[32] = {0x15, 0x8c, 0x13, 0xa6, 0xdf, 0x1d, 0x62, 0x9a, 0x8b, 0x4d, 0xc3, 
-                0xcb, 0xea, 0x54, 0xfa, 0xf0, 0xa7, 0x4f, 0x9b, 0x3f, 0xe0, 0xd1, 0x24, 0xf5,
-                0x71, 0xf3, 0xc9, 0x77, 0x93, 0x8c, 0xec, 0xe1 };
-#include "CCcustom.inc"
-#undef FUNCNAME
-#undef EVALCODE
-
 int32_t CClib_initcp(struct CCcontract_info *cp,uint8_t evalcode)
 {
     CPubKey pk; int32_t i; uint8_t pub33[33],check33[33],hash[32]; char CCaddr[64],checkaddr[64],str[67];
@@ -452,12 +440,7 @@ struct CCcontract_info *CCinit(struct CCcontract_info *cp, uint8_t evalcode)
             break;
         case EVAL_HTLC:
         {
-            strcpy(cp->unspendableCCaddr, HTLCCCaddr);
-            strcpy(cp->normaladdr, HTLCNormaladdr);
-            strcpy(cp->CChexstr, HTLCCChexstr);
-            memcpy(cp->CCpriv, HTLCCCpriv, 32);
-            cp->validate = HTLCValidate;
-            cp->ismyvin = HTLCIsMyVin;
+            HTLC::SetValues(cp);
             break;
         }
 		case EVAL_TOKENS:

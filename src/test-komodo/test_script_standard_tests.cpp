@@ -638,7 +638,7 @@ namespace TestScriptStandardTests {
         scriptPubKey << OP_HASH160 << ToByteVector(CScriptID(redeemScript)) << OP_EQUAL;
 
         CScript scriptSig;
-        scriptSig << 1 << 98;
+        scriptSig << 1 << 98; // add 1 byte (decimal 98) to stack
         scriptSig.push_back(redeemScript.size()); // add next n bytes to stack;
         scriptSig += redeemScript;
 
@@ -654,16 +654,23 @@ namespace TestScriptStandardTests {
         // force validation although not synced
         KOMODO_CONNECTING = 0;
 
+        CKey key;
+        key.MakeNewKey(true);
+        CPubKey pubkey = key.GetPubKey();
+
         // make a CryptoCondition
-        CC* cc = MakeCCcond1(EVAL_HTLC, notaryKey.GetPubKey());
-        //std::cout << cc_conditionToJSONString(cc) << std::endl;
+        // Synopsis: threshold of 2 fulfillments that are:
+        // - HTLC validates
+        // - Transaction signed by the passed-in public key
+        CC* cc = MakeCCcond1(EVAL_HTLC, pubkey);
+        std::cout << cc_conditionToJSONString(cc) << std::endl;
 
         // sign it
         CMutableTransaction tx;
         tx.vin.resize(1);
         PrecomputedTransactionData mutable_txdata(tx);
         uint256 sighash = SignatureHash(CCPubKey(cc), tx, 0, SIGHASH_ALL, 0, 0, &mutable_txdata);
-        int out = cc_signTreeSecp256k1Msg32(cc, notaryKey.begin(), sighash.begin());
+        int out = cc_signTreeSecp256k1Msg32(cc, key.begin(), sighash.begin());
         tx.vin[0].scriptSig = CCSig(cc);
 
         // see if it works as a regular transaction
