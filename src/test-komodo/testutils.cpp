@@ -71,15 +71,15 @@ void setupChain()
  */
 void generateBlock(CBlock *block)
 {
+    SetMockTime(nMockTime+=100);  // CreateNewBlock can fail if not enough time passes
+
     UniValue params;
     params.setArray();
     params.push_back(1);
-    uint256 blockId;
-
-    SetMockTime(nMockTime+=100);  // CreateNewBlock can fail if not enough time passes
 
     try {
         UniValue out = generate(params, false, CPubKey());
+        uint256 blockId;
         blockId.SetHex(out[0].getValStr());
         if (block) 
             ASSERT_TRUE(ReadBlockFromDisk(*block, mapBlockIndex[blockId], false));
@@ -88,18 +88,24 @@ void generateBlock(CBlock *block)
     }
 }
 
-
+/***
+ * Accept a transaction, failing the gtest if the tx is not accepted
+ * @param tx the transaction to be accepted
+ */
 void acceptTxFail(const CTransaction tx)
 {
     CValidationState state;
-    if (!acceptTx(tx, state)) FAIL() << state.GetRejectReason();
+    if (!acceptTx(tx, state)) 
+        FAIL() << state.GetRejectReason();
 }
 
 
 bool acceptTx(const CTransaction tx, CValidationState &state)
 {
     LOCK(cs_main);
-    return AcceptToMemoryPool(mempool, state, tx, false, NULL);
+    bool missingInputs = false;
+    bool accepted = AcceptToMemoryPool(mempool, state, tx, false, &missingInputs, false, -1);
+    return accepted && !missingInputs;
 }
 
 /***
@@ -163,9 +169,20 @@ TestChain::TestChain()
     notaryKey = vchSecret.GetKey();
 }
 
-void TestChain::generateBlock(CBlock *block)
+CBlock TestChain::generateBlock()
 {
-    ::generateBlock(block);
+    CBlock block;
+    ::generateBlock(&block);
+    return block;
 }
 
 CKey TestChain::getNotaryKey() { return notaryKey; }
+
+CValidationState TestChain::acceptTx(const CTransaction& tx)
+{
+    CValidationState retVal;
+    bool accepted = ::acceptTx(tx, retVal);
+    if (!accepted && retVal.IsValid())
+        retVal.DoS(100, false, 0U, "acceptTx returned false");
+    return retVal;
+}

@@ -21,7 +21,8 @@
  */
 bool IncludesMinerFee::Validate(Eval *eval, const CTransaction &tx, uint32_t nIn)
 {
-    CAmount total = tx.GetShieldedValueIn();
+    int64_t interest;
+    CAmount total = pcoinsTip->GetValueIn(chainActive.LastTip()->GetHeight(),&interest,tx,chainActive.LastTip()->nTime);
     total -= tx.GetValueOut();
     if (total > 0)
     {

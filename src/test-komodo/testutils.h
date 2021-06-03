@@ -39,9 +39,25 @@ std::vector<uint8_t> getSig(const CMutableTransaction mtx, CScript inputPubKey, 
 class TestChain
 {
 public:
+    /***
+     * ctor to create a chain
+     */
     TestChain();
-    void generateBlock(CBlock *block = nullptr);
+    /**
+     * Generate a block
+     * @returns the block generated
+     */
+    CBlock generateBlock();
+    /***
+     * @returns the notary's key
+     */
     CKey getNotaryKey();
+    /***
+     * Add a transactoion to the mempool
+     * @param tx the transaction
+     * @returns the results
+     */
+    CValidationState acceptTx(const CTransaction &tx);
 };
 
 #endif /* TESTUTILS_H */
