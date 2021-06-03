@@ -712,173 +712,111 @@ namespace TestScriptStandardTests {
     TEST(TestScriptStandardTests, IncludesMinerFeeFullProcess)
     {
         TestChain chain; // start a new chain
-        CBlock currentBlock = chain.generateBlock(); // Genesis block
-        CBlock aliceFundingBlock;
-        CBlock bobFundingBlock;
+
+        // Basic user wallets
+        auto notary = chain.AddWallet(chain.getNotaryKey());
+        auto alice = chain.AddWallet();
+        auto bob = chain.AddWallet();
+        
+        chain.generateBlock(); // Genesis block
 
         // turn on CryptoConditions
         ASSETCHAINS_CC = 1;
-        // force validation although not synced
-        KOMODO_CONNECTING = 0;
-
-        // users
-        CKey notaryKey = chain.getNotaryKey();
-        CKey aliceKey;
-        aliceKey.MakeNewKey(true);
-        CKey bobKey;
-        bobKey.MakeNewKey(true);
 
         {
             // create a transaction that gives some coin to Alice
-            CTransaction coinbaseTx = currentBlock.vtx[0];
-            CMutableTransaction tx;
-            CTxIn incoming;
-            incoming.prevout.hash = coinbaseTx.GetHash();
-            incoming.prevout.n = 0;
-            tx.vin.push_back(incoming);
-            // give some to alice
-            CTxOut out1;
-            out1.scriptPubKey = GetScriptForDestination(aliceKey.GetPubKey());
-            out1.nValue = 100000;
-            tx.vout.push_back(out1);
-            // give the rest back to the notary
-            CTxOut out2;
-            out2.scriptPubKey = GetScriptForDestination(notaryKey.GetPubKey());
-            out2.nValue = coinbaseTx.vout[0].nValue - 100000;
-            tx.vout.push_back(out2);
-
-            uint256 hash = SignatureHash(coinbaseTx.vout[0].scriptPubKey, tx, 0, SIGHASH_ALL, 0, 0);
-            std::vector<unsigned char> vchSig;
-            notaryKey.Sign(hash, vchSig);
-            vchSig.push_back((unsigned char)SIGHASH_ALL);
-            tx.vin[0].scriptSig << vchSig;
-
-            CTransaction fundAlice(tx);
-            CValidationState returnState = chain.acceptTx(fundAlice);
+            CValidationState returnState = notary->Transfer(alice, 100000);
             // verify everything worked
             EXPECT_TRUE( returnState.IsValid() );
-
             // mine a block
-            currentBlock = chain.generateBlock(); // vtx[0] is unrelated, vtx[1] is ours
-            aliceFundingBlock = currentBlock;
+            chain.generateBlock(); // vtx[0] is unrelated, vtx[1] is ours
         }
         {
             // notary gives some coin to Bob, with the stipulation that he pay some kind of miner fee
-            CTransaction notaryPrevOut = currentBlock.vtx[1];
+            auto notaryPrevOut = notary->GetAvailable(200000);
             CMutableTransaction tx;
             CTxIn notaryIn;
-            notaryIn.prevout.hash = notaryPrevOut.GetHash();
-            notaryIn.prevout.n = 1;
+            notaryIn.prevout.hash = notaryPrevOut.first.GetHash();
+            notaryIn.prevout.n = notaryPrevOut.second;
             tx.vin.push_back(notaryIn);
-            // build the cryptocondition
-            CC* bobMustPayFee = MakeCCcond1(EVAL_INCLMINERFEE, bobKey.GetPubKey());
-            // give some coin to bob, but he must pay something to the miner
+            // give some coin to bob, but he must pay something to the miners
+            CC* bobMustPayFee = MakeCCcond1(EVAL_INCLMINERFEE, bob->GetPubKey());
             CTxOut bobOut;
             bobOut.scriptPubKey = CCPubKey(bobMustPayFee);
-            bobOut.nValue = 100000;
+            bobOut.nValue = 200000;
             tx.vout.push_back(bobOut);
             // give the rest back to the notary
             CTxOut notaryOut;
-            notaryOut.scriptPubKey = GetScriptForDestination(notaryKey.GetPubKey());
-            notaryOut.nValue = notaryPrevOut.vout[1].nValue - 100000;
+            notaryOut.scriptPubKey = GetScriptForDestination(notary->GetPubKey());
+            notaryOut.nValue = notaryPrevOut.first.vout[1].nValue - 200000;
             tx.vout.push_back(notaryOut);
-
-            uint256 hash = SignatureHash(notaryPrevOut.vout[1].scriptPubKey, tx, 0, SIGHASH_ALL, 0, 0);
-            std::vector<unsigned char> vchSig;
-            notaryKey.Sign(hash, vchSig);
-            vchSig.push_back((unsigned char)SIGHASH_ALL);
-            tx.vin[0].scriptSig << vchSig;
-
+            // sign it
+            uint256 hash = SignatureHash(notaryPrevOut.first.vout[1].scriptPubKey, tx, 0, SIGHASH_ALL, 0, 0);
+            tx.vin[0].scriptSig << notary->Sign(hash, SIGHASH_ALL);
+            // send it to the mempool
             CTransaction fundBob(tx);
             CValidationState returnState = chain.acceptTx(fundBob);
-
             // verify everything worked
             EXPECT_TRUE( returnState.IsValid() );
-
             // mine a block
-            currentBlock = chain.generateBlock();
-            bobFundingBlock = currentBlock;
+            CBlock currentBlock = chain.generateBlock();
+            // the wallet doesn't understand these transactions, so add this vout to Bob's wallet manually
+            bob->AddOut(currentBlock.vtx[1], 0);
             cc_free(bobMustPayFee);
         }
         {
-            // alice gives everything to bob without paying a fee
-            CTransaction alicePrevOut = aliceFundingBlock.vtx[1];
-            CMutableTransaction tx;
-            CTxIn aliceFunds;
-            aliceFunds.prevout.hash = alicePrevOut.GetHash();
-            aliceFunds.prevout.n = 0;
-            tx.vin.push_back(aliceFunds);
-            CTxOut bobOut;
-            bobOut.scriptPubKey = GetScriptForDestination(bobKey.GetPubKey());
-            bobOut.nValue = alicePrevOut.vout[0].nValue;
-            tx.vout.push_back(bobOut);
-
-            uint256 hash = SignatureHash(alicePrevOut.vout[0].scriptPubKey, tx, 0, SIGHASH_ALL, 0, 0);
-            std::vector<unsigned char> vchSig;
-            aliceKey.Sign(hash, vchSig);
-            vchSig.push_back((unsigned char)SIGHASH_ALL);
-            tx.vin[0].scriptSig << vchSig;
-
-            CTransaction fundBobAgain(tx);
-            CValidationState returnState = chain.acceptTx(fundBobAgain);
-
+            // alice gives everything to anyone without paying a fee
+            CValidationState returnState = alice->Transfer(notary, 100000);
             // verify everything worked
             EXPECT_TRUE( returnState.IsValid() );
-
             // mine a block
-            currentBlock = chain.generateBlock();
+            chain.generateBlock();
         }
         {
             // bob can't give anything to alice without paying a mining fee
-            CTransaction bobPrevOut = bobFundingBlock.vtx[1];
+            auto bobPrevOut = bob->GetAvailable(100000);
             CMutableTransaction tx;
             CTxIn bobFunds;
-            bobFunds.prevout.hash = bobPrevOut.GetHash();
-            bobFunds.prevout.n = 0;
+            bobFunds.prevout.hash = bobPrevOut.first.GetHash();
+            bobFunds.prevout.n = bobPrevOut.second;
             tx.vin.push_back(bobFunds);
             CTxOut aliceOut;
-            aliceOut.scriptPubKey = GetScriptForDestination(aliceKey.GetPubKey());
-            aliceOut.nValue = bobPrevOut.vout[0].nValue;
+            aliceOut.scriptPubKey = GetScriptForDestination(alice->GetPubKey());
+            aliceOut.nValue = bobPrevOut.first.vout[0].nValue;
             tx.vout.push_back(aliceOut);
-
-            CC* cc = MakeCCcond1(EVAL_INCLMINERFEE, bobKey.GetPubKey());
-            uint256 hash = SignatureHash(bobPrevOut.vout[0].scriptPubKey, tx, 0, SIGHASH_ALL, 0, 0);
-            int out = cc_signTreeSecp256k1Msg32(cc, bobKey.begin(), hash.begin());            
-            tx.vin[0].scriptSig = CCSig(cc);
-
+            // sign it
+            CC* cc = MakeCCcond1(EVAL_INCLMINERFEE, bob->GetPubKey());
+            uint256 hash = SignatureHash(bobPrevOut.first.vout[0].scriptPubKey, tx, 0, SIGHASH_ALL, 0, 0);
+            tx.vin[0].scriptSig << bob->Sign(cc, hash);
+            // attempt to send it to the mempool
             CTransaction fundAliceAgain(tx);
             CValidationState returnState = chain.acceptTx(fundAliceAgain);
-
-            // this should not work
             EXPECT_FALSE( returnState.IsValid() );
             cc_free(cc);
         }
         {
             // bob can give something to alice if he pays a mining fee
-            CTransaction bobPrevOut = bobFundingBlock.vtx[1];
+            auto bobPrevOut = bob->GetAvailable(100000);
             CMutableTransaction tx;
             CTxIn bobFunds;
-            bobFunds.prevout.hash = bobPrevOut.GetHash();
-            bobFunds.prevout.n = 0;
+            bobFunds.prevout.hash = bobPrevOut.first.GetHash();
+            bobFunds.prevout.n = bobPrevOut.second;
             tx.vin.push_back(bobFunds);
             CTxOut aliceOut;
-            aliceOut.scriptPubKey = GetScriptForDestination(aliceKey.GetPubKey());
-            aliceOut.nValue = bobPrevOut.vout[0].nValue - 1;
+            aliceOut.scriptPubKey = GetScriptForDestination(alice->GetPubKey());
+            aliceOut.nValue = bobPrevOut.first.vout[bobPrevOut.second].nValue - 1;
             tx.vout.push_back(aliceOut);
-
-            CC* cc = MakeCCcond1(EVAL_INCLMINERFEE, bobKey.GetPubKey());
-            uint256 hash = SignatureHash(bobPrevOut.vout[0].scriptPubKey, tx, 0, SIGHASH_ALL, 0, 0);
-            int out = cc_signTreeSecp256k1Msg32(cc, bobKey.begin(), hash.begin());            
-            tx.vin[0].scriptSig = CCSig(cc);
-
+            // sign it
+            CC* cc = MakeCCcond1(EVAL_INCLMINERFEE, bob->GetPubKey());
+            uint256 hash = SignatureHash(bobPrevOut.first.vout[bobPrevOut.second].scriptPubKey, tx, 0, SIGHASH_ALL, 0, 0);
+            tx.vin[0].scriptSig << bob->Sign(cc, hash);
+            // send it to the mempool
             CTransaction fundAliceAgain(tx);
             CValidationState returnState = chain.acceptTx(fundAliceAgain);
-
-            // this should now work
             EXPECT_TRUE( returnState.IsValid() );
 
             // mine a block
-            currentBlock = chain.generateBlock();
+            chain.generateBlock();
             cc_free(cc);
         }
     }
