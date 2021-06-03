@@ -18,12 +18,30 @@ extern CKey notaryKey;
 
 
 void setupChain();
+/***
+ * Generate a block
+ * @param block a place to store the block (read from disk)
+ */
 void generateBlock(CBlock *block=NULL);
 bool acceptTx(const CTransaction tx, CValidationState &state);
 void acceptTxFail(const CTransaction tx);
-void getInputTx(CScript scriptPubKey, CTransaction &txIn);
+/****
+ * In order to do tests there needs to be inputs to spend.
+ * This method creates a block and returns a transaction that spends the coinbase.
+ * @param scriptPubKey
+ * @returns the transaction
+ */
+CTransaction getInputTx(CScript scriptPubKey);
 CMutableTransaction spendTx(const CTransaction &txIn, int nOut=0);
 std::vector<uint8_t> getSig(const CMutableTransaction mtx, CScript inputPubKey, int nIn=0);
 
+
+class TestChain
+{
+public:
+    TestChain();
+    void generateBlock(CBlock *block = nullptr);
+    CKey getNotaryKey();
+};
 
 #endif /* TESTUTILS_H */

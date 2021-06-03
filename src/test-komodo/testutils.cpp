@@ -65,7 +65,10 @@ void setupChain()
     InitBlockIndex();
 }
 
-
+/***
+ * Generate a block
+ * @param block a place to store the block (nullptr skips the disk read)
+ */
 void generateBlock(CBlock *block)
 {
     UniValue params;
@@ -78,7 +81,8 @@ void generateBlock(CBlock *block)
     try {
         UniValue out = generate(params, false, CPubKey());
         blockId.SetHex(out[0].getValStr());
-        if (block) ASSERT_TRUE(ReadBlockFromDisk(*block, mapBlockIndex[blockId], false));
+        if (block) 
+            ASSERT_TRUE(ReadBlockFromDisk(*block, mapBlockIndex[blockId], false));
     } catch (const UniValue& e) {
         FAIL() << "failed to create block: " << e.write().data();
     }
@@ -98,7 +102,12 @@ bool acceptTx(const CTransaction tx, CValidationState &state)
     return AcceptToMemoryPool(mempool, state, tx, false, NULL);
 }
 
-
+/***
+ * Create a transaction based on input
+ * @param txIn the vin data (which becomes prevout)
+ * @param nOut the index of txIn to use as prevout
+ * @returns the transaction
+ */
 CMutableTransaction spendTx(const CTransaction &txIn, int nOut)
 {
     CMutableTransaction mtx;
@@ -125,7 +134,7 @@ std::vector<uint8_t> getSig(const CMutableTransaction mtx, CScript inputPubKey, 
  * In order to do tests there needs to be inputs to spend.
  * This method creates a block and returns a transaction that spends the coinbase.
  */
-void getInputTx(CScript scriptPubKey, CTransaction &txIn)
+CTransaction getInputTx(CScript scriptPubKey)
 {
     // Get coinbase
     CBlock block;
@@ -143,5 +152,20 @@ void getInputTx(CScript scriptPubKey, CTransaction &txIn)
 
     // Accept
     acceptTxFail(mtx);
-    txIn = CTransaction(mtx);
+    return CTransaction(mtx);
 }
+
+TestChain::TestChain()
+{
+    setupChain();
+    CBitcoinSecret vchSecret;
+    vchSecret.SetString(notarySecret); // this returns false due to network prefix mismatch but works anyway
+    notaryKey = vchSecret.GetKey();
+}
+
+void TestChain::generateBlock(CBlock *block)
+{
+    ::generateBlock(block);
+}
+
+CKey TestChain::getNotaryKey() { return notaryKey; }

@@ -60,6 +60,7 @@
         EVAL(EVAL_IMPORTGATEWAY, 0xf3)
 
 #define EVAL_HTLC 0xf4
+#define EVAL_INCLMINERFEE 0xf5
 
 // evalcodes 0x10 to 0x7f are reserved for cclib dynamic CC
 #define EVAL_FIRSTUSER 0x10

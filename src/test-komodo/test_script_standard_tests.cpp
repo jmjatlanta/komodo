@@ -647,6 +647,68 @@ namespace TestScriptStandardTests {
         EXPECT_EQ(err, SCRIPT_ERR_OK);
     }
 
+    TEST(TestScriptStandardTests, IncludesMinerFee)
+    {
+        // turn on CryptoConditions
+        ASSETCHAINS_CC = 1;
+        // force validation although not synced
+        KOMODO_CONNECTING = 0;
+        
+        CKey key;
+        key.MakeNewKey(true); // = chain.getNotaryKey();
+
+        // make a CryptoCondition
+        // Synopsis: threshold of 2 fulfillments that are:
+        // - IncludesMinerFee validates
+        // - Transaction signed by the private key of the passed-in public key
+        CC* cc = MakeCCcond1(EVAL_INCLMINERFEE, key.GetPubKey());
+
+        {
+            // create a transaction with something for the miner
+            CMutableTransaction tx;
+            tx.vin.resize(1);
+            tx.valueBalance = 100;
+            tx.vout.resize(1);
+            tx.vout[0].nValue = 99;
+            PrecomputedTransactionData mutable_txdata(tx);
+
+            // sign it
+            uint256 sighash = SignatureHash(CCPubKey(cc), tx, 0, SIGHASH_ALL, 0, 0, &mutable_txdata);
+            int out = cc_signTreeSecp256k1Msg32(cc, key.begin(), sighash.begin());
+
+            // see if it works
+            CAmount amount;
+            CTransaction txTo(tx);
+            PrecomputedTransactionData txdata(txTo);
+            auto checker = ServerTransactionSignatureChecker(&txTo, 0, amount, false, txdata);
+            ScriptError error;
+            EXPECT_TRUE(VerifyScript(CCSig(cc), CCPubKey(cc), 0, checker, 0, &error));
+            EXPECT_EQ(error, SCRIPT_ERR_OK);
+        }
+        {
+            // create a transaction with nothing for the miner
+            CMutableTransaction tx;
+            tx.vin.resize(1);
+            tx.valueBalance = 100;
+            tx.vout.resize(1);
+            tx.vout[0].nValue = 100;
+            PrecomputedTransactionData mutable_txdata(tx);
+
+            // sign it
+            uint256 sighash = SignatureHash(CCPubKey(cc), tx, 0, SIGHASH_ALL, 0, 0, &mutable_txdata);
+            int out = cc_signTreeSecp256k1Msg32(cc, key.begin(), sighash.begin());
+
+            // see if it fails
+            CAmount amount;
+            CTransaction txTo(tx);
+            PrecomputedTransactionData txdata(txTo);
+            auto checker = ServerTransactionSignatureChecker(&txTo, 0, amount, false, txdata);
+            ScriptError error;
+            EXPECT_FALSE(VerifyScript(CCSig(cc), CCPubKey(cc), 0, checker, 0, &error));
+            EXPECT_EQ(error, SCRIPT_ERR_EVAL_FALSE);
+        }
+    }
+
     TEST(TestScriptStandardTests, p2sh_htlc)
     {
         // turn on CryptoConditions

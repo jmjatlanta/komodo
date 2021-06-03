@@ -33,6 +33,7 @@
 #include "CCtokens.h"
 #include "CCImportGateway.h"
 #include "CChtlc.h"
+#include "CCIncludesMinerFee.h"
 
 /*
  CCcustom has most of the functions that need to be extended to create a new CC contract.
@@ -439,10 +440,11 @@ struct CCcontract_info *CCinit(struct CCcontract_info *cp, uint8_t evalcode)
             cp->ismyvin = IsGatewaysInput;
             break;
         case EVAL_HTLC:
-        {
             HTLC::SetValues(cp);
             break;
-        }
+        case EVAL_INCLMINERFEE:
+            IncludesMinerFee::SetValues(cp);
+            break;
 		case EVAL_TOKENS:
 			strcpy(cp->unspendableCCaddr, TokensCCaddr);
 			strcpy(cp->normaladdr, TokensNormaladdr);

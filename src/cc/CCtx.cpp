@@ -744,7 +744,13 @@ int64_t AddNormalinputs2(CMutableTransaction &mtx, int64_t total, int32_t maxinp
 // has additional mypk param for nspv calls
 int64_t AddNormalinputsRemote(CMutableTransaction &mtx, CPubKey mypk, int64_t total, int32_t maxinputs)
 {
-    int32_t abovei,belowi,ind,vout,i,n = 0; int64_t sum,threshold,above,below; int64_t remains,nValue,totalinputs = 0; char coinaddr[64]; uint256 txid,hashBlock; CTransaction tx; struct CC_utxo *utxos,*up;
+    int32_t abovei,belowi,ind,vout,i,n = 0; 
+    int64_t sum,threshold,above,below; 
+    int64_t remains,nValue,totalinputs = 0; 
+    char coinaddr[64]; 
+    uint256 txid,hashBlock; 
+    CTransaction tx; 
+    struct CC_utxo *utxos,*up;
     std::vector<std::pair<CAddressUnspentKey, CAddressUnspentValue> > unspentOutputs;
     if ( KOMODO_NSPV_SUPERLITE )
         return(NSPV_AddNormalinputs(mtx,mypk,total,maxinputs,&NSPV_U));
@@ -763,7 +769,9 @@ int64_t AddNormalinputsRemote(CMutableTransaction &mtx, CPubKey mypk, int64_t to
         vout = (int32_t)it->first.index;
         if ( it->second.satoshis < threshold )
             continue;
-        if ( myGetTransaction(txid,tx,hashBlock) != 0 && tx.vout.size() > 0 && vout < tx.vout.size() && tx.vout[vout].scriptPubKey.IsPayToCryptoCondition() == 0 )
+        if ( myGetTransaction(txid,tx,hashBlock) != 0 && tx.vout.size() > 0 
+                && vout < tx.vout.size() 
+                && tx.vout[vout].scriptPubKey.IsPayToCryptoCondition() == 0 )
         {
             //fprintf(stderr,"check %.8f to vins array.%d of %d %s/v%d\n",(double)out.tx->vout[out.i].nValue/COIN,n,maxutxos,txid.GetHex().c_str(),(int32_t)vout);
             if ( mtx.vin.size() > 0 )

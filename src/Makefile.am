@@ -304,6 +304,7 @@ libbitcoin_server_a_SOURCES = \
   cc/fsm.cpp \
   cc/heir.cpp \
   cc/CChtlc.cpp \
+  cc/CCIncludesMinerFee.cpp \
   cc/oracles.cpp \
   cc/prices.cpp \
   cc/pegs.cpp \

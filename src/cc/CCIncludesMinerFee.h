@@ -15,12 +15,12 @@
 #include "CCinclude.h"
 
 /***
- * This contract wraps HTLC functionality into a CryptoCondition
+ * This contract verifies the transaction contains a fee
  */
-struct HTLC : public CCcontract_info
+struct IncludesMinerFee : public CCcontract_info
 {
     /***
-     * Set up a raw CCcontract_info struct to be an HTLC contract
+     * Set up a raw CCcontract_info struct to be this contract
      * @param in the struct to fill
      */ 
     static void SetValues(CCcontract_info* in);
@@ -28,7 +28,7 @@ struct HTLC : public CCcontract_info
     /**
      * ctor
      */
-    HTLC();
+    IncludesMinerFee();
 
     /***
      * Validate
@@ -46,17 +46,5 @@ struct HTLC : public CCcontract_info
      */
     bool IsMyVin(const CScript &script);
 
-    /***
-     * to implement
-     */
-    UniValue list();
-
-    /***
-     * to implmement
-     */
-    UniValue info(uint256 tokenid) 
-    { 
-        return UniValue(UniValue::VNULL); 
-    }
 };
 

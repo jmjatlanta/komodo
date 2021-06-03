@@ -151,31 +151,50 @@ CScript EncodeRewardsOpRet(uint8_t funcid,uint64_t sbits,uint256 fundingtxid)
     return(opret);
 }
 
-uint8_t DecodeRewardsOpRet(uint256 txid,const CScript &scriptPubKey,uint64_t &sbits,uint256 &fundingtxid)
+/****
+ * Decode the opreturn data
+ * @param txid
+ * @param scriptPubKey the incomding script
+ * @param sbits sbits found in OP_RETURN data
+ * @param fundingtxid the appropriate txid
+ * @returns the character immediately following the OP_RETURN
+ */
+uint8_t DecodeRewardsOpRet(uint256 txid, const CScript &scriptPubKey, uint64_t &sbits, uint256 &fundingtxid)
 {
-    std::vector<uint8_t> vopret; uint8_t *script,e,f,funcid; uint64_t APR,minseconds,maxseconds,mindeposit;
+    uint8_t e,f,funcid; 
+    uint64_t APR,minseconds,maxseconds,mindeposit;
+
+    // get the data from OP_RETURN
+    std::vector<uint8_t> vopret;
     GetOpReturnData(scriptPubKey, vopret);
     if ( vopret.size() > 2 )
     {
-        script = (uint8_t *)vopret.data();
-        if ( script[0] == EVAL_REWARDS )
+        uint8_t *script = (uint8_t *)vopret.data();
+        if ( script[0] == EVAL_REWARDS ) // make sure we're decoding something that is for the Rewards contract
         {
-            if ( script[1] == 'F' )
+            if ( script[1] == 'F' ) // Funding
             {
                 if ( E_UNMARSHAL(vopret,ss >> e; ss >> f; ss >> sbits; ss >> APR; ss >> minseconds; ss >> maxseconds; ss >> mindeposit) != 0 )
                 {
                     fundingtxid = txid;
                     return('F');
-                } else fprintf(stderr,"unmarshal error for F\n");
+                } 
+                else 
+                    fprintf(stderr,"unmarshal error for F\n");
             }
             else if ( E_UNMARSHAL(vopret,ss >> e; ss >> f; ss >> sbits; ss >> fundingtxid) != 0 )
             {
-                if ( e == EVAL_REWARDS && (f == 'L' || f == 'U' || f == 'A') )
+                if ( e == EVAL_REWARDS && (f == 'L' || f == 'U' || f == 'A') ) // Lock, Unlock, or Add funding
                     return(f);
-                else fprintf(stderr,"mismatched e.%02x f.(%c)\n",e,f);
+                else 
+                    fprintf(stderr,"mismatched e.%02x f.(%c)\n",e,f);
             }
-        } else fprintf(stderr,"script[0] %02x != EVAL_REWARDS\n",script[0]);
-    } else fprintf(stderr,"not enough opret.[%d]\n",(int32_t)vopret.size());
+        } 
+        else 
+            fprintf(stderr,"script[0] %02x != EVAL_REWARDS\n",script[0]);
+    } 
+    else 
+        fprintf(stderr,"not enough opret.[%d]\n",(int32_t)vopret.size());
     return(0);
 }
 
@@ -230,9 +249,21 @@ bool RewardsExactAmounts(struct CCcontract_info *cp,Eval *eval,const CTransactio
     else return(true);
 }
 
+/****
+ * Validate rewards - should only be called when unlocking
+ * @param cp the rewards contract
+ * @param eval where to put the results
+ * @param tx the incoming transaction
+ * @param nIn not used
+ * @returns true on success
+ */
 bool RewardsValidate(struct CCcontract_info *cp,Eval* eval,const CTransaction &tx, uint32_t nIn)
 {
-    uint256 txid,fundingtxid,hashBlock,vinfundingtxid; uint64_t vinsbits,sbits,APR,minseconds,maxseconds,mindeposit,amount,reward,txfee=10000; int32_t numvins,numvouts,preventCCvins,preventCCvouts,i; uint8_t funcid; CScript scriptPubKey; CTransaction fundingTx,vinTx;
+    uint256 txid,fundingtxid,hashBlock,vinfundingtxid; 
+    uint64_t vinsbits,sbits,APR,minseconds,maxseconds,mindeposit,amount,reward,txfee=10000; 
+    int32_t numvins,numvouts,preventCCvins,preventCCvouts,i; 
+    CScript scriptPubKey; 
+    CTransaction fundingTx,vinTx;
     int64_t dummy;
     numvins = tx.vin.size();
     numvouts = tx.vout.size();
@@ -242,12 +273,17 @@ bool RewardsValidate(struct CCcontract_info *cp,Eval* eval,const CTransaction &t
     else
     {
         txid = tx.GetHash();
-        if ( (funcid= DecodeRewardsOpRet(txid,tx.vout[numvouts-1].scriptPubKey,sbits,fundingtxid)) != 0 )
+        uint8_t funcid = DecodeRewardsOpRet(txid, tx.vout[numvouts-1].scriptPubKey, sbits, fundingtxid);
+        if ( funcid != 0 )
         {
             if ( eval->GetTxUnconfirmed(fundingtxid,fundingTx,hashBlock) == 0 )
                 return eval->Invalid("cant find fundingtxid");
-            else if ( fundingTx.vout.size() > 0 && DecodeRewardsFundingOpRet(fundingTx.vout[fundingTx.vout.size()-1].scriptPubKey,sbits,APR,minseconds,maxseconds,mindeposit) != 'F' )
-                return eval->Invalid("fundingTx not valid");
+            else
+            {
+                if ( fundingTx.vout.size() > 0 
+                        && DecodeRewardsFundingOpRet(fundingTx.vout[fundingTx.vout.size()-1].scriptPubKey,sbits,APR,minseconds,maxseconds,mindeposit) != 'F' )
+                    return eval->Invalid("fundingTx not valid");
+            }
             if ( APR > REWARDSCC_MAXAPR )
                 return eval->Invalid("excessive APR");
             switch ( funcid )
@@ -337,7 +373,9 @@ bool RewardsValidate(struct CCcontract_info *cp,Eval* eval,const CTransaction &t
                     return eval->Invalid("unexpected rewards funcid");
                     break;
             }
-        } else return eval->Invalid("unexpected rewards missing funcid");
+        } 
+        else 
+            return eval->Invalid("unexpected rewards missing funcid");
         return(PreventCC(eval,tx,preventCCvins,numvins,preventCCvouts,numvouts));
     }
     return(true);
