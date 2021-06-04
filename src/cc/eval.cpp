@@ -94,11 +94,10 @@ bool Eval::Dispatch(const CC *cond, const CTransaction &txTo, unsigned int nIn)
         else return Invalid("mismatched -ac_cclib vs CClib_name");
     }
 
-    //NOTE: ecode will be between EVAL_FIRSTUSER and EVAL_LASTUSER
     std::shared_ptr<CCcontract_info> cp = CCinfos[(int32_t)ecode];
     if ( cp == nullptr )
     {
-        cp = std::make_shared<CClibContract_info>(ecode);
+        cp = CCinit(ecode);
     }
 
     switch ( ecode )
