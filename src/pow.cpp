@@ -297,11 +297,11 @@ arith_uint256 zawy_TSA_EMA(int32_t height,int32_t tipdiff,arith_uint256 prevTarg
 
 unsigned int GetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHeader *pblock, const Consensus::Params& params)
 {
-    if (ASSETCHAINS_ALGO != ASSETCHAINS_EQUIHASH && ASSETCHAINS_STAKED == 0)
+    if (ASSETCHAINS_ALGO->algo != hash_algo::HASH_ALGO_EQUIHASH && ASSETCHAINS_STAKED == 0)
         return lwmaGetNextWorkRequired(pindexLast, pblock, params);
 
     arith_uint256 bnLimit;
-    if (ASSETCHAINS_ALGO == ASSETCHAINS_EQUIHASH)
+    if (ASSETCHAINS_ALGO->algo == hash_algo::HASH_ALGO_EQUIHASH)
         bnLimit = UintToArith256(params.powLimit);
     else
         bnLimit = UintToArith256(params.powAlternate);
@@ -522,7 +522,7 @@ unsigned int CalculateNextWorkRequired(arith_uint256 bnAvg,
     }
     // Retarget
     arith_uint256 bnLimit;
-    if (ASSETCHAINS_ALGO == ASSETCHAINS_EQUIHASH)
+    if (ASSETCHAINS_ALGO->algo == hash_algo::HASH_ALGO_EQUIHASH)
         bnLimit = UintToArith256(params.powLimit);
     else
         bnLimit = UintToArith256(params.powAlternate);
@@ -552,7 +552,7 @@ unsigned int lwmaGetNextWorkRequired(const CBlockIndex* pindexLast, const CBlock
 unsigned int lwmaCalculateNextWorkRequired(const CBlockIndex* pindexLast, const Consensus::Params& params)
 {
     arith_uint256 nextTarget {0}, sumTarget {0}, bnTmp, bnLimit;
-    if (ASSETCHAINS_ALGO == ASSETCHAINS_EQUIHASH)
+    if (ASSETCHAINS_ALGO->algo == hash_algo::HASH_ALGO_EQUIHASH)
         bnLimit = UintToArith256(params.powLimit);
     else
         bnLimit = UintToArith256(params.powAlternate);
@@ -756,7 +756,7 @@ uint32_t lwmaGetNextPOSRequired(const CBlockIndex* pindexLast, const Consensus::
 
 bool CheckEquihashSolution(const CBlockHeader *pblock, const CChainParams& params)
 {
-    if (ASSETCHAINS_ALGO != ASSETCHAINS_EQUIHASH)
+    if (ASSETCHAINS_ALGO->algo != hash_algo::HASH_ALGO_EQUIHASH)
         return true;
     
     if ( ASSETCHAINS_NK[0] != 0 && ASSETCHAINS_NK[1] != 0 && pblock->GetHash().ToString() == "027e3758c3a65b12aa1046462b486d0a63bfa1beae327897f56c5cfb7daaae71" )
@@ -869,7 +869,7 @@ bool CheckProofOfWork(const CBlockHeader &blkHeader, uint8_t *pubkey33, int32_t 
             }
         }
     }
-    arith_uint256 bnLimit = (height <= 1 || ASSETCHAINS_ALGO == ASSETCHAINS_EQUIHASH) ? UintToArith256(params.powLimit) : UintToArith256(params.powAlternate);
+    arith_uint256 bnLimit = (height <= 1 || ASSETCHAINS_ALGO->algo == hash_algo::HASH_ALGO_EQUIHASH) ? UintToArith256(params.powLimit) : UintToArith256(params.powAlternate);
     if (fNegative || bnTarget == 0 || fOverflow || bnTarget > bnLimit)
         return error("CheckProofOfWork(): nBits below minimum work");
     if ( ASSETCHAINS_STAKED != 0 )

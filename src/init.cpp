@@ -93,6 +93,7 @@
 using namespace std;
 
 #include "komodo_defs.h"
+
 extern void ThreadSendAlert();
 extern bool komodo_dailysnapshot(int32_t height);
 extern int32_t KOMODO_LOADINGBLOCKS;
@@ -1340,15 +1341,15 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
 
     // set the hash algorithm to use for this chain
     // Again likely better solution here, than using long IF ELSE. 
-    extern uint32_t ASSETCHAINS_ALGO, ASSETCHAINS_VERUSHASH, ASSETCHAINS_VERUSHASHV1_1;
+    extern std::shared_ptr<hash_algorithm> ASSETCHAINS_ALGO;
     CVerusHash::init();
     CVerusHashV2::init();
-    if (ASSETCHAINS_ALGO == ASSETCHAINS_VERUSHASH)
+    if (ASSETCHAINS_ALGO->algo == hash_algo::HASH_ALGO_VERUSHASH)
     {
         // initialize VerusHash
         CBlockHeader::SetVerusHash();
     }
-    else if (ASSETCHAINS_ALGO == ASSETCHAINS_VERUSHASHV1_1)
+    else if (ASSETCHAINS_ALGO->algo == hash_algo::HASH_ALGO_VERUSHASHV1_1)
     {
         // initialize VerusHashV2
         CBlockHeader::SetVerusHashV2();

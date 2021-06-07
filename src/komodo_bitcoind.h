@@ -1560,7 +1560,7 @@ arith_uint256 komodo_PoWtarget(int32_t *percPoSp,arith_uint256 target,int32_t he
     if ( m+n < 100 )
     {
         // We do actual PoS % at the start. Requires coin distribution in first 10 blocks! 
-        if ( ASSETCHAINS_ALGO == ASSETCHAINS_VERUSHASH || ASSETCHAINS_ALGO == ASSETCHAINS_VERUSHASHV1_1 )
+        if ( ASSETCHAINS_ALGO->algo == hash_algo::HASH_ALGO_VERUSHASH || ASSETCHAINS_ALGO->algo == hash_algo::HASH_ALGO_VERUSHASHV1_1)
             percPoS = (percPoS*100) / (m+n); 
         else
             percPoS = ((percPoS * n) + (goalperc * (100-n))) / 100;            
