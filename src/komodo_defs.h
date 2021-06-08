@@ -18,7 +18,6 @@
 #include "arith_uint256.h"
 #include "chain.h"
 #include "komodo_nk.h"
-#include "komodo_algorithms.h"
 
 #define KOMODO_EARLYTXID_HEIGHT 100
 //#define ADAPTIVEPOW_CHANGETO_DEFAULTON 1572480000
@@ -38,6 +37,8 @@
 #define ASSETCHAINS_STAKED_BLOCK_FUTURE_HALF 27
 #define ASSETCHAINS_STAKED_MIN_POW_DIFF 536900000 // 537000000 537300000
 #define _COINBASE_MATURITY 100
+
+#include "komodo_algorithms.h"
 
 // KMD Notary Seasons 
 // 1: May 1st 2018 1530921600

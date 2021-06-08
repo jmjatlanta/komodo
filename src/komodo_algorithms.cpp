@@ -1,5 +1,6 @@
 #include "komodo_algorithms.h"
 #include "chainparams.h"
+#include "arith_uint256.h"
 
 hash_algorithm hash_algorithm::get_algorithm(const std::string& in)
 {
@@ -23,6 +24,11 @@ hash_algorithm hash_algorithm::get_algorithm(hash_algo in)
     return hash_algorithm();
 }
 
+arith_uint256 hash_algorithm::GetPoWLimit(const Consensus::Params &in)
+{
+    return UintToArith256(in.powLimit);
+}
+
 void hash_algorithm::SetConsensusValues(CChainParams *in)
 {
 }
@@ -39,6 +45,11 @@ void verushash::SetConsensusValues(CChainParams *in)
     in->consensus.nLwmaAjustedWeight = 1350;
     in->consensus.nPowAveragingWindow = 45;
     in->consensus.powAlternate = uint256S("00000f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f");    
+}
+
+arith_uint256 verushash::GetPoWLimit(const Consensus::Params &in)
+{
+    return UintToArith256(in.powAlternate);
 }
 
 int32_t verushash::CalculatePercentPoS(int32_t inPct, int32_t m, int32_t n, int32_t goalPct)

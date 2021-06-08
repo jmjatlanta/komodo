@@ -300,12 +300,7 @@ unsigned int GetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHead
     if (ASSETCHAINS_ALGO.algo != hash_algo::HASH_ALGO_EQUIHASH && ASSETCHAINS_STAKED == 0)
         return lwmaGetNextWorkRequired(pindexLast, pblock, params);
 
-    arith_uint256 bnLimit;
-    if (ASSETCHAINS_ALGO.algo == hash_algo::HASH_ALGO_EQUIHASH)
-        bnLimit = UintToArith256(params.powLimit);
-    else
-        bnLimit = UintToArith256(params.powAlternate);
-    unsigned int nProofOfWorkLimit = bnLimit.GetCompact();
+    unsigned int nProofOfWorkLimit = ASSETCHAINS_ALGO.GetPoWLimit(params).GetCompact();
     // Genesis block
     if (pindexLast == NULL )
         return nProofOfWorkLimit;
@@ -521,13 +516,7 @@ unsigned int CalculateNextWorkRequired(arith_uint256 bnAvg,
             nActualTimespan = params.MaxActualTimespan();
     }
     // Retarget
-    arith_uint256 bnLimit;
-    if (ASSETCHAINS_ALGO.algo == hash_algo::HASH_ALGO_EQUIHASH)
-        bnLimit = UintToArith256(params.powLimit);
-    else
-        bnLimit = UintToArith256(params.powAlternate);
-
-    const arith_uint256 bnPowLimit = bnLimit; //UintToArith256(params.powLimit);
+    const arith_uint256 bnPowLimit = ASSETCHAINS_ALGO.GetPoWLimit(params);
     arith_uint256 bnNew {bnAvg};
     bnNew /= params.AveragingWindowTimespan();
     bnNew *= nActualTimespan;
@@ -551,16 +540,8 @@ unsigned int lwmaGetNextWorkRequired(const CBlockIndex* pindexLast, const CBlock
 
 unsigned int lwmaCalculateNextWorkRequired(const CBlockIndex* pindexLast, const Consensus::Params& params)
 {
-    arith_uint256 nextTarget {0}, sumTarget {0}, bnTmp, bnLimit;
-    if (ASSETCHAINS_ALGO.algo == hash_algo::HASH_ALGO_EQUIHASH)
-        bnLimit = UintToArith256(params.powLimit);
-    else
-        bnLimit = UintToArith256(params.powAlternate);
-
-    unsigned int nProofOfWorkLimit = bnLimit.GetCompact();
+    arith_uint256 nextTarget {0}, sumTarget {0}, bnTmp;
     
-    //printf("PoWLimit: %u\n", nProofOfWorkLimit);
-
     // Find the first block in the averaging interval as we total the linearly weighted average
     const CBlockIndex* pindexFirst = pindexLast;
     const CBlockIndex* pindexNext;
@@ -584,9 +565,10 @@ unsigned int lwmaCalculateNextWorkRequired(const CBlockIndex* pindexLast, const 
         sumTarget += bnTmp / (k * N * N);
     }
 
+    arith_uint256 bnLimit = ASSETCHAINS_ALGO.GetPoWLimit(params);
     // Check we have enough blocks
     if (!pindexFirst)
-        return nProofOfWorkLimit;
+        return bnLimit.GetCompact();
 
     // Keep t reasonable in case strange solvetimes occurred.
     if (t < N * k / 3)
@@ -869,7 +851,12 @@ bool CheckProofOfWork(const CBlockHeader &blkHeader, uint8_t *pubkey33, int32_t 
             }
         }
     }
-    arith_uint256 bnLimit = (height <= 1 || ASSETCHAINS_ALGO.algo == hash_algo::HASH_ALGO_EQUIHASH) ? UintToArith256(params.powLimit) : UintToArith256(params.powAlternate);
+    arith_uint256 bnLimit;
+    if (height <= 1 && ASSETCHAINS_ALGO.algo != hash_algo::HASH_ALGO_EQUIHASH) // always use equihash if height <= 1
+        bnLimit = equihash().GetPoWLimit(params);
+    else
+        bnLimit = ASSETCHAINS_ALGO.GetPoWLimit(params);
+        
     if (fNegative || bnTarget == 0 || fOverflow || bnTarget > bnLimit)
         return error("CheckProofOfWork(): nBits below minimum work");
     if ( ASSETCHAINS_STAKED != 0 )
