@@ -1340,20 +1340,8 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
     globalVerifyHandle.reset(new ECCVerifyHandle());
 
     // set the hash algorithm to use for this chain
-    // Again likely better solution here, than using long IF ELSE. 
     extern hash_algorithm ASSETCHAINS_ALGO;
-    CVerusHash::init();
-    CVerusHashV2::init();
-    if (ASSETCHAINS_ALGO.algo == hash_algo::HASH_ALGO_VERUSHASH)
-    {
-        // initialize VerusHash
-        CBlockHeader::SetVerusHash();
-    }
-    else if (ASSETCHAINS_ALGO.algo == hash_algo::HASH_ALGO_VERUSHASHV1_1)
-    {
-        // initialize VerusHashV2
-        CBlockHeader::SetVerusHashV2();
-    }
+    CBlockHeader::SetHashFunction(ASSETCHAINS_ALGO);
 
     // Sanity check
     if (!InitSanityCheck())
