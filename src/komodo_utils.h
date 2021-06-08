@@ -1816,7 +1816,6 @@ void komodo_args(char *argv0)
         {
             printf("ASSETCHAINS_ALGO, algorithm set to %s\n", selectedAlgo.c_str());
         }
-        STAKING_MIN_DIFF = ASSETCHAINS_ALGO->mindiff;
         if ( ASSETCHAINS_ALGO->algo == hash_algo::HASH_ALGO_EQUIHASH && ASSETCHAINS_NK[0] != 0 && ASSETCHAINS_NK[1] != 0 )
         {
             if ( equihash_params_possible(ASSETCHAINS_NK[0], ASSETCHAINS_NK[1]) == -1 ) 
