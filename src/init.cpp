@@ -1341,15 +1341,15 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
 
     // set the hash algorithm to use for this chain
     // Again likely better solution here, than using long IF ELSE. 
-    extern std::shared_ptr<hash_algorithm> ASSETCHAINS_ALGO;
+    extern hash_algorithm ASSETCHAINS_ALGO;
     CVerusHash::init();
     CVerusHashV2::init();
-    if (ASSETCHAINS_ALGO->algo == hash_algo::HASH_ALGO_VERUSHASH)
+    if (ASSETCHAINS_ALGO.algo == hash_algo::HASH_ALGO_VERUSHASH)
     {
         // initialize VerusHash
         CBlockHeader::SetVerusHash();
     }
-    else if (ASSETCHAINS_ALGO->algo == hash_algo::HASH_ALGO_VERUSHASHV1_1)
+    else if (ASSETCHAINS_ALGO.algo == hash_algo::HASH_ALGO_VERUSHASHV1_1)
     {
         // initialize VerusHashV2
         CBlockHeader::SetVerusHashV2();

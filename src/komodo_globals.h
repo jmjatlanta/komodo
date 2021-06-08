@@ -89,7 +89,7 @@ uint8_t ASSETCHAINS_CCDISABLES[256];
 std::vector<std::string> ASSETCHAINS_PRICES,ASSETCHAINS_STOCKS;
 
 // the hashing algorithm (defaults to equihash)
-std::shared_ptr<hash_algorithm> ASSETCHAINS_ALGO = hash_algorithm::get_algorithm(hash_algo::HASH_ALGO_EQUIHASH);
+hash_algorithm ASSETCHAINS_ALGO = hash_algorithm::get_algorithm(hash_algo::HASH_ALGO_EQUIHASH);
 
 // Verus proof of stake controls
 int32_t ASSETCHAINS_LWMAPOS = 0;        // percentage of blocks should be PoS

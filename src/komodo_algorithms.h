@@ -1,7 +1,6 @@
 #pragma once
 #include <cstdint>
 #include <string>
-#include <memory>
 
 enum hash_algo
 {
@@ -14,14 +13,16 @@ enum hash_algo
 class hash_algorithm
 {
 public:
+    hash_algorithm() {}
+public:
     uint64_t nonce_mask;
     uint32_t nonce_shift;
     uint32_t hashes_per_round;
     uint32_t mindiff;
-    const std::string name;
+    std::string name;
     hash_algo algo = hash_algo::HASH_ALGO_UNKNOWN;
-    static std::shared_ptr<hash_algorithm> get_algorithm(const std::string& in);
-    static std::shared_ptr<hash_algorithm> get_algorithm(hash_algo algo);
+    static hash_algorithm get_algorithm(const std::string& in);
+    static hash_algorithm get_algorithm(hash_algo algo);
 protected:
     hash_algorithm(uint64_t mask, uint32_t shift, uint32_t hashesPerRound, uint32_t mindiff, const std::string& name, hash_algo algo)
             : nonce_mask(mask), nonce_shift(shift), hashes_per_round(hashesPerRound), mindiff(mindiff), name(name), algo(algo)

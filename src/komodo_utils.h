@@ -1807,7 +1807,7 @@ void komodo_args(char *argv0)
         std::string selectedAlgo = GetArg("-ac_algo", "equihash");
 
         ASSETCHAINS_ALGO = hash_algorithm::get_algorithm(selectedAlgo);
-        if (ASSETCHAINS_ALGO == nullptr)
+        if (ASSETCHAINS_ALGO.algo == hash_algo::HASH_ALGO_UNKNOWN)
         {
             printf("ASSETCHAINS_ALGO, %s not supported. using equihash\n", selectedAlgo.c_str());
             ASSETCHAINS_ALGO = hash_algorithm::get_algorithm(hash_algo::HASH_ALGO_EQUIHASH);
@@ -1816,7 +1816,7 @@ void komodo_args(char *argv0)
         {
             printf("ASSETCHAINS_ALGO, algorithm set to %s\n", selectedAlgo.c_str());
         }
-        if ( ASSETCHAINS_ALGO->algo == hash_algo::HASH_ALGO_EQUIHASH && ASSETCHAINS_NK[0] != 0 && ASSETCHAINS_NK[1] != 0 )
+        if ( ASSETCHAINS_ALGO.algo == hash_algo::HASH_ALGO_EQUIHASH && ASSETCHAINS_NK[0] != 0 && ASSETCHAINS_NK[1] != 0 )
         {
             if ( equihash_params_possible(ASSETCHAINS_NK[0], ASSETCHAINS_NK[1]) == -1 ) 
             {
@@ -2074,7 +2074,7 @@ void komodo_args(char *argv0)
                 || ASSETCHAINS_COMMISSION != 0 || ASSETCHAINS_PUBLIC != 0 || ASSETCHAINS_PRIVATE != 0 || ASSETCHAINS_TXPOW != 0 
                 || ASSETCHAINS_FOUNDERS != 0 || ASSETCHAINS_SCRIPTPUB.size() > 1 || ASSETCHAINS_SELFIMPORT.size() > 0 
                 || ASSETCHAINS_OVERRIDE_PUBKEY33[0] != 0 || ASSETCHAINS_TIMELOCKGTE != _ASSETCHAINS_TIMELOCKOFF
-                || ASSETCHAINS_ALGO->algo != hash_algo::HASH_ALGO_EQUIHASH || ASSETCHAINS_LWMAPOS != 0 || ASSETCHAINS_LASTERA > 0 
+                || ASSETCHAINS_ALGO.algo != hash_algo::HASH_ALGO_EQUIHASH || ASSETCHAINS_LWMAPOS != 0 || ASSETCHAINS_LASTERA > 0 
                 || ASSETCHAINS_BEAMPORT != 0 || ASSETCHAINS_CODAPORT != 0 || ASSETCHAINS_MARMARA != 0 || nonz > 0 
                 || ASSETCHAINS_CCLIB.size() > 0 || ASSETCHAINS_FOUNDERS_REWARD != 0 || ASSETCHAINS_NOTARY_PAY[0] != 0 
                 || ASSETCHAINS_BLOCKTIME != 60 || ASSETCHAINS_CBOPRET != 0 || Mineropret.size() != 0 
@@ -2118,9 +2118,9 @@ void komodo_args(char *argv0)
                 extralen += iguana_rwnum(1,&extraptr[extralen],sizeof(ASSETCHAINS_TIMEUNLOCKTO),(void *)&ASSETCHAINS_TIMEUNLOCKTO);
             }
 
-            if ( ASSETCHAINS_ALGO->algo != hash_algo::HASH_ALGO_EQUIHASH )
+            if ( ASSETCHAINS_ALGO.algo != hash_algo::HASH_ALGO_EQUIHASH )
             {
-                extralen += iguana_rwnum(1,&extraptr[extralen],sizeof(ASSETCHAINS_ALGO->algo),(void *)&ASSETCHAINS_ALGO->algo);
+                extralen += iguana_rwnum(1,&extraptr[extralen],sizeof(ASSETCHAINS_ALGO.algo),(void *)&ASSETCHAINS_ALGO.algo);
             }
 
             if ( ASSETCHAINS_LWMAPOS != 0 )

@@ -356,8 +356,8 @@ UniValue getinfo(const UniValue& params, bool fHelp, const CPubKey& mypk)
             obj.push_back(Pair("staked",        ASSETCHAINS_STAKED));
         if ( ASSETCHAINS_LWMAPOS != 0 )
             obj.push_back(Pair("veruspos", ASSETCHAINS_LWMAPOS));
-        if ( ASSETCHAINS_ALGO->algo != hash_algo::HASH_ALGO_EQUIHASH )
-            obj.push_back(Pair("algo",ASSETCHAINS_ALGO->name.c_str()));
+        if ( ASSETCHAINS_ALGO.algo != hash_algo::HASH_ALGO_EQUIHASH )
+            obj.push_back(Pair("algo",ASSETCHAINS_ALGO.name.c_str()));
     }
     return obj;
 }

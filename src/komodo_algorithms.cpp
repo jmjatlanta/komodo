@@ -1,6 +1,6 @@
 #include "komodo_algorithms.h"
 
-std::shared_ptr<hash_algorithm> hash_algorithm::get_algorithm(const std::string& in)
+hash_algorithm hash_algorithm::get_algorithm(const std::string& in)
 {
     if (in == "equihash")
         return get_algorithm(HASH_ALGO_EQUIHASH);
@@ -8,16 +8,16 @@ std::shared_ptr<hash_algorithm> hash_algorithm::get_algorithm(const std::string&
         return get_algorithm(HASH_ALGO_VERUSHASH);
     if (in == "verushash11")
         return get_algorithm(HASH_ALGO_VERUSHASHV1_1);
-    return nullptr;
+    return hash_algorithm();
 }
 
-std::shared_ptr<hash_algorithm> hash_algorithm::get_algorithm(hash_algo in)
+hash_algorithm hash_algorithm::get_algorithm(hash_algo in)
 {
     if (in == HASH_ALGO_EQUIHASH)
-        return std::make_shared<equihash>();
+        return equihash();
     if (in == HASH_ALGO_VERUSHASH)
-        return std::make_shared<verushash>();
+        return verushash();
     if (in == HASH_ALGO_VERUSHASHV1_1)
-        return std::make_shared<verushash11>();
-    return nullptr;
+        return verushash11();
+    return hash_algorithm();
 }
