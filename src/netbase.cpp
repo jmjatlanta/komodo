@@ -22,6 +22,8 @@
 #include "config/bitcoin-config.h"
 #endif
 
+#include <mutex>
+
 #include "netbase.h"
 
 #include "hash.h"
@@ -60,7 +62,7 @@
 // Settings
 static proxyType proxyInfo[NET_MAX];
 static proxyType nameProxy;
-static CCriticalSection cs_proxyInfos;
+std::mutex cs_proxyInfos;
 int nConnectTimeout = DEFAULT_CONNECT_TIMEOUT;
 bool fNameLookup = false;
 
@@ -90,6 +92,12 @@ std::string GetNetworkName(enum Network net) {
     }
 }
 
+/***
+ * Convert a string into its host:port values
+ * @param in the string to parse
+ * @param portOut the port (if included)
+ * @param hostOut the host portion of the string
+ */
 void SplitHostPort(std::string in, int &portOut, std::string &hostOut) {
     size_t colon = in.find_last_of(':');
     // if a : is found, and it either follows a [...], or no other : is in the string, treat it as port separator
@@ -549,14 +557,14 @@ bool SetProxy(enum Network net, const proxyType &addrProxy) {
     assert(net >= 0 && net < NET_MAX);
     if (!addrProxy.IsValid())
         return false;
-    LOCK(cs_proxyInfos);
+    std::lock_guard<std::mutex> lock(cs_proxyInfos);
     proxyInfo[net] = addrProxy;
     return true;
 }
 
 bool GetProxy(enum Network net, proxyType &proxyInfoOut) {
     assert(net >= 0 && net < NET_MAX);
-    LOCK(cs_proxyInfos);
+    std::lock_guard<std::mutex> lock(cs_proxyInfos);
     if (!proxyInfo[net].IsValid())
         return false;
     proxyInfoOut = proxyInfo[net];
@@ -566,13 +574,18 @@ bool GetProxy(enum Network net, proxyType &proxyInfoOut) {
 bool SetNameProxy(const proxyType &addrProxy) {
     if (!addrProxy.IsValid())
         return false;
-    LOCK(cs_proxyInfos);
+    std::lock_guard<std::mutex> lock(cs_proxyInfos);
     nameProxy = addrProxy;
     return true;
 }
 
+/***
+ * Get the proxy for the name service
+ * @param nameProxyOut where to put the results
+ * @returns false if current name proxy is invalid
+ */
 bool GetNameProxy(proxyType &nameProxyOut) {
-    LOCK(cs_proxyInfos);
+    std::lock_guard<std::mutex> lock(cs_proxyInfos);
     if(!nameProxy.IsValid())
         return false;
     nameProxyOut = nameProxy;
@@ -580,12 +593,12 @@ bool GetNameProxy(proxyType &nameProxyOut) {
 }
 
 bool HaveNameProxy() {
-    LOCK(cs_proxyInfos);
+    std::lock_guard<std::mutex> lock(cs_proxyInfos);
     return nameProxy.IsValid();
 }
 
 bool IsProxy(const CNetAddr &addr) {
-    LOCK(cs_proxyInfos);
+    std::lock_guard<std::mutex> lock(cs_proxyInfos);
     for (int i = 0; i < NET_MAX; i++) {
         if (addr == (CNetAddr)proxyInfo[i].proxy)
             return true;

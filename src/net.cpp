@@ -129,7 +129,6 @@ void AddOneShot(const std::string& strDest)
 
 unsigned short GetListenPort()
 {
-    //printf("Listenport.%u\n",Params().GetDefaultPort());
     return (unsigned short)(GetArg("-port", Params().GetDefaultPort()));
 }
 
@@ -374,6 +373,12 @@ CNode* FindNode(const CService& addr)
     return NULL;
 }
 
+/***
+ * Connect to an address (checks if already connected first)
+ * @param addrConnect the address to connect to
+ * @param pszDest the destination
+ * @returns the node (or nullptr on error)
+ */
 CNode* ConnectNode(CAddress addrConnect, const char *pszDest)
 {
     if (pszDest == NULL) {
@@ -1144,7 +1149,7 @@ void ThreadSocketHandler()
                     if (lockRecv && (
                         pnode->vRecvMsg.empty() || !pnode->vRecvMsg.front().complete() ||
                         pnode->GetTotalRecvSize() <= ReceiveFloodSize()))
-                        FD_SET(pnode->hSocket, &fdsetRecv);
+                        FD_SET(pnode->hSocket, &fdsetRecv); // add the socket to the set
                 }
             }
         }
@@ -1542,7 +1547,15 @@ void ThreadOpenAddedConnections()
     }
 }
 
-// if successful, this moves the passed grant to the constructed node
+/****
+ * @brief Open a connection to a remote node
+ * NOTE: if successful, this moves the passed grant to the constructed node
+ * @param addrConnect the remote node address
+ * @param grantOutbound
+ * @param strDet the remote address as a string (i.e. "mydomain.com:2345")
+ * @param fOneShot true to connect, retrieve the "getaddr" response, and disconnect
+ * @returns true on success
+ */
 bool OpenNetworkConnection(const CAddress& addrConnect, CSemaphoreGrant *grantOutbound, const char *pszDest, bool fOneShot)
 {
     //

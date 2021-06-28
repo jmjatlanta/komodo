@@ -213,28 +213,137 @@ public:
     bool randomize_credentials;
 };
 
+/***
+ * Determine the network type by string
+ * @param net the string (i.e. "ipv4" or "onion" or "tor")
+ * @returns the network
+ */
 enum Network ParseNetwork(std::string net);
+/***
+ * converts the network into a string
+ * @param net the network
+ * @returns the network as a string (i.e. "ipv4" or "onion" or "tor")
+ */
 std::string GetNetworkName(enum Network net);
+/***
+ * Convert a string into its host:port values
+ * @param in the string to parse
+ * @param portOut the port (if included)
+ * @param hostOut the host portion of the string
+ */
 void SplitHostPort(std::string in, int &portOut, std::string &hostOut);
+/****
+ * Set the proxy for a network
+ * @param net the network
+ * @param addrProxy the proxy
+ * @returns true on success
+ */
 bool SetProxy(enum Network net, const proxyType &addrProxy);
+/***
+ * Get the proxy for a network
+ * @param net the network
+ * @param proxyInfoOut the results
+ * @returns true on success
+ */
 bool GetProxy(enum Network net, proxyType &proxyInfoOut);
+/****
+ * Determine if an address is a proxy
+ * @param addr the address
+ * @returns true if the address is a proxy
+ */
 bool IsProxy(const CNetAddr &addr);
+/****
+ * Set the proxy for the naming service
+ * @param addrProxy the proxy
+ * @returns true on success
+ */
 bool SetNameProxy(const proxyType &addrProxy);
+/****
+ * @returns true if the name proxy is valid
+ */
 bool HaveNameProxy();
+/****
+ * Look up a host using the name proxy
+ * @param pszName the host string
+ * @param vIP the results
+ * @param nMaxSolutions the maximum number of results (0=unlimited)
+ * @param fAllowLookup true to allow a lookup, false to translate an address instead of a host name
+ * @returns true on success
+ */
 bool LookupHost(const char *pszName, std::vector<CNetAddr>& vIP, unsigned int nMaxSolutions = 0, bool fAllowLookup = true);
+/*****
+ * Look up a host
+ * @param pszName the host string
+ * @param addr the results
+ * @param portDefault the default port (used if port not included in pszName)
+ * @param fAllowLookup true to allow lookup, false to simply translate an IP address
+ * @returns true on success
+ */
 bool Lookup(const char *pszName, CService& addr, int portDefault = 0, bool fAllowLookup = true);
-bool Lookup(const char *pszName, std::vector<CService>& vAddr, int portDefault = 0, bool fAllowLookup = true, unsigned int nMaxSolutions = 0);
+/****
+ * Lookup up a host
+ * @param pszName the host string
+ * @param vAddr the results of the lookup
+ * @param portDefault the default port (used if port not included in pszName)
+ * @param fAllowLookup true to allow lookup, false to simply translate an IP address
+ * @param nMaxSolutions max number of addresses to put in vAddr
+ * @returns true on success
+ */
+bool Lookup(const char *pszName, std::vector<CService>& vAddr, int portDefault = 0, bool fAllowLookup = true, 
+        unsigned int nMaxSolutions = 0);
+/****
+ * convert an address expressed as a string of an integer into a CService
+ * @param pszName the string of an integer
+ * @param addr the results
+ * @param portDefault the default port (used if port not included in pszName)
+ * @returns true on success
+ */
 bool LookupNumeric(const char *pszName, CService& addr, int portDefault = 0);
+
+/****
+ * Attempt a connection to a socket
+ * @param addr who to connect to
+ * @param hSocketRet the socket connected to
+ * @param nTimeout how long to wait before giving up
+ * @param outProxyConnectionFailed true if connection to proxy failed
+ * @returns true on success
+ */
 bool ConnectSocket(const CService &addr, SOCKET& hSocketRet, int nTimeout, bool *outProxyConnectionFailed = 0);
-bool ConnectSocketByName(CService &addr, SOCKET& hSocketRet, const char *pszDest, int portDefault, int nTimeout, bool *outProxyConnectionFailed = 0);
-/** Return readable error string for a network error code */
+/****
+ * Connect to a socket by name
+ * @param addr who was connected to
+ * @param hSocketRet The socket connected to
+ * @param pszDest the destination address (i.e. "123.45.67.89:2345")
+ * @param portDefault the default port (can be overridden by pszDest
+ * @param nTimeout how long to wait before giving up
+ * @param outProxyConnectionFailed true if connection to proxy failed
+ * @returns true on success
+ */
+bool ConnectSocketByName(CService &addr, SOCKET& hSocketRet, const char *pszDest, int portDefault, 
+        int nTimeout,  bool *outProxyConnectionFailed = 0);
+/****
+ * Return readable error string for a network error code
+ * @param err the error
+ * @returns the error as a readable string
+ */
 std::string NetworkErrorString(int err);
-/** Close socket and set hSocket to INVALID_SOCKET */
+/** 
+ * Close socket and set hSocket to INVALID_SOCKET
+ * @param hSocket the socket to close
+ * @returns true on success 
+ */
 bool CloseSocket(SOCKET& hSocket);
-/** Disable or enable blocking-mode for a socket */
+/** 
+ * Disable or enable blocking-mode for a socket
+ * @param hSocket the socket to set
+ * @param fNonBlocking true to set this socket as non-blocking
+ * @returns true on success
+ */
 bool SetSocketNonBlocking(SOCKET& hSocket, bool fNonBlocking);
 /**
- * Convert milliseconds to a struct timeval for e.g. select.
+ * Convert milliseconds to a struct timeval (for e.g. select)
+ * @param nTimeout milliseconds
+ * @returns a struct timeval
  */
 struct timeval MillisToTimeval(int64_t nTimeout);
 
