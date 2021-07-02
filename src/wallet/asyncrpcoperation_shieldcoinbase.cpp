@@ -24,7 +24,6 @@
 #include "init.h"
 #include "key_io.h"
 #include "main.h"
-#include "net.h"
 #include "netbase.h"
 #include "rpc/protocol.h"
 #include "rpc/server.h"

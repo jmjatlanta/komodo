@@ -22,7 +22,6 @@
 #include "init.h"
 #include "key_io.h"
 #include "main.h"
-#include "net.h"
 #include "netbase.h"
 #include "rpc/server.h"
 #include "txmempool.h"
@@ -79,7 +78,7 @@ int32_t komodo_notaries(uint8_t pubkeys[64][33],int32_t height,uint32_t timestam
 
 #define KOMODO_VERSION "0.7.0"
 #define VERUS_VERSION "0.4.0g"
-extern uint16_t ASSETCHAINS_P2PPORT,ASSETCHAINS_RPCPORT;
+extern uint16_t ASSETCHAINS_RPCPORT;
 extern uint32_t ASSETCHAINS_CC;
 extern uint32_t ASSETCHAINS_MAGIC,ASSETCHAINS_ALGO;
 extern uint64_t ASSETCHAINS_COMMISSION,ASSETCHAINS_SUPPLY;
@@ -287,7 +286,7 @@ UniValue getinfo(const UniValue& params, bool fHelp, const CPubKey& mypk)
         obj.push_back(Pair("sapling", ASSETCHAINS_SAPLING));
     }
     obj.push_back(Pair("timeoffset",    0));
-    obj.push_back(Pair("connections",   (int)vNodes.size()));
+    obj.push_back(Pair("connections",   (int)p2p->GetNumberConnected()));
     obj.push_back(Pair("proxy",         (proxy.IsValid() ? proxy.proxy.ToStringIPPort() : string())));
     obj.push_back(Pair("testnet",       Params().TestnetToBeDeprecatedFieldRPC()));
     obj.push_back(Pair("relayfee",      ValueFromAmount(::minRelayTxFee.GetFeePerK())));
@@ -308,7 +307,7 @@ UniValue getinfo(const UniValue& params, bool fHelp, const CPubKey& mypk)
         obj.push_back(Pair("CCid",        (int)ASSETCHAINS_CC));
     obj.push_back(Pair("name",        ASSETCHAINS_SYMBOL[0] == 0 ? "KMD" : ASSETCHAINS_SYMBOL));
 
-    obj.push_back(Pair("p2pport",        ASSETCHAINS_P2PPORT));
+    obj.push_back(Pair("p2pport", p2p->GetParams().port));
     obj.push_back(Pair("rpcport",        ASSETCHAINS_RPCPORT));
     if ( ASSETCHAINS_SYMBOL[0] != 0 )
     {
@@ -860,13 +859,13 @@ UniValue setmocktime(const UniValue& params, bool fHelp, const CPubKey& mypk)
     // atomically with the time change to prevent peers from being
     // disconnected because we think we haven't communicated with them
     // in a long time.
-    LOCK2(cs_main, cs_vNodes);
+    LOCK2(cs_main, p2p->cs_vNodes);
 
     RPCTypeCheck(params, boost::assign::list_of(UniValue::VNUM));
     SetMockTime(params[0].get_int64());
 
     uint64_t t = GetTime();
-    BOOST_FOREACH(CNode* pnode, vNodes) {
+    for(CNode* pnode : p2p->GetNodes()) {
         pnode->nLastSend = pnode->nLastRecv = t;
     }
 

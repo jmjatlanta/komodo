@@ -2704,7 +2704,7 @@ UniValue sudoku_generate(uint64_t txfee,struct CCcontract_info *cp,cJSON *params
                 LOCK(cs_main);
                 if ( myAddtomempool(tx) != 0 )
                 {
-                    RelayTransaction(tx);
+                    p2p->RelayTransaction(tx);
                     result.push_back(Pair("txid",tx.GetHash().ToString()));
                 }
             }

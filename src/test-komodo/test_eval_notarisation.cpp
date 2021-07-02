@@ -7,6 +7,7 @@
 #include "core_io.h"
 #include "key.h"
 #include "main.h"
+#include "utilstrencodings.h" // ParseHex
 #include "script/cc.h"
 #include "primitives/transaction.h"
 #include "script/interpreter.h"

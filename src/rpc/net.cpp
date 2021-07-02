@@ -21,19 +21,21 @@
 
 #include "clientversion.h"
 #include "main.h"
-#include "net.h"
 #include "netbase.h"
 #include "protocol.h"
 #include "sync.h"
 #include "util.h"
 #include "version.h"
 #include "deprecation.h"
-
-#include <boost/foreach.hpp>
+#include "p2p/p2p.h"
+#include "p2p/node.h"
+#include "utilstrencodings.h" // ARRAYLEN
 
 #include <univalue.h>
 
 using namespace std;
+
+extern std::shared_ptr<P2P> p2p;
 
 UniValue getconnectioncount(const UniValue& params, bool fHelp, const CPubKey& mypk)
 {
@@ -48,9 +50,9 @@ UniValue getconnectioncount(const UniValue& params, bool fHelp, const CPubKey& m
             + HelpExampleRpc("getconnectioncount", "")
         );
 
-    LOCK2(cs_main, cs_vNodes);
+    LOCK2(cs_main, p2p->cs_vNodes);
 
-    return (int)vNodes.size();
+    return (int)p2p->GetNumberConnected();
 }
 
 UniValue ping(const UniValue& params, bool fHelp, const CPubKey& mypk)
@@ -67,9 +69,9 @@ UniValue ping(const UniValue& params, bool fHelp, const CPubKey& mypk)
         );
 
     // Request that each node send a ping during next message processing pass
-    LOCK2(cs_main, cs_vNodes);
+    LOCK2(cs_main, p2p->cs_vNodes);
 
-    BOOST_FOREACH(CNode* pNode, vNodes) {
+    for(CNode* pNode : p2p->GetNodes()) {
         pNode->fPingQueued = true;
     }
 
@@ -118,12 +120,11 @@ UniValue getpeerinfo(const UniValue& params, bool fHelp, const CPubKey& mypk)
 
     LOCK(cs_main);
 
-    vector<CNodeStats> vstats;
-    CopyNodeStats(vstats);
+    std::vector<CNodeStats> vstats = p2p->GetNodeStats();
 
     UniValue ret(UniValue::VARR);
 
-    BOOST_FOREACH(const CNodeStats& stats, vstats) {
+    for(const CNodeStats& stats : vstats) {
         UniValue obj(UniValue::VOBJ);
         CNodeStateStats statestats;
         bool fStateStats = GetNodeStateStats(stats.nodeid, statestats);
@@ -158,7 +159,7 @@ UniValue getpeerinfo(const UniValue& params, bool fHelp, const CPubKey& mypk)
             obj.push_back(Pair("synced_headers", statestats.nSyncHeight));
             obj.push_back(Pair("synced_blocks", statestats.nCommonHeight));
             UniValue heights(UniValue::VARR);
-            BOOST_FOREACH(int height, statestats.vHeightInFlight) {
+            for(int height : statestats.vHeightInFlight) {
                 heights.push_back(height);
             }
             obj.push_back(Pair("inflight", heights));
@@ -195,12 +196,7 @@ int32_t komodo_longestchain()
         }
 
         depth++;
-        vector<CNodeStats> vstats;
-        {
-            //LOCK(cs_main);
-            CopyNodeStats(vstats);
-        }
-        BOOST_FOREACH(const CNodeStats& stats, vstats)
+        for(const CNodeStats& stats : p2p->GetNodeStats())
         {
             //fprintf(stderr,"komodo_longestchain iter.%d\n",n);
             CNodeStateStats statestats;
@@ -258,27 +254,27 @@ UniValue addnode(const UniValue& params, bool fHelp, const CPubKey& mypk)
     if (strCommand == "onetry")
     {
         CAddress addr;
-        OpenNetworkConnection(addr, NULL, strNode.c_str());
+        p2p->OpenNetworkConnection(addr, NULL, strNode.c_str());
         return NullUniValue;
     }
 
-    LOCK(cs_vAddedNodes);
-    vector<string>::iterator it = vAddedNodes.begin();
-    for(; it != vAddedNodes.end(); it++)
+    LOCK(p2p->cs_vAddedNodes);
+    vector<string>::iterator it = p2p->vAddedNodes.begin();
+    for(; it != p2p->vAddedNodes.end(); it++)
         if (strNode == *it)
             break;
 
     if (strCommand == "add")
     {
-        if (it != vAddedNodes.end())
+        if (it != p2p->vAddedNodes.end())
             throw JSONRPCError(RPC_CLIENT_NODE_ALREADY_ADDED, "Error: Node already added");
-        vAddedNodes.push_back(strNode);
+        p2p->vAddedNodes.push_back(strNode);
     }
     else if(strCommand == "remove")
     {
-        if (it == vAddedNodes.end())
+        if (it == p2p->vAddedNodes.end())
             throw JSONRPCError(RPC_CLIENT_NODE_NOT_ADDED, "Error: Node has not been added.");
-        vAddedNodes.erase(it);
+        p2p->vAddedNodes.erase(it);
     }
 
     return NullUniValue;
@@ -297,7 +293,7 @@ UniValue disconnectnode(const UniValue& params, bool fHelp, const CPubKey& mypk)
             + HelpExampleRpc("disconnectnode", "\"192.168.0.6:8233\"")
         );
 
-    CNode* pNode = FindNode(params[0].get_str());
+    CNode* pNode = p2p->FindNode(params[0].get_str());
     if (pNode == NULL)
         throw JSONRPCError(RPC_CLIENT_NODE_NOT_CONNECTED, "Node not found in connected nodes");
 
@@ -344,15 +340,15 @@ UniValue getaddednodeinfo(const UniValue& params, bool fHelp, const CPubKey& myp
     list<string> laddedNodes(0);
     if (params.size() == 1)
     {
-        LOCK(cs_vAddedNodes);
-        BOOST_FOREACH(const std::string& strAddNode, vAddedNodes)
+        LOCK(p2p->cs_vAddedNodes);
+        for(const std::string& strAddNode : p2p->vAddedNodes)
             laddedNodes.push_back(strAddNode);
     }
     else
     {
         string strNode = params[1].get_str();
-        LOCK(cs_vAddedNodes);
-        BOOST_FOREACH(const std::string& strAddNode, vAddedNodes) {
+        LOCK(p2p->cs_vAddedNodes);
+        for(const std::string& strAddNode : p2p->vAddedNodes) {
             if (strAddNode == strNode)
             {
                 laddedNodes.push_back(strAddNode);
@@ -366,7 +362,7 @@ UniValue getaddednodeinfo(const UniValue& params, bool fHelp, const CPubKey& myp
     UniValue ret(UniValue::VARR);
     if (!fDns)
     {
-        BOOST_FOREACH (const std::string& strAddNode, laddedNodes) {
+        for(const std::string& strAddNode : laddedNodes) {
             UniValue obj(UniValue::VOBJ);
             obj.push_back(Pair("addednode", strAddNode));
             ret.push_back(obj);
@@ -375,7 +371,7 @@ UniValue getaddednodeinfo(const UniValue& params, bool fHelp, const CPubKey& myp
     }
 
     list<pair<string, vector<CService> > > laddedAddreses(0);
-    BOOST_FOREACH(const std::string& strAddNode, laddedNodes) {
+    for(const std::string& strAddNode : laddedNodes) {
         vector<CService> vservNode(0);
         if(Lookup(strAddNode.c_str(), vservNode, Params().GetDefaultPort(), fNameLookup, 0))
             laddedAddreses.push_back(make_pair(strAddNode, vservNode));
@@ -389,7 +385,7 @@ UniValue getaddednodeinfo(const UniValue& params, bool fHelp, const CPubKey& myp
         }
     }
 
-    LOCK(cs_vNodes);
+    LOCK(p2p->cs_vNodes);
     for (list<pair<string, vector<CService> > >::iterator it = laddedAddreses.begin(); it != laddedAddreses.end(); it++)
     {
         UniValue obj(UniValue::VOBJ);
@@ -397,11 +393,11 @@ UniValue getaddednodeinfo(const UniValue& params, bool fHelp, const CPubKey& myp
 
         UniValue addresses(UniValue::VARR);
         bool fConnected = false;
-        BOOST_FOREACH(const CService& addrNode, it->second) {
+        for(const CService& addrNode : it->second) {
             bool fFound = false;
             UniValue node(UniValue::VOBJ);
             node.push_back(Pair("address", addrNode.ToString()));
-            BOOST_FOREACH(CNode* pnode, vNodes) {
+            for(CNode* pnode : p2p->GetNodes()) {
                 if (pnode->addr == addrNode)
                 {
                     fFound = true;
@@ -441,8 +437,8 @@ UniValue getnettotals(const UniValue& params, bool fHelp, const CPubKey& mypk)
        );
 
     UniValue obj(UniValue::VOBJ);
-    obj.push_back(Pair("totalbytesrecv", CNode::GetTotalBytesRecv()));
-    obj.push_back(Pair("totalbytessent", CNode::GetTotalBytesSent()));
+    obj.push_back(Pair("totalbytesrecv", p2p->GetTotalBytesRecv()));
+    obj.push_back(Pair("totalbytessent", p2p->GetTotalBytesSent()));
     obj.push_back(Pair("timemillis", GetTimeMillis()));
     return obj;
 }
@@ -459,8 +455,8 @@ static UniValue GetNetworksInfo()
         UniValue obj(UniValue::VOBJ);
         GetProxy(network, proxy);
         obj.push_back(Pair("name", GetNetworkName(network)));
-        obj.push_back(Pair("limited", IsLimited(network)));
-        obj.push_back(Pair("reachable", IsReachable(network)));
+        obj.push_back(Pair("limited", p2p->IsLimited(network)));
+        obj.push_back(Pair("reachable", p2p->IsReachable(network)));
         obj.push_back(Pair("proxy", proxy.IsValid() ? proxy.proxy.ToStringIPPort() : string()));
         obj.push_back(Pair("proxy_randomize_credentials", proxy.randomize_credentials));
         networks.push_back(obj);
@@ -538,17 +534,17 @@ UniValue getnetworkinfo(const UniValue& params, bool fHelp, const CPubKey& mypk)
 
     UniValue obj(UniValue::VOBJ);
     obj.push_back(Pair("version",       CLIENT_VERSION));
-    obj.push_back(Pair("subversion",    strSubVersion));
+    obj.push_back(Pair("subversion",    p2p->GetParams().subVersion));
     obj.push_back(Pair("protocolversion",PROTOCOL_VERSION));
-    obj.push_back(Pair("localservices",       strprintf("%016x", nLocalServices)));
+    obj.push_back(Pair("localservices",       strprintf("%016x", p2p->GetParams().localServices)));
     obj.push_back(Pair("timeoffset",    0));
-    obj.push_back(Pair("connections",   (int)vNodes.size()));
+    obj.push_back(Pair("connections",   (int)p2p->GetNumberConnected()));
     obj.push_back(Pair("networks",      GetNetworksInfo()));
     obj.push_back(Pair("relayfee",      ValueFromAmount(::minRelayTxFee.GetFeePerK())));
     UniValue localAddresses(UniValue::VARR);
     {
-        LOCK(cs_mapLocalHost);
-        BOOST_FOREACH(const PAIRTYPE(CNetAddr, LocalServiceInfo) &item, mapLocalHost)
+        std::lock_guard<std::mutex> lock(p2p->cs_mapLocalHost);
+        for(const auto &item : p2p->mapLocalHost)
         {
             UniValue rec(UniValue::VOBJ);
             rec.push_back(Pair("address", item.first.ToString()));
@@ -600,7 +596,7 @@ UniValue setban(const UniValue& params, bool fHelp, const CPubKey& mypk)
 
     if (strCommand == "add")
     {
-        if (isSubnet ? CNode::IsBanned(subNet) : CNode::IsBanned(netAddr))
+        if (isSubnet ? p2p->IsBanned(subNet) : p2p->IsBanned(netAddr))
             throw JSONRPCError(RPC_CLIENT_NODE_ALREADY_ADDED, "Error: IP/Subnet already banned");
 
         int64_t banTime = 0; //use standard bantime if not specified
@@ -611,15 +607,15 @@ UniValue setban(const UniValue& params, bool fHelp, const CPubKey& mypk)
         if (params.size() == 4 && params[3].isTrue())
             absolute = true;
 
-        isSubnet ? CNode::Ban(subNet, banTime, absolute) : CNode::Ban(netAddr, banTime, absolute);
+        isSubnet ? p2p->Ban(subNet, banTime, absolute) : p2p->Ban(netAddr, banTime, absolute);
 
         //disconnect possible nodes
-        while(CNode *bannedNode = (isSubnet ? FindNode(subNet) : FindNode(netAddr)))
+        while(CNode *bannedNode = (isSubnet ? p2p->FindNode(subNet) : p2p->FindNode(netAddr)))
             bannedNode->fDisconnect = true;
     }
     else if(strCommand == "remove")
     {
-        if (!( isSubnet ? CNode::Unban(subNet) : CNode::Unban(netAddr) ))
+        if (!( isSubnet ? p2p->Unban(subNet) : p2p->Unban(netAddr) ))
             throw JSONRPCError(RPC_MISC_ERROR, "Error: Unban failed");
     }
 
@@ -638,7 +634,7 @@ UniValue listbanned(const UniValue& params, bool fHelp, const CPubKey& mypk)
                             );
 
     std::map<CSubNet, int64_t> banMap;
-    CNode::GetBanned(banMap);
+    p2p->GetBanned(banMap);
 
     UniValue bannedAddresses(UniValue::VARR);
     for (std::map<CSubNet, int64_t>::iterator it = banMap.begin(); it != banMap.end(); it++)
@@ -663,7 +659,7 @@ UniValue clearbanned(const UniValue& params, bool fHelp, const CPubKey& mypk)
                             + HelpExampleRpc("clearbanned", "")
                             );
 
-    CNode::ClearBanned();
+    p2p->ClearBanned();
 
     return NullUniValue;
 }

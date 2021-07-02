@@ -25,7 +25,6 @@
 #include "init.h"
 #include "crypto/common.h"
 #include "primitives/block.h"
-#include "addrman.h"
 #include "amount.h"
 #include "checkpoints.h"
 #include "compat/sanity.h"
@@ -42,7 +41,8 @@
 #include "main.h"
 #include "metrics.h"
 #include "miner.h"
-#include "net.h"
+#include "sendalert.h"
+#include "p2p/p2p.h"
 #include "rpc/server.h"
 #include "rpc/register.h"
 #include "script/standard.h"
@@ -77,6 +77,7 @@
 #include <chrono>
 #include <openssl/crypto.h>
 #include <thread>
+#include <memory>
 
 #include <libsnark/common/profiling.hpp>
 
@@ -93,7 +94,7 @@
 using namespace std;
 
 #include "komodo_defs.h"
-extern void ThreadSendAlert();
+
 extern bool komodo_dailysnapshot(int32_t height);
 extern int32_t KOMODO_LOADINGBLOCKS;
 extern bool VERUS_MINTBLOCKS;
@@ -244,9 +245,9 @@ void Shutdown()
     GenerateBitcoins(false, 0);
  #endif
 #endif
-    StopNode();
     StopTorControl();
-    UnregisterNodeSignals(GetNodeSignals());
+    UnregisterNodeSignals(p2p->GetNodeSignals());
+    p2p = nullptr;
 
     if (fFeeEstimatesInitialized)
     {
@@ -339,10 +340,10 @@ bool static InitWarning(const std::string &str)
 }
 
 bool static Bind(const CService &addr, unsigned int flags) {
-    if (!(flags & BF_EXPLICIT) && IsLimited(addr))
+    if (!(flags & BF_EXPLICIT) && p2p->IsLimited(addr))
         return false;
     std::string strError;
-    if (!BindListenPort(addr, strError, (flags & BF_WHITELIST) != 0)) {
+    if (!p2p->BindListenPort(addr, strError, (flags & BF_WHITELIST) != 0)) {
         if (flags & BF_REPORT_ERROR)
             return InitError(strError);
         return false;
@@ -369,12 +370,14 @@ std::string HelpMessage(HelpMessageMode mode)
 {
     const bool showDebug = GetBoolArg("-help-debug", false);
 
+    P2PParameters p2pDefaults;
+
     // When adding new options to the categories, please keep and ensure alphabetical ordering.
     // Do not translate _(...) -help-debug options, many technical terms, and only a very small audience, so is unnecessary stress to translators
 
     string strUsage = HelpMessageGroup(_("Options:"));
     strUsage += HelpMessageOpt("-?", _("This help message"));
-    strUsage += HelpMessageOpt("-alerts", strprintf(_("Receive and display P2P network alerts (default: %u)"), DEFAULT_ALERTS));
+    strUsage += HelpMessageOpt("-alerts", strprintf(_("Receive and display P2P network alerts (default: %u)"), p2pDefaults.showAlerts));
     strUsage += HelpMessageOpt("-alertnotify=<cmd>", _("Execute command when a relevant alert is received or we see a really long fork (%s in cmd is replaced by message)"));
     strUsage += HelpMessageOpt("-blocknotify=<cmd>", _("Execute command when the best block changes (%s in cmd is replaced by block hash)"));
     strUsage += HelpMessageOpt("-checkblocks=<n>", strprintf(_("How many blocks to check at startup (default: %u, 0 = all)"), 288));
@@ -423,17 +426,17 @@ std::string HelpMessage(HelpMessageMode mode)
     strUsage += HelpMessageOpt("-forcednsseed", strprintf(_("Always query for peer addresses via DNS lookup (default: %u)"), 0));
     strUsage += HelpMessageOpt("-listen", _("Accept connections from outside (default: 1 if no -proxy or -connect)"));
     strUsage += HelpMessageOpt("-listenonion", strprintf(_("Automatically create Tor hidden service (default: %d)"), DEFAULT_LISTEN_ONION));
-    strUsage += HelpMessageOpt("-maxconnections=<n>", strprintf(_("Maintain at most <n> connections to peers (default: %u)"), DEFAULT_MAX_PEER_CONNECTIONS));
-    strUsage += HelpMessageOpt("-maxreceivebuffer=<n>", strprintf(_("Maximum per-connection receive buffer, <n>*1000 bytes (default: %u)"), 5000));
-    strUsage += HelpMessageOpt("-maxsendbuffer=<n>", strprintf(_("Maximum per-connection send buffer, <n>*1000 bytes (default: %u)"), 1000));
+    strUsage += HelpMessageOpt("-maxconnections=<n>", strprintf(_("Maintain at most <n> connections to peers (default: %u)"), p2pDefaults.maxPeerConnections));
+    strUsage += HelpMessageOpt("-maxreceivebuffer=<n>", strprintf(_("Maximum per-connection receive buffer, <n>*1000 bytes (default: %u)"), p2pDefaults.maxReceiveBuffer));
+    strUsage += HelpMessageOpt("-maxsendbuffer=<n>", strprintf(_("Maximum per-connection send buffer, <n>*1000 bytes (default: %u)"), p2pDefaults.maxSendBuffer));
     strUsage += HelpMessageOpt("-onion=<ip:port>", strprintf(_("Use separate SOCKS5 proxy to reach peers via Tor hidden services (default: %s)"), "-proxy"));
     strUsage += HelpMessageOpt("-onlynet=<net>", _("Only connect to nodes in network <net> (ipv4, ipv6 or onion)"));
     strUsage += HelpMessageOpt("-permitbaremultisig", strprintf(_("Relay non-P2SH multisig (default: %u)"), 1));
     strUsage += HelpMessageOpt("-peerbloomfilters", strprintf(_("Support filtering of blocks and transaction with Bloom filters (default: %u)"), 1));
-    strUsage += HelpMessageOpt("-nspv_msg", strprintf(_("Enable NSPV messages processing (default: %u)"), DEFAULT_NSPV_PROCESSING));
+    strUsage += HelpMessageOpt("-nspv_msg", strprintf(_("Enable NSPV messages processing (default: %u)"), p2pDefaults.nspvProcessing));
     if (showDebug)
         strUsage += HelpMessageOpt("-enforcenodebloom", strprintf("Enforce minimum protocol version to limit use of Bloom filters (default: %u)", 0));
-    strUsage += HelpMessageOpt("-port=<port>", strprintf(_("Listen for connections on <port> (default: %u or testnet: %u)"), 7770, 17770));
+    strUsage += HelpMessageOpt("-port=<port>", strprintf(_("Listen for connections on <port> (default: %u or testnet: %u)"), p2pDefaults.port, 17770));
     strUsage += HelpMessageOpt("-proxy=<ip:port>", _("Connect through SOCKS5 proxy"));
     strUsage += HelpMessageOpt("-proxyrandomize", strprintf(_("Randomize credentials for every proxy connection. This enables Tor stream isolation (default: %u)"), 1));
     strUsage += HelpMessageOpt("-seednode=<ip>", _("Connect to a node to retrieve peer addresses, and disconnect"));
@@ -925,7 +928,7 @@ bool AppInitServers(boost::thread_group& threadGroup)
  */
 extern int32_t KOMODO_REWIND;
 
-bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
+bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler, P2PParameters& p2pParams)
 {
     // ********************************************************* Step 1: setup
 #ifdef _MSC_VER
@@ -953,6 +956,8 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
 
     if (!SetupNetworking())
         return InitError("Error: Initializing networking failed");
+
+    P2PParameters p2pDefaults;
 
 #ifndef _WIN32
     if (GetBoolArg("-sysperms", false)) {
@@ -987,7 +992,6 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
 
     // ********************************************************* Step 2: parameter interactions
     const CChainParams& chainparams = Params();
-
     // Set this early so that experimental features are correctly enabled/disabled
     fExperimentalMode = GetBoolArg("-experimentalfeatures", true);
 
@@ -1022,6 +1026,9 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
             LogPrintf("%s: parameter interaction: -whitebind set -> setting -listen=1\n", __func__);
     }
 
+    if (mapArgs.count("-dnsseed"))
+        p2pParams.dnsSeedingExplicitlySet = true;
+
     if (mapArgs.count("-connect") && mapMultiArgs["-connect"].size() > 0) {
         // when only connecting to trusted nodes, do not seed via DNS, or listen by default
         if (SoftSetBoolArg("-dnsseed", false))
@@ -1029,6 +1036,8 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
         if (SoftSetBoolArg("-listen", false))
             LogPrintf("%s: parameter interaction: -connect set -> setting -listen=0\n", __func__);
     }
+
+    p2pParams.allowDNSSeeding = GetBoolArg("-dnsseed", true);
 
     if (mapArgs.count("-proxy")) {
         // to protect privacy, do not listen by default if a default proxy server is specified
@@ -1039,7 +1048,7 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
             LogPrintf("%s: parameter interaction: -proxy set -> setting -discover=0\n", __func__);
     }
 
-    if (!GetBoolArg("-listen", DEFAULT_LISTEN)) {
+    if (!GetBoolArg("-listen", p2pDefaults.listen)) {
         // do not try to retrieve public IP when not listening (pointless)
         if (SoftSetBoolArg("-discover", false))
             LogPrintf("%s: parameter interaction: -listen=0 -> setting -discover=0\n", __func__);
@@ -1051,31 +1060,6 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
         // if an explicit public IP is specified, do not try to find others
         if (SoftSetBoolArg("-discover", false))
             LogPrintf("%s: parameter interaction: -externalip set -> setting -discover=0\n", __func__);
-    }
-
-    // Read asmap file if configured
-    if (mapArgs.count("-asmap")) {
-        fs::path asmap_path = fs::path(GetArg("-asmap", ""));
-        if (asmap_path.empty()) {
-            asmap_path = DEFAULT_ASMAP_FILENAME;
-        }
-        if (!asmap_path.is_absolute()) {
-            asmap_path = GetDataDir() / asmap_path;
-        }
-        if (!fs::exists(asmap_path)) {
-            InitError(strprintf(_("Could not find asmap file %s"), asmap_path));
-            return false;
-        }
-        std::vector<bool> asmap = CAddrMan::DecodeAsmap(asmap_path);
-        if (asmap.size() == 0) {
-            InitError(strprintf(_("Could not parse asmap file %s"), asmap_path));
-            return false;
-        }
-        const uint256 asmap_version = SerializeHash(asmap);
-        addrman.m_asmap = std::move(asmap); // //node.connman->SetAsmap(std::move(asmap));
-        LogPrintf("Using asmap version %s for IP bucketing\n", asmap_version.ToString());
-    } else {
-        LogPrintf("Using /16 prefix for IP bucketing\n");
     }
 
     if (GetBoolArg("-salvagewallet", false)) {
@@ -1092,16 +1076,16 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
 
     // Make sure enough file descriptors are available
     int nBind = std::max((int)mapArgs.count("-bind") + (int)mapArgs.count("-whitebind"), 1);
-    nMaxConnections = GetArg("-maxconnections", DEFAULT_MAX_PEER_CONNECTIONS);
-    //fprintf(stderr,"nMaxConnections %d\n",nMaxConnections);
-    nMaxConnections = std::max(std::min(nMaxConnections, (int)(FD_SETSIZE - nBind - MIN_CORE_FILEDESCRIPTORS)), 0);
-    int nFD = RaiseFileDescriptorLimit(nMaxConnections + MIN_CORE_FILEDESCRIPTORS);
-    //fprintf(stderr,"nMaxConnections %d FD_SETSIZE.%d nBind.%d expr.%d \n",nMaxConnections,FD_SETSIZE,nBind,(int)(FD_SETSIZE - nBind - MIN_CORE_FILEDESCRIPTORS));
+    p2pParams.maxPeerConnections = GetArg("-maxconnections", p2pDefaults.maxPeerConnections);
+    p2pParams.maxPeerConnections = std::max(std::min(p2pParams.maxPeerConnections, (uint32_t)(FD_SETSIZE - nBind - MIN_CORE_FILEDESCRIPTORS)), 0U);
+    int nFD = RaiseFileDescriptorLimit(p2pParams.maxPeerConnections + MIN_CORE_FILEDESCRIPTORS);
     if (nFD < MIN_CORE_FILEDESCRIPTORS)
         return InitError(_("Not enough file descriptors available."));
-    if (nFD - MIN_CORE_FILEDESCRIPTORS < nMaxConnections)
-        nMaxConnections = nFD - MIN_CORE_FILEDESCRIPTORS;
-    fprintf(stderr,"nMaxConnections %d\n",nMaxConnections);
+    if (nFD - MIN_CORE_FILEDESCRIPTORS < p2pParams.maxPeerConnections)
+        p2pParams.maxPeerConnections = nFD - MIN_CORE_FILEDESCRIPTORS;
+    fprintf(stderr,"MaxPeerConnections %d\n",p2pParams.maxPeerConnections);
+    p2pParams.maxReceiveBuffer = GetArg("-maxreceivebuffer", p2pDefaults.maxReceiveBuffer);
+    p2pParams.maxSendBuffer = GetArg("-maxsendbuffer", p2pDefaults.maxSendBuffer);
     // if using block pruning, then disable txindex
     // also disable the wallet (for now, until SPV support is implemented in wallet)
     if (GetArg("-prune", 0)) {
@@ -1186,7 +1170,7 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
     if ( KOMODO_NSPV_SUPERLITE )
     {
         fDisableWallet = true;
-        nLocalServices = 0;
+        p2pParams.localServices = 0;
     }
     if (!fDisableWallet)
         RegisterWalletRPCCommands(tableRPC);
@@ -1259,7 +1243,8 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
     fIsBareMultisigStd = GetBoolArg("-permitbaremultisig", true);
     nMaxDatacarrierBytes = GetArg("-datacarriersize", nMaxDatacarrierBytes);
 
-    fAlerts = GetBoolArg("-alerts", DEFAULT_ALERTS);
+    p2pParams.showAlerts = GetBoolArg("-alerts", p2pDefaults.showAlerts);
+    p2pParams.nspvProcessing = GetBoolArg("-nspv_msg", p2pDefaults.nspvProcessing);
 
     // Option to startup with mocktime set (used for regression testing):
     SetMockTime(GetArg("-mocktime", 0)); // SetMockTime(0) is a no-op
@@ -1267,7 +1252,7 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
     if ( KOMODO_NSPV_FULLNODE )
     {
         if (GetBoolArg("-peerbloomfilters", true))
-            nLocalServices |= NODE_BLOOM;
+            p2pParams.localServices |= NODE_BLOOM;
     }
     nMaxTipAge = GetArg("-maxtipage", DEFAULT_MAX_TIP_AGE);
 
@@ -1396,7 +1381,7 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
     LogPrintf("Default data directory %s\n", GetDefaultDataDir().string());
     LogPrintf("Using data directory %s\n", strDataDir);
     LogPrintf("Using config file %s\n", GetConfigFile().string());
-    LogPrintf("Using at most %i connections (%i file descriptors available)\n", nMaxConnections, nFD);
+    LogPrintf("Using at most %i connections (%i file descriptors available)\n", p2pParams.maxPeerConnections, nFD);
     std::ostringstream strErrors;
 
     LogPrintf("Using %u threads for script verification\n", nScriptCheckThreads);
@@ -1465,7 +1450,7 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
 #endif // ENABLE_WALLET
     // ********************************************************* Step 6: network initialization
 
-    RegisterNodeSignals(GetNodeSignals());
+    RegisterNodeSignals(p2p->GetNodeSignals());
 
     // sanitize comments per BIP-0014, format user agent and check total size
     std::vector<string> uacomments;
@@ -1475,10 +1460,12 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
             return InitError(strprintf("User Agent comment (%s) contains unsafe characters.", cmt));
         uacomments.push_back(SanitizeString(cmt, SAFE_CHARS_UA_COMMENT));
     }
-    strSubVersion = FormatSubVersion(CLIENT_NAME, CLIENT_VERSION, uacomments);
-    if (strSubVersion.size() > MAX_SUBVERSION_LENGTH) {
+    p2pParams.subVersion = FormatSubVersion(CLIENT_NAME, CLIENT_VERSION, uacomments);
+    auto maximum = P2PParameters::MAX_SUBVERSION_LENGTH;
+    if (p2pParams.subVersion.size() > maximum) 
+    {
         return InitError(strprintf("Total length of network version string %i exceeds maximum of %i characters. Reduce the number and/or size of uacomments.",
-            strSubVersion.size(), MAX_SUBVERSION_LENGTH));
+                p2pParams.subVersion.size(), maximum));
     }
 
     if (mapArgs.count("-onlynet")) {
@@ -1492,7 +1479,7 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
         for (int n = 0; n < NET_MAX; n++) {
             enum Network net = (enum Network)n;
             if (!nets.count(net))
-                SetLimited(net);
+                p2p->SetLimited(net);
         }
     }
 
@@ -1501,7 +1488,7 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
             CSubNet subnet(net);
             if (!subnet.IsValid())
                 return InitError(strprintf(_("Invalid netmask specified in -whitelist: '%s'"), net));
-            CNode::AddWhitelistedRange(subnet);
+            p2p->AddWhitelistedRange(subnet);
         }
     }
 
@@ -1509,7 +1496,7 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
     // -proxy sets a proxy for all outgoing network traffic
     // -noproxy (or -proxy=0) as well as the empty string can be used to not set a proxy, this is the default
     std::string proxyArg = GetArg("-proxy", "");
-    SetLimited(NET_ONION);
+    p2p->SetLimited(NET_ONION);
     if (proxyArg != "" && proxyArg != "0") {
         proxyType addrProxy = proxyType(CService(proxyArg, 9050), proxyRandomize);
         if (!addrProxy.IsValid())
@@ -1519,7 +1506,7 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
         SetProxy(NET_IPV6, addrProxy);
         SetProxy(NET_ONION, addrProxy);
         SetNameProxy(addrProxy);
-        SetLimited(NET_ONION, false); // by default, -proxy sets onion as reachable, unless -noonion later
+        p2p->SetLimited(NET_ONION, false); // by default, -proxy sets onion as reachable, unless -noonion later
     }
 
     // -onion can be used to set only a proxy for .onion, or override normal proxy for .onion addresses
@@ -1528,27 +1515,27 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
     std::string onionArg = GetArg("-onion", "");
     if (onionArg != "") {
         if (onionArg == "0") { // Handle -noonion/-onion=0
-            SetLimited(NET_ONION); // set onions as unreachable
+            p2p->SetLimited(NET_ONION); // set onions as unreachable
         } else {
             proxyType addrOnion = proxyType(CService(onionArg, 9050), proxyRandomize);
             if (!addrOnion.IsValid())
                 return InitError(strprintf(_("Invalid -onion address: '%s'"), onionArg));
             SetProxy(NET_ONION, addrOnion);
-            SetLimited(NET_ONION, false);
+            p2p->SetLimited(NET_ONION, false);
         }
     }
 
     // see Step 2: parameter interactions for more information about these
-    fListen = GetBoolArg("-listen", DEFAULT_LISTEN);
-    fDiscover = GetBoolArg("-discover", true);
+    p2pParams.listen = GetBoolArg("-listen", p2pDefaults.listen);
+    p2pParams.discover = GetBoolArg("-discover", true);
     fNameLookup = GetBoolArg("-dns", true);
 
     bool fBound = false;
-    if (fListen) {
+    if (p2pParams.listen) {
         if (mapArgs.count("-bind") || mapArgs.count("-whitebind")) {
             BOOST_FOREACH(const std::string& strBind, mapMultiArgs["-bind"]) {
                 CService addrBind;
-                if (!Lookup(strBind.c_str(), addrBind, GetListenPort(), false))
+                if (!Lookup(strBind.c_str(), addrBind, p2p->GetListenPort(), false))
                     return InitError(strprintf(_("Cannot resolve -bind address: '%s'"), strBind));
                 fBound |= Bind(addrBind, (BF_EXPLICIT | BF_REPORT_ERROR));
             }
@@ -1564,24 +1551,51 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
         else {
             struct in_addr inaddr_any;
             inaddr_any.s_addr = INADDR_ANY;
-            fBound |= Bind(CService(in6addr_any, GetListenPort()), BF_NONE);
-            fBound |= Bind(CService(inaddr_any, GetListenPort()), !fBound ? BF_REPORT_ERROR : BF_NONE);
+            fBound |= Bind(CService(in6addr_any, p2p->GetListenPort()), BF_NONE);
+            fBound |= Bind(CService(inaddr_any, p2p->GetListenPort()), !fBound ? BF_REPORT_ERROR : BF_NONE);
         }
         if (!fBound)
             return InitError(_("Failed to listen on any port. Use -listen=0 if you want this."));
     }
 
+    p2p = std::make_shared<P2P>(p2pParams, &chainStatus);
+
+    // Read asmap file if configured
+    if (mapArgs.count("-asmap")) {
+        fs::path asmap_path = fs::path(GetArg("-asmap", ""));
+        if (asmap_path.empty()) {
+            asmap_path = DEFAULT_ASMAP_FILENAME;
+        }
+        if (!asmap_path.is_absolute()) {
+            asmap_path = GetDataDir() / asmap_path;
+        }
+        if (!fs::exists(asmap_path)) {
+            InitError(strprintf(_("Could not find asmap file %s"), asmap_path));
+            return false;
+        }
+        std::vector<bool> asmap = CAddrMan::DecodeAsmap(asmap_path);
+        if (asmap.size() == 0) {
+            InitError(strprintf(_("Could not parse asmap file %s"), asmap_path));
+            return false;
+        }
+        const uint256 asmap_version = SerializeHash(asmap);
+        p2p->addrman.m_asmap = std::move(asmap); // //node.connman->SetAsmap(std::move(asmap));
+        LogPrintf("Using asmap version %s for IP bucketing\n", asmap_version.ToString());
+    } else {
+        LogPrintf("Using /16 prefix for IP bucketing\n");
+    }
+
     if (mapArgs.count("-externalip")) {
         BOOST_FOREACH(const std::string& strAddr, mapMultiArgs["-externalip"]) {
-            CService addrLocal(strAddr, GetListenPort(), fNameLookup);
+            CService addrLocal(strAddr, p2p->GetListenPort(), fNameLookup);
             if (!addrLocal.IsValid())
                 return InitError(strprintf(_("Cannot resolve -externalip address: '%s'"), strAddr));
-            AddLocal(CService(strAddr, GetListenPort(), fNameLookup), LOCAL_MANUAL);
+            p2p->AddLocal(CService(strAddr, p2p->GetListenPort(), fNameLookup), LOCAL_MANUAL);
         }
     }
 
     BOOST_FOREACH(const std::string& strDest, mapMultiArgs["-seednode"])
-        AddOneShot(strDest);
+        p2p->AddOneShot(strDest);
 
 #if ENABLE_ZMQ
     pzmqNotificationInterface = CZMQNotificationInterface::CreateWithArguments(mapArgs);
@@ -1610,7 +1624,7 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
     {
         std::vector<boost::filesystem::path> vImportFiles;
         threadGroup.create_thread(boost::bind(&ThreadImport, vImportFiles));
-        StartNode(threadGroup, scheduler);
+        p2p->StartNode(threadGroup, scheduler);
         pcoinsTip = new CCoinsViewCache(pcoinscatcher);
         InitBlockIndex();
         SetRPCWarmupFinished();
@@ -1999,7 +2013,7 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
     // after any wallet rescanning has taken place.
     if (fPruneMode) {
         LogPrintf("Unsetting NODE_NETWORK on prune mode\n");
-        nLocalServices &= ~NODE_NETWORK;
+        p2pParams.localServices &= ~NODE_NETWORK;
         if (!fReindex) {
             uiInterface.InitMessage(_("Pruning blockstore..."));
             PruneAndFlush();
@@ -2008,10 +2022,10 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
     if ( KOMODO_NSPV == 0 )
     {
         if ( GetBoolArg("-addressindex", DEFAULT_ADDRESSINDEX) != 0 )
-            nLocalServices |= NODE_ADDRINDEX;
+            p2pParams.localServices |= NODE_ADDRINDEX;
         if ( GetBoolArg("-spentindex", DEFAULT_SPENTINDEX) != 0 )
-            nLocalServices |= NODE_SPENTINDEX;
-        fprintf(stderr,"nLocalServices %llx %d, %d\n",(long long)nLocalServices,GetBoolArg("-addressindex", DEFAULT_ADDRESSINDEX),GetBoolArg("-spentindex", DEFAULT_SPENTINDEX));
+            p2pParams.localServices |= NODE_SPENTINDEX;
+        fprintf(stderr,"nLocalServices %llx %d, %d\n",(long long)p2pParams.localServices,GetBoolArg("-addressindex", DEFAULT_ADDRESSINDEX),GetBoolArg("-spentindex", DEFAULT_SPENTINDEX));
     }
     // ********************************************************* Step 10: import blocks
 
@@ -2067,8 +2081,6 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
     if (GetBoolArg("-listenonion", DEFAULT_LISTEN_ONION))
         StartTorControl(threadGroup, scheduler);
 
-    StartNode(threadGroup, scheduler);
-
 #ifdef ENABLE_MINING
     // Generate coins in the background
  #ifdef ENABLE_WALLET
@@ -2097,7 +2109,7 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
 #endif
 
     // SENDALERT
-    threadGroup.create_thread(boost::bind(ThreadSendAlert));
+    threadGroup.create_thread(boost::bind(ThreadSendAlert, p2p));
 
     return !fRequestShutdown;
 }

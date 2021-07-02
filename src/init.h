@@ -24,6 +24,8 @@
 #include <string>
 
 #include "zcash/JoinSplit.hpp"
+#include "p2p/p2p_parameters.h"
+#include "p2p/p2p.h"
 
 class CScheduler;
 class CWallet;
@@ -35,13 +37,14 @@ class thread_group;
 
 extern CWallet* pwalletMain;
 extern ZCJoinSplit* pzcashParams;
+extern std::shared_ptr<P2P> p2p;
 
 void StartShutdown();
 bool ShutdownRequested();
 /** Interrupt threads */
 void Interrupt(boost::thread_group& threadGroup);
 void Shutdown();
-bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler);
+bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler, P2PParameters& p2pParams);
 
 /** The help message mode determines what help message to show */
 enum HelpMessageMode {

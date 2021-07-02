@@ -27,6 +27,7 @@
 #include "utiltime.h"
 #include "utilmoneystr.h"
 #include "utilstrencodings.h"
+#include "p2p/p2p.h"
 
 #include <boost/thread.hpp>
 #include <boost/thread/synchronized_value.hpp>
@@ -41,6 +42,8 @@
 
 #include "komodo_defs.h"
 int64_t komodo_block_unlocktime(uint32_t nHeight);
+
+extern std::shared_ptr<P2P> p2p;
 
 void AtomicTimer::start()
 {
@@ -244,10 +247,10 @@ int printStats(bool mining)
     size_t connections;
     int64_t netsolps;
     {
-        LOCK2(cs_main, cs_vNodes);
+        LOCK(cs_main);
         height = chainActive.Height();
         tipmediantime = chainActive.LastTip()->GetMedianTimePast();
-        connections = vNodes.size();
+        connections = p2p->GetNumberConnected();
         netsolps = GetNetworkHashPS(120, -1);
     }
     auto localsolps = GetLocalSolPS();
@@ -282,12 +285,7 @@ int printMiningStatus(bool mining)
             std::cout << strprintf(_("You are mining with the %s solver on %d threads."),
                                    GetArg("-equihashsolver", "default"), nThreads) << std::endl;
         } else {
-            bool fvNodesEmpty;
-            {
-                LOCK(cs_vNodes);
-                fvNodesEmpty = vNodes.empty();
-            }
-            if (fvNodesEmpty) {
+            if (p2p->GetNumberConnected() == 0) {
                 std::cout << _("Mining is paused while waiting for connections.") << std::endl;
             } else if (IsInitialBlockDownload()) {
                 std::cout << _("Mining is paused while downloading blocks.") << std::endl;

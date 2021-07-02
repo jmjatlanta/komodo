@@ -23,7 +23,6 @@
 #include "main.h"
 #include "sodium.h"
 
-#include "addrman.h"
 #include "alert.h"
 #include "arith_uint256.h"
 #include "importcoin.h"
@@ -37,7 +36,12 @@
 #include "merkleblock.h"
 #include "metrics.h"
 #include "notarisationdb.h"
-#include "net.h"
+#define KOMODO_ZCASH
+#include "komodo.h" // include this before komodo_utils.h
+#include "komodo_utils.h" // CRYPTO777_KMDADDR
+#include "p2p/p2p.h"
+#include "p2p/node.h"
+#include "komodo_hardfork.h"
 #include "pow.h"
 #include "script/interpreter.h"
 #include "txdb.h"
@@ -58,6 +62,7 @@
 #include <map>
 #include <unordered_map>
 #include <vector>
+#include <memory>
 
 #include <boost/algorithm/string/replace.hpp>
 #include <boost/filesystem.hpp>
@@ -90,7 +95,9 @@ void komodo_setactivation(int32_t height);
 void komodo_pricesupdate(int32_t height,CBlock *pblock);
 
 BlockMap mapBlockIndex;
+std::shared_ptr<P2P> p2p;
 CChain chainActive;
+ChainStatus chainStatus(&chainActive, Params());
 CBlockIndex *pindexBestHeader = NULL;
 static int64_t nTimeBestReceived = 0;
 CWaitableCriticalSection csBestBlock;
@@ -391,7 +398,7 @@ namespace {
             nSyncStarted--;
 
         if (state->nMisbehavior == 0 && state->fCurrentlyConnected) {
-            AddressCurrentlyConnected(state->address);
+            p2p->AddressCurrentlyConnected(state->address);
         }
 
         BOOST_FOREACH(const QueuedBlock& entry, state->vBlocksInFlight)
@@ -643,11 +650,6 @@ CBlockIndex* FindForkInGlobalIndex(const CChain& chain, const CBlockLocator& loc
 
 CCoinsViewCache *pcoinsTip = NULL;
 CBlockTreeDB *pblocktree = NULL;
-
-// Komodo globals
-
-#define KOMODO_ZCASH
-#include "komodo.h"
 
 UniValue komodo_snapshot(int top)
 {
@@ -4650,11 +4652,15 @@ bool ActivateBestChain(bool fSkipdpow, CValidationState &state, CBlock *pblock) 
                 nBlockEstimate = Checkpoints::GetTotalBlocksEstimate(chainParams.Checkpoints());
             // Don't relay blocks if pruning -- could cause a peer to try to download, resulting
             // in a stalled download if the block file is pruned before the request.
-            if (nLocalServices & NODE_NETWORK) {
-                LOCK(cs_vNodes);
-                BOOST_FOREACH(CNode* pnode, vNodes)
-                if (chainActive.Height() > (pnode->nStartingHeight != -1 ? pnode->nStartingHeight - 2000 : nBlockEstimate))
-                    pnode->PushInventory(CInv(MSG_BLOCK, hashNewTip));
+            if (p2p->GetParams().localServices & NODE_NETWORK) {
+                LOCK(p2p->cs_vNodes);
+                for(CNode* pnode : p2p->GetNodes())
+                {
+                    if (chainActive.Height() > (pnode->nStartingHeight != -1 
+                            ? pnode->nStartingHeight - 2000 
+                            : nBlockEstimate))
+                        pnode->PushInventory(CInv(MSG_BLOCK, hashNewTip));
+                }
             }
             // Notify external listeners about the new tip.
             GetMainSignals().UpdatedBlockTip(pindexNewTip);
@@ -7023,7 +7029,7 @@ void static ProcessGetData(CNode* pfrom)
 
     while (it != pfrom->vRecvGetData.end()) {
         // Don't bother if send buffer is too full to respond anyway
-        if (pfrom->nSendSize >= SendBufferSize())
+        if (pfrom->nSendSize >= p2p->SendBufferSize())
             break;
 
         const CInv &inv = *it;
@@ -7113,9 +7119,9 @@ void static ProcessGetData(CNode* pfrom)
                 // Send stream from relay memory
                 bool pushed = false;
                 {
-                    LOCK(cs_mapRelay);
-                    map<CInv, CDataStream>::iterator mi = mapRelay.find(inv);
-                    if (mi != mapRelay.end()) {
+                    LOCK(p2p->cs_mapRelay);
+                    map<CInv, CDataStream>::iterator mi = p2p->mapRelay.find(inv);
+                    if (mi != p2p->mapRelay.end()) {
                         pfrom->PushMessage(inv.GetCommand(), (*mi).second);
                         pushed = true;
                     }
@@ -7168,16 +7174,12 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
     int32_t nProtocolVersion;
     const CChainParams& chainparams = Params();
     LogPrint("net", "received: %s (%u bytes) peer=%d\n", SanitizeString(strCommand), vRecv.size(), pfrom->id);
-    //if ( KOMODO_NSPV_SUPERLITE )
-    //if ( strCommand != "version" && strCommand != "verack" )
-    //    fprintf(stderr, "recv: %s (%u bytes) peer=%d\n", SanitizeString(strCommand).c_str(), (int32_t)vRecv.size(), (int32_t)pfrom->GetId());
+
     if (mapArgs.count("-dropmessagestest") && GetRand(atoi(mapArgs["-dropmessagestest"])) == 0)
     {
         LogPrintf("dropmessagestest DROPPING RECV MESSAGE\n");
         return true;
     }
-
-    //fprintf(stderr,"netmsg: %s\n", strCommand.c_str());
 
     if (strCommand == "version")
     {
@@ -7226,7 +7228,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
         if (!vRecv.empty())
             vRecv >> addrFrom >> nNonce;
         if (!vRecv.empty()) {
-            vRecv >> LIMITED_STRING(pfrom->strSubVer, MAX_SUBVERSION_LENGTH);
+            vRecv >> LIMITED_STRING(pfrom->strSubVer, P2PParameters::MAX_SUBVERSION_LENGTH);
             pfrom->cleanSubVer = SanitizeString(pfrom->strSubVer);
         }
         if (!vRecv.empty())
@@ -7237,7 +7239,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
             pfrom->fRelayTxes = true;
 
         // Disconnect if we connected to ourself
-        if (nNonce == nLocalHostNonce && nNonce > 1)
+        if (nNonce == pfrom->localHostNonce && nNonce > 1)
         {
             LogPrintf("connected to self at %s, disconnecting\n", pfrom->addr.ToString());
             pfrom->fDisconnect = true;
@@ -7249,7 +7251,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
         pfrom->addrLocal = addrMe;
         if (pfrom->fInbound && addrMe.IsRoutable())
         {
-            SeenLocal(addrMe);
+            p2p->SeenLocal(addrMe);
         }
 
         // Be shy and don't send version until we hear
@@ -7268,14 +7270,14 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
         if (!pfrom->fInbound)
         {
             // Advertise our address
-            if (fListen && !IsInitialBlockDownload())
+            if (p2p->GetParams().listen && !IsInitialBlockDownload())
             {
-                CAddress addr = GetLocalAddress(&pfrom->addr);
+                CAddress addr = pfrom->GetParent()->GetLocalAddress(&pfrom->addr);
                 if (addr.IsRoutable())
                 {
                     LogPrintf("ProcessMessages: advertizing address %s\n", addr.ToString());
                     pfrom->PushAddress(addr);
-                } else if (IsPeerAddrLocalGood(pfrom)) {
+                } else if (p2p->IsPeerAddrLocalGood(pfrom)) {
                     addr.SetIP(pfrom->addrLocal);
                     LogPrintf("ProcessMessages: advertizing address %s\n", addr.ToString());
                     pfrom->PushAddress(addr);
@@ -7283,17 +7285,17 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
             }
 
             // Get recent addresses
-            if (pfrom->fOneShot || pfrom->nVersion >= CADDR_TIME_VERSION || addrman.size() < 1000)
+            if (pfrom->fOneShot || pfrom->nVersion >= CADDR_TIME_VERSION || p2p->addrman.size() < 1000)
             {
                 pfrom->PushMessage("getaddr");
                 pfrom->fGetAddr = true;
             }
-            addrman.Good(pfrom->addr);
+            p2p->addrman.Good(pfrom->addr);
         } else {
             if (((CNetAddr)pfrom->addr) == (CNetAddr)addrFrom)
             {
-                addrman.Add(addrFrom, addrFrom);
-                addrman.Good(addrFrom);
+                p2p->addrman.Add(addrFrom, addrFrom);
+                p2p->addrman.Good(addrFrom);
             }
         }
 
@@ -7381,7 +7383,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
         vRecv >> vAddr;
 
         // Don't want addr from older versions unless seeding
-        if (pfrom->nVersion < CADDR_TIME_VERSION && addrman.size() > 1000)
+        if (pfrom->nVersion < CADDR_TIME_VERSION && p2p->addrman.size() > 1000)
             return true;
         if (vAddr.size() > 1000)
         {
@@ -7400,12 +7402,12 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
             if (addr.nTime <= 100000000 || addr.nTime > nNow + 10 * 60)
                 addr.nTime = nNow - 5 * 24 * 60 * 60;
             pfrom->AddAddressKnown(addr);
-            bool fReachable = IsReachable(addr);
+            bool fReachable = p2p->IsReachable(addr);
             if (addr.nTime > nSince && !pfrom->fGetAddr && vAddr.size() <= 10 && addr.IsRoutable())
             {
                 // Relay to a limited number of other nodes
                 {
-                    LOCK(cs_vNodes);
+                    LOCK(p2p->cs_vNodes);
                     // Use deterministic randomness to send to the same nodes for 24 hours
                     // at a time so the addrKnowns of the chosen nodes prevent repeats
                     static uint256 hashSalt;
@@ -7415,7 +7417,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
                     uint256 hashRand = ArithToUint256(UintToArith256(hashSalt) ^ (hashAddr<<32) ^ ((GetTime()+hashAddr)/(24*60*60)));
                     hashRand = Hash(BEGIN(hashRand), END(hashRand));
                     multimap<uint256, CNode*> mapMix;
-                    BOOST_FOREACH(CNode* pnode, vNodes)
+                    for(CNode* pnode : p2p->GetNodes())
                     {
                         if (pnode->nVersion < CADDR_TIME_VERSION)
                             continue;
@@ -7434,7 +7436,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
             if (fReachable)
                 vAddrOk.push_back(addr);
         }
-        addrman.Add(vAddrOk, pfrom->addr, 2 * 60 * 60);
+        p2p->addrman.Add(vAddrOk, pfrom->addr, 2 * 60 * 60);
         if (vAddr.size() < 1000)
             pfrom->fGetAddr = false;
         if (pfrom->fOneShot)
@@ -7535,12 +7537,11 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
         pfrom->fSentAddr = true;
         
         pfrom->vAddrToSend.clear();
-        vector<CAddress> vAddr = addrman.GetAddr();
-        BOOST_FOREACH(const CAddress &addr, vAddr)
-        pfrom->PushAddress(addr);
+        for(const CAddress &addr : p2p->addrman.GetAddr())
+            pfrom->PushAddress(addr);
     }
     // temporary optional nspv message processing
-    else if (GetBoolArg("-nspv_msg", DEFAULT_NSPV_PROCESSING) &&
+    else if ( p2p->GetParams().nspvProcessing &&
             (strCommand == "getnSPV" || strCommand == "nSPV")) {
 
         std::vector<uint8_t> payload;
@@ -7559,7 +7560,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
     {
         vector<CInv> vInv;
         vRecv >> vInv;
-        if (vInv.size() > MAX_INV_SZ)
+        if (vInv.size() > p2p->GetParams().MAX_INV_SZ)
         {
             Misbehaving(pfrom->GetId(), 20);
             return error("message inv size() = %u", vInv.size());
@@ -7609,7 +7610,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
             // Track requests for our stuff
             GetMainSignals().Inventory(inv.hash);
 
-            if (pfrom->nSendSize > (SendBufferSize() * 2)) {
+            if (pfrom->nSendSize > (p2p->SendBufferSize() * 2)) {
                 Misbehaving(pfrom->GetId(), 50);
                 return error("send buffer size() = %u", pfrom->nSendSize);
             }
@@ -7624,7 +7625,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
     {
         vector<CInv> vInv;
         vRecv >> vInv;
-        if (vInv.size() > MAX_INV_SZ)
+        if (vInv.size() > p2p->GetParams().MAX_INV_SZ)
         {
             Misbehaving(pfrom->GetId(), 20);
             return error("message getdata size() = %u", vInv.size());
@@ -7756,12 +7757,12 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
         CValidationState state;
 
         pfrom->setAskFor.erase(inv.hash);
-        mapAlreadyAskedFor.erase(inv);
+        p2p->mapAlreadyAskedFor.erase(inv);
 
         if (!AlreadyHave(inv) && AcceptToMemoryPool(mempool, state, tx, true, &fMissingInputs))
         {
             mempool.check(pcoinsTip);
-            RelayTransaction(tx);
+            p2p->RelayTransaction(tx);
             vWorkQueue.push_back(inv.hash);
 
             LogPrint("mempool", "AcceptToMemoryPool: peer=%d %s: accepted %s (poolsz %u)\n",
@@ -7795,7 +7796,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
                     if (AcceptToMemoryPool(mempool, stateDummy, orphanTx, true, &fMissingInputs2))
                     {
                         LogPrint("mempool", "   accepted orphan tx %s\n", orphanHash.ToString());
-                        RelayTransaction(orphanTx);
+                        p2p->RelayTransaction(orphanTx);
                         vWorkQueue.push_back(orphanHash);
                         vEraseQueue.push_back(orphanHash);
                     }
@@ -7853,7 +7854,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
                 int nDoS = 0;
                 if (!state.IsInvalid(nDoS) || nDoS == 0) {
                     LogPrintf("Force relaying tx %s from whitelisted peer=%d\n", tx.GetHash().ToString(), pfrom->id);
-                    RelayTransaction(tx);
+                    p2p->RelayTransaction(tx);
                 } else {
                     LogPrintf("Not relaying invalid transaction %s from whitelisted peer=%d (%s (code %d))\n",
                               tx.GetHash().ToString(), pfrom->id, state.GetRejectReason(), state.GetRejectCode());
@@ -8015,7 +8016,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
                 if (!pfrom->pfilter->IsRelevantAndUpdate(tx)) continue;
             }
             vInv.push_back(inv);
-            if (vInv.size() == MAX_INV_SZ) {
+            if (vInv.size() == p2p->GetParams().MAX_INV_SZ) {
                 pfrom->PushMessage("inv", vInv);
                 vInv.clear();
             }
@@ -8036,9 +8037,9 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
                 // Relay
                 pfrom->setKnown.insert(alertHash);
                 {
-                    LOCK(cs_vNodes);
-                    BOOST_FOREACH(CNode* pnode, vNodes)
-                    alert.RelayTo(pnode);
+                    LOCK(p2p->cs_vNodes);
+                    for(CNode* pnode : p2p->GetNodes())
+                        alert.RelayTo(pnode);
                 }
             }
             else {
@@ -8053,7 +8054,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
         }
     }
 
-    else if (!(nLocalServices & NODE_BLOOM) &&
+    else if (!(p2p->GetParams().localServices & NODE_BLOOM) &&
               (strCommand == "filterload" ||
                strCommand == "filteradd"))
     {
@@ -8109,7 +8110,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
     else if (strCommand == "filterclear")
     {
         LOCK(pfrom->cs_filter);
-        if (nLocalServices & NODE_BLOOM) {
+        if (p2p->GetParams().localServices & NODE_BLOOM) {
             delete pfrom->pfilter;
             pfrom->pfilter = new CBloomFilter();
         }
@@ -8180,7 +8181,7 @@ bool ProcessMessages(CNode* pfrom)
     std::deque<CNetMessage>::iterator it = pfrom->vRecvMsg.begin();
     while (!pfrom->fDisconnect && it != pfrom->vRecvMsg.end()) {
         // Don't bother if send buffer is too full to respond anyway
-        if (pfrom->nSendSize >= SendBufferSize())
+        if (pfrom->nSendSize >= p2p->SendBufferSize())
             break;
 
         // get next message
@@ -8292,7 +8293,7 @@ bool SendMessages(CNode* pto, bool fSendTrickle)
             // RPC ping request by user
             pingSend = true;
         }
-        if (pto->nPingNonceSent == 0 && pto->nPingUsecStart + PING_INTERVAL * 1000000 < GetTimeMicros()) {
+        if (pto->nPingNonceSent == 0 && pto->nPingUsecStart + p2p->GetParams().pingInterval * 1000000 < GetTimeMicros()) {
             // Ping automatically sent as a latency probe & keepalive.
             pingSend = true;
         }
@@ -8321,17 +8322,17 @@ bool SendMessages(CNode* pto, bool fSendTrickle)
         static int64_t nLastRebroadcast;
         if (!IsInitialBlockDownload() && (GetTime() - nLastRebroadcast > 24 * 60 * 60))
         {
-            LOCK(cs_vNodes);
-            BOOST_FOREACH(CNode* pnode, vNodes)
+            LOCK(p2p->cs_vNodes);
+            for(CNode* pnode : p2p->GetNodes())
             {
                 // Periodically clear addrKnown to allow refresh broadcasts
                 if (nLastRebroadcast)
                     pnode->addrKnown.reset();
 
                 // Rebroadcast our address
-                AdvertizeLocal(pnode);
+                p2p->AdvertizeLocal(pnode);
             }
-            if (!vNodes.empty())
+            if (p2p->GetNumberConnected() > 0)
                 nLastRebroadcast = GetTime();
         }
 
@@ -8371,7 +8372,7 @@ bool SendMessages(CNode* pto, bool fSendTrickle)
                     LogPrintf("Warning: not banning local peer %s!\n", pto->addr.ToString());
                 else
                 {
-                    CNode::Ban(pto->addr);
+                    p2p->Ban(pto->addr);
                 }
             }
             state.fShouldBan = false;

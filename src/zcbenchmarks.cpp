@@ -46,7 +46,7 @@ void pre_wallet_load()
 #ifdef ENABLE_MINING
     GenerateBitcoins(false, NULL, 0);
 #endif
-    UnregisterNodeSignals(GetNodeSignals());
+    UnregisterNodeSignals(p2p->GetNodeSignals());
     if (pwalletMain)
         pwalletMain->Flush(true);
 
@@ -54,7 +54,7 @@ void pre_wallet_load()
     delete pwalletMain;
     pwalletMain = NULL;
     bitdb.Reset();
-    RegisterNodeSignals(GetNodeSignals());
+    RegisterNodeSignals(p2p->GetNodeSignals());
     LogPrintf("%s: done\n", __func__);
 }
 

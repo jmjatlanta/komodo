@@ -3,7 +3,7 @@
 #include "cc/eval.h"
 #include "core_io.h"
 #include "key.h"
-
+#include "utilstrencodings.h" // ParseHex
 #include "testutils.h"
 
 

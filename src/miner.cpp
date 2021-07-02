@@ -38,7 +38,8 @@
 #include "key_io.h"
 #include "main.h"
 #include "metrics.h"
-#include "net.h"
+#include "p2p/p2p.h"
+#include "p2p/node.h"
 #include "pow.h"
 #include "primitives/transaction.h"
 #include "random.h"
@@ -65,6 +66,8 @@
 #include <mutex>
 
 using namespace std;
+
+extern std::shared_ptr<P2P> p2p;
 
 //////////////////////////////////////////////////////////////////////////////
 //
@@ -1060,8 +1063,8 @@ CBlockTemplate* CreateNewBlockWithKey(CReserveKey& reservekey, int32_t nHeight, 
 void komodo_sendmessage(int32_t minpeers,int32_t maxpeers,const char *message,std::vector<uint8_t> payload)
 {
     int32_t numsent = 0;
-    LOCK(cs_vNodes);
-    BOOST_FOREACH(CNode* pnode, vNodes)
+    LOCK(p2p->cs_vNodes);
+    for(CNode* pnode : p2p->GetNodes())
     {
         if ( pnode->hSocket == INVALID_SOCKET )
             continue;
@@ -1082,8 +1085,8 @@ void komodo_broadcast(CBlock *pblock,int32_t limit)
     int32_t n = 1;
     //fprintf(stderr,"broadcast new block t.%u\n",(uint32_t)time(NULL));
     {
-        LOCK(cs_vNodes);
-        BOOST_FOREACH(CNode* pnode, vNodes)
+        LOCK(p2p->cs_vNodes);
+        for(CNode* pnode : p2p->GetNodes())
         {
             if ( pnode->hSocket == INVALID_SOCKET )
                 continue;
@@ -1153,7 +1156,6 @@ static bool ProcessBlockFound(CBlock* pblock)
     return true;
 }
 
-int32_t komodo_baseid(char *origbase);
 int32_t komodo_eligiblenotary(uint8_t pubkeys[66][33],int32_t *mids,uint32_t *blocktimes,int32_t *nonzpkeysp,int32_t height);
 arith_uint256 komodo_PoWtarget(int32_t *percPoSp,arith_uint256 target,int32_t height,int32_t goalperc,int32_t newStakerActive);
 int32_t FOUND_BLOCK,KOMODO_MAYBEMINED;
@@ -1169,8 +1171,7 @@ void waitForPeers(const CChainParams &chainparams)
         bool fvNodesEmpty;
         {
             boost::this_thread::interruption_point();
-            LOCK(cs_vNodes);
-            fvNodesEmpty = vNodes.empty();
+            fvNodesEmpty = p2p->GetNumberConnected() == 0;
         }
         if (fvNodesEmpty || IsNotInSync())
         {
@@ -1181,8 +1182,7 @@ void waitForPeers(const CChainParams &chainparams)
                 {
                     MilliSleep(1000 + rand() % 4000);
                     boost::this_thread::interruption_point();
-                    LOCK(cs_vNodes);
-                    fvNodesEmpty = vNodes.empty();
+                    fvNodesEmpty = p2p->GetNumberConnected();
                     loops = 0;
                     blockDiff = 0;
                 }
@@ -1317,7 +1317,7 @@ void static VerusStaker(CWallet *pwallet)
             unsigned int nExtraNonce = 0;
             IncrementExtraNonce(pblock, pindexPrev, nExtraNonce);
 
-            if (vNodes.empty() && chainparams.MiningRequiresPeers())
+            if (p2p->GetNumberConnected() == 0 && chainparams.MiningRequiresPeers())
             {
                 if ( Mining_height > ASSETCHAINS_MINHEIGHT )
                 {
@@ -1645,7 +1645,7 @@ void static BitcoinMiner_noeq()
                 // Check for stop or if block needs to be rebuilt
                 boost::this_thread::interruption_point();
 
-                if (vNodes.empty() && chainparams.MiningRequiresPeers())
+                if (p2p->GetNumberConnected() == 0 && chainparams.MiningRequiresPeers())
                 {
                     if ( Mining_height > ASSETCHAINS_MINHEIGHT )
                     {
@@ -1761,19 +1761,10 @@ void static BitcoinMiner()
                 // Busy-wait for the network to come online so we don't waste time mining
                 // on an obsolete chain. In regtest mode we expect to fly solo.
                 miningTimer.stop();
-                do {
-                    bool fvNodesEmpty;
-                    {
-                        //LOCK(cs_vNodes);
-                        fvNodesEmpty = vNodes.empty();
-                    }
-                    if (!fvNodesEmpty )//&& !IsInitialBlockDownload())
-                        break;
+                while (p2p->GetNumberConnected() == 0)
+                {
                     MilliSleep(15000);
-                    //fprintf(stderr,"fvNodesEmpty %d IsInitialBlockDownload(%s) %d\n",(int32_t)fvNodesEmpty,ASSETCHAINS_SYMBOL,(int32_t)IsInitialBlockDownload());
-
-                } while (true);
-                //fprintf(stderr,"%s Found peers\n",ASSETCHAINS_SYMBOL);
+                }
                 miningTimer.start();
             }
             //
@@ -2122,7 +2113,7 @@ void static BitcoinMiner()
                         fprintf(stderr,"FOUND_BLOCK!\n");
                         //sleep(2000);
                     } */
-                    if (vNodes.empty() && chainparams.MiningRequiresPeers())
+                    if (p2p->GetNumberConnected() == 0 && chainparams.MiningRequiresPeers())
                     {
                         if ( ASSETCHAINS_SYMBOL[0] == 0 || Mining_height > ASSETCHAINS_MINHEIGHT )
                         {

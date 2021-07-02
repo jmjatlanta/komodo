@@ -30,7 +30,6 @@
 #include "main.h"
 #include "metrics.h"
 #include "miner.h"
-#include "net.h"
 #include "pow.h"
 #include "rpc/server.h"
 #include "txmempool.h"
@@ -700,13 +699,7 @@ UniValue getblocktemplate(const UniValue& params, bool fHelp, const CPubKey& myp
         strMode = "template";
     }
 
-    bool fvNodesEmpty;
-    {
-        LOCK(cs_vNodes);
-        fvNodesEmpty = vNodes.empty();
-    }
-
-    if (Params().MiningRequiresPeers() && fvNodesEmpty)
+    if (Params().MiningRequiresPeers() && p2p->GetNumberConnected() == 0)
     {
         throw JSONRPCError(RPC_CLIENT_NOT_CONNECTED, "Komodo is not connected!");
     }

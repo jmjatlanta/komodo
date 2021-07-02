@@ -229,7 +229,7 @@ bool mySenddicetransaction(std::string res,uint256 entropyused,int32_t entropyvo
                 LOCK(cs_main);
                 if ( myAddtomempool(tx) != 0 )
                 {
-                    RelayTransaction(tx);
+                    p2p->RelayTransaction(tx);
                     if ( retval == 0 )
                     {
                         if ( ptr != 0 )
@@ -243,7 +243,7 @@ bool mySenddicetransaction(std::string res,uint256 entropyused,int32_t entropyvo
                 }
                 else
                 {
-                    RelayTransaction(tx);
+                    p2p->RelayTransaction(tx);
                     fprintf(stderr,"rebroadcast.%c and clear [%d] and broadcast entropyused.%s bettxid.%s -> %s\n",funcid,i,entropyused.GetHex().c_str(),bettxid.GetHex().c_str(),tx.GetHash().GetHex().c_str());
                     if ( ptr != 0 )
                     {
@@ -1692,7 +1692,7 @@ void *dealer0_loop(void *_arg)
                         if ( myAddtomempool(tx) != 0 )
                         {
                             fprintf(stderr,"ENTROPY %s: %d of %d, %d\n",tx.GetHash().GetHex().c_str(),i,n,DICE_MINUTXOS - numentropytxs);
-                            RelayTransaction(tx);
+                            p2p->RelayTransaction(tx);
                             entropytxs[m++] = tx;
                         } else break;
                     } else break;
@@ -1711,7 +1711,7 @@ void *dealer0_loop(void *_arg)
                         if ( myAddtomempool(tx) != 0 )
                         {
                             fprintf(stderr,"resend ENTROPY %s: %d of %d\n",txid.GetHex().c_str(),i,m);
-                            RelayTransaction(tx);
+                            p2p->RelayTransaction(tx);
                         }
                     }
                     else

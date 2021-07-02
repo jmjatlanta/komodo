@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include "addrman.h"
+#include "p2p/addrman.h"
 #include <boost/filesystem.hpp>
 #include <boost/thread.hpp>
 #include <string>

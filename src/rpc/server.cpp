@@ -46,7 +46,7 @@
 
 using namespace RPCServer;
 using namespace std;
-extern uint16_t ASSETCHAINS_P2PPORT,ASSETCHAINS_RPCPORT;
+extern uint16_t ASSETCHAINS_RPCPORT;
 
 static bool fRPCRunning = false;
 static bool fRPCInWarmup = true;

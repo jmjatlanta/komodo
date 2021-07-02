@@ -5,13 +5,13 @@
 
 #include "torcontrol.h"
 #include "utilstrencodings.h"
-#include "net.h"
 #include "util.h"
 #include "crypto/hmac_sha256.h"
 
 #include <vector>
 #include <deque>
 #include <set>
+#include <memory>
 #include <stdlib.h>
 
 #include <boost/function.hpp>
@@ -28,6 +28,8 @@
 #include <event2/util.h>
 #include <event2/event.h>
 #include <event2/thread.h>
+
+#include "p2p/p2p.h"
 
 /** Default control port */
 const std::string DEFAULT_TOR_CONTROL = "127.0.0.1:9051";
@@ -48,6 +50,8 @@ static const float RECONNECT_TIMEOUT_EXP = 1.5;
  * this is belt-and-suspenders sanity limit to prevent memory exhaustion.
  */
 static const int MAX_LINE_LENGTH = 100000;
+
+extern std::shared_ptr<P2P> p2p;
 
 /****** Low-level TorControlConnection ********/
 
@@ -480,7 +484,7 @@ TorController::~TorController()
         reconnect_ev = 0;
     }
     if (service.IsValid()) {
-        RemoveLocal(service);
+        p2p->RemoveLocal(service);
     }
 }
 
@@ -504,14 +508,14 @@ void TorController::add_onion_cb(TorControlConnection& conn, const TorControlRep
             return;
         }
 
-        service = CService(service_id+".onion", GetListenPort(), false);
+        service = CService(service_id+".onion", p2p->GetListenPort(), false);
         LogPrintf("tor: Got service ID %s, advertizing service %s\n", service_id, service.ToString());
         if (WriteBinaryFile(GetPrivateKeyFile(), private_key)) {
             LogPrint("tor", "tor: Cached service private key to %s\n", GetPrivateKeyFile());
         } else {
             LogPrintf("tor: Error writing service private key to %s\n", GetPrivateKeyFile());
         }
-        AddLocal(service, LOCAL_MANUAL);
+        p2p->AddLocal(service, LOCAL_MANUAL);
         // ... onion requested - keep connection open
     } else if (reply.code == 510) { // 510 Unrecognized command
         LogPrintf("tor: Add onion failed with unrecognized command (You probably need to upgrade Tor)\n");
@@ -530,7 +534,7 @@ void TorController::auth_cb(TorControlConnection& conn, const TorControlReply& r
         if (GetArg("-onion", "") == "") {
             proxyType addrOnion = proxyType(CService("127.0.0.1", 9050), true);
             SetProxy(NET_ONION, addrOnion);
-            SetLimited(NET_ONION, false);
+            p2p->SetLimited(NET_ONION, false);
         }
 
         // Finally - now create the service
@@ -539,7 +543,7 @@ void TorController::auth_cb(TorControlConnection& conn, const TorControlReply& r
         // Request hidden service, redirect port.
         // Note that the 'virtual' port doesn't have to be the same as our internal port, but this is just a convenient
         // choice.  TODO; refactor the shutdown sequence some day.
-        conn.Command(strprintf("ADD_ONION %s Port=%i,127.0.0.1:%i", private_key, GetListenPort(), GetListenPort()),
+        conn.Command(strprintf("ADD_ONION %s Port=%i,127.0.0.1:%i", private_key, p2p->GetListenPort(), p2p->GetListenPort()),
             boost::bind(&TorController::add_onion_cb, this, _1, _2));
     } else {
         LogPrintf("tor: Authentication failed\n");
@@ -694,7 +698,7 @@ void TorController::disconnected_cb(TorControlConnection& conn)
 {
     // Stop advertizing service when disconnected
     if (service.IsValid())
-        RemoveLocal(service);
+        p2p->RemoveLocal(service);
     service = CService();
     if (!reconnect)
         return;
