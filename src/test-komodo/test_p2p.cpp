@@ -18,10 +18,10 @@ TEST(TestP2P, ctor)
     // destructor called, shutdown clean and complete.
 }
 
-TEST(TestP2P, two_nodes)
+TEST(TestP2P, TwoNodes)
 {
     // logging
-    fPrintToConsole = true;
+    //fPrintToConsole = true;
     // context for node 1
     std::shared_ptr<P2P> p2p1;
     CChain activeChain1; // the active chain for p2p1
@@ -44,7 +44,7 @@ TEST(TestP2P, two_nodes)
         CAddress addr( CService("127.0.0.1:10001") );
         std::string errorString;
         p2p1->BindListenPort(addr, errorString, true);
-        std::this_thread::sleep_for(std::chrono::seconds(1));
+        std::this_thread::sleep_for(std::chrono::milliseconds(500));
     }
     {
         p2pParameters2.port = 10002;
@@ -55,7 +55,7 @@ TEST(TestP2P, two_nodes)
         p2p2->AddNode("127.0.0.1:10001");
         p2p2->StartNode(threadGroup2, scheduler2);
     }
-    std::this_thread::sleep_for(std::chrono::seconds(3));
+    std::this_thread::sleep_for(std::chrono::milliseconds(500));
     // See if the two nodes are connected
     ASSERT_EQ(p2p1->GetNumberConnected(), 1);
     ASSERT_EQ(p2p2->GetNumberConnected(), 1);
@@ -64,6 +64,26 @@ TEST(TestP2P, two_nodes)
     threadGroup2.join_all();
     threadGroup1.interrupt_all();
     threadGroup1.join_all();
+}
+
+TEST(TestP2P, AddRemoveNode)
+{
+    P2PParameters p2pParameters;
+    CChain activeChain;
+    P2P p2p(p2pParameters, ChainStatus(&activeChain, Params()));
+    std::string n1("127.0.0.1:1234");
+    std::string n2("127.0.0.1:1235");
+    // add
+    ASSERT_TRUE(p2p.AddNode(n1));
+    ASSERT_TRUE(p2p.AddNode(n2));
+    ASSERT_FALSE(p2p.AddNode(n1));
+    ASSERT_EQ(p2p.GetAddedNodes().size(), 2);
+    // remove
+    ASSERT_TRUE(p2p.RemoveNode(n1));
+    ASSERT_FALSE(p2p.RemoveNode(n1));
+    ASSERT_EQ(p2p.GetAddedNodes().size(), 1);
+    ASSERT_TRUE(p2p.RemoveNode(n2));
+    ASSERT_EQ(p2p.GetAddedNodes().size(), 0);
 }
 
 } // namespace TestP2P

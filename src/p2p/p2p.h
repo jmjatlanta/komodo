@@ -87,7 +87,6 @@ public:
      */
     bool AddLocal(const CNetAddr &addr, int nScore);
     void ProcessOneShot();
-    void AcceptConnection(const ListenSocket& hListenSocket); 
     bool BindListenPort(const CService &addrBind, std::string& strError, bool fWhitelisted);
     /****
      * @brief Open a connection to a remote node
@@ -344,5 +343,11 @@ private:
      * @param[in] paddrPeer the destination (can be nullptr)
      * @returns true if found a local address
      */
-    bool GetLocal(CService &addr, const CNetAddr *paddrPeer = NULL);    
+    bool GetLocal(CService &addr, const CNetAddr *paddrPeer = NULL);
+    /***
+     * Listen on a particular socket
+     * @param hListenSocket the socket
+     */    
+    void AcceptConnection(const ListenSocket& hListenSocket); 
+
 };
