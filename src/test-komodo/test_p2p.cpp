@@ -20,6 +20,8 @@ TEST(TestP2P, ctor)
 
 TEST(TestP2P, two_nodes)
 {
+    // logging
+    fPrintToConsole = true;
     // context for node 1
     std::shared_ptr<P2P> p2p1;
     CChain activeChain1; // the active chain for p2p1
@@ -35,24 +37,31 @@ TEST(TestP2P, two_nodes)
     {
         // get p2p1 up and running
         p2pParameters1.port = 10001;
+        CScheduler::Function serviceLoop = boost::bind(&CScheduler::serviceQueue, &scheduler1);
+        threadGroup1.create_thread(boost::bind(&TraceThread<CScheduler::Function>, "scheduler", serviceLoop));        
         p2p1 = std::make_shared<P2P>( p2pParameters1, ChainStatus(&activeChain1, Params()));
         p2p1->StartNode(threadGroup1, scheduler1);
+        CAddress addr(CService( (std::string("127.0.0.1:") + std::to_string(p2pParameters1.port) ).c_str()));
+        std::string errorString;
+        p2p1->BindListenPort(addr, errorString, true);
+        std::this_thread::sleep_for(std::chrono::seconds(1));
     }
     {
         p2pParameters2.port = 10002;
         // get p2p2 up and running and talking to p2p1
+        CScheduler::Function serviceLoop = boost::bind(&CScheduler::serviceQueue, &scheduler2);
+        threadGroup2.create_thread(boost::bind(&TraceThread<CScheduler::Function>, "scheduler", serviceLoop));
         p2p2 = std::make_shared<P2P>( p2pParameters2, ChainStatus(&activeChain2, Params()));
         p2p2->AddOneShot("127.0.0.1:10001");
         p2p2->StartNode(threadGroup2, scheduler2);
     }
     // see if one is talking to the other
-    std::this_thread::sleep_for(std::chrono::seconds(30));
-
+    std::this_thread::sleep_for(std::chrono::seconds(5));
     // shut down threads
-    threadGroup1.interrupt_all();
-    threadGroup1.join_all();
     threadGroup2.interrupt_all();
     threadGroup2.join_all();
+    threadGroup1.interrupt_all();
+    threadGroup1.join_all();
 }
 
 } // namespace TestP2P

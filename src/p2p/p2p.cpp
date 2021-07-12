@@ -172,14 +172,6 @@ void P2P::StartNode(boost::thread_group& threadGroup, CScheduler& scheduler)
 
 P2P::~P2P()
 {
-    if (semOutbound)
-    {
-        for (int i=0; i< params.maxOutboundConnections; i++)
-            semOutbound->post();
-        delete semOutbound;
-        semOutbound = nullptr;
-    }
-
     if (KOMODO_NSPV_FULLNODE && addressesInitialized)
     {
         DumpAddresses();
@@ -202,6 +194,13 @@ P2P::~P2P()
         delete pnode;
     nodes.clear();
     vNodesDisconnected.clear();
+    if (semOutbound)
+    {
+        for (int i=0; i< params.maxOutboundConnections; i++)
+            semOutbound->post();
+        delete semOutbound;
+        semOutbound = nullptr;
+    }
     vhListenSocket.clear();
 
 #ifdef _WIN32
