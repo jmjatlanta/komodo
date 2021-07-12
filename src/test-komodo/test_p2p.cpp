@@ -41,7 +41,7 @@ TEST(TestP2P, two_nodes)
         threadGroup1.create_thread(boost::bind(&TraceThread<CScheduler::Function>, "scheduler", serviceLoop));        
         p2p1 = std::make_shared<P2P>( p2pParameters1, ChainStatus(&activeChain1, Params()));
         p2p1->StartNode(threadGroup1, scheduler1);
-        CAddress addr(CService( (std::string("127.0.0.1:") + std::to_string(p2pParameters1.port) ).c_str()));
+        CAddress addr( CService("127.0.0.1:10001") );
         std::string errorString;
         p2p1->BindListenPort(addr, errorString, true);
         std::this_thread::sleep_for(std::chrono::seconds(1));
@@ -55,8 +55,10 @@ TEST(TestP2P, two_nodes)
         p2p2->AddNode("127.0.0.1:10001");
         p2p2->StartNode(threadGroup2, scheduler2);
     }
-    // TODO: see if one is talking to the other
-    std::this_thread::sleep_for(std::chrono::seconds(5));
+    std::this_thread::sleep_for(std::chrono::seconds(3));
+    // See if the two nodes are connected
+    ASSERT_EQ(p2p1->GetNumberConnected(), 1);
+    ASSERT_EQ(p2p2->GetNumberConnected(), 1);
     // shut down threads
     threadGroup2.interrupt_all();
     threadGroup2.join_all();
