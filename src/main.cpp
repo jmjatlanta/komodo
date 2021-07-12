@@ -97,7 +97,6 @@ void komodo_pricesupdate(int32_t height,CBlock *pblock);
 BlockMap mapBlockIndex;
 std::shared_ptr<P2P> p2p;
 CChain chainActive;
-ChainStatus chainStatus(&chainActive, Params());
 CBlockIndex *pindexBestHeader = NULL;
 static int64_t nTimeBestReceived = 0;
 CWaitableCriticalSection csBestBlock;

@@ -56,7 +56,7 @@ public:
     /***
      * ctor
      */
-    P2P(const P2PParameters& params, ChainStatus* chainStatus);
+    P2P(const P2PParameters& params, ChainStatus chainStatus);
     /***
      * Shuts down the network
      */
@@ -65,7 +65,7 @@ public:
      * @returns the p2p parameters
      */
     const P2PParameters& GetParams() { return params; }
-    const CChainParams GetChainParams() { return chainStatus->Params(); }
+    const CChainParams GetChainParams() { return chainStatus.Params(); }
     /***
      * Does the heavy lifting to get the P2P network started
      * @param threadGroup the thread group
@@ -259,7 +259,7 @@ public:
     CCriticalSection cs_vAddedNodes;    
 private:
     P2PParameters params;
-    ChainStatus* chainStatus;
+    ChainStatus chainStatus;
     bool addressesInitialized = false; // if peers.dat has been read
     CSemaphore* semOutbound = nullptr; // semaphore to control outbound network traffic
     std::deque<std::string> vOneShots; // collections of addresses where we just want to query and hang up

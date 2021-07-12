@@ -107,7 +107,7 @@ public:
 /***
  * ctor
  */
-P2P::P2P(const P2PParameters& params, ChainStatus* chainStatus) : params(params), chainStatus(chainStatus)
+P2P::P2P(const P2PParameters& params, ChainStatus chainStatus) : params(params), chainStatus(chainStatus)
 {
 } 
 
@@ -1071,7 +1071,7 @@ bool P2P::AttemptToEvictConnection(bool fPreferNewConnection) {
 
     // Check version of eviction candidates and prioritize nodes which do not support network upgrade.
     std::vector<CNodeRef> vTmpEvictionCandidates;
-    int nextProtocolVersion = chainStatus->NextProtocolVersion(params.networkUpgragedPeerPreferenceBlockPeriod);
+    int nextProtocolVersion = chainStatus.NextProtocolVersion(params.networkUpgragedPeerPreferenceBlockPeriod);
     if (nextProtocolVersion != 0)
     {
         for (const CNodeRef &node : vEvictionCandidates) {
@@ -1304,7 +1304,7 @@ CNode* P2P::ConnectNode(CAddress addrConnect, const char *pszDest)
  * NOTE: if successful, this moves the passed grant to the constructed node
  * @param addrConnect the remote node address
  * @param grantOutbound
- * @param strDet the remote address as a string (i.e. "mydomain.com:2345")
+ * @param pszDest the remote address as a string (i.e. "mydomain.com:2345")
  * @param fOneShot true to connect, retrieve the "getaddr" response, and disconnect
  * @returns true on success
  */

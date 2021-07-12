@@ -1558,7 +1558,7 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler, P2PParame
             return InitError(_("Failed to listen on any port. Use -listen=0 if you want this."));
     }
 
-    p2p = std::make_shared<P2P>(p2pParams, &chainStatus);
+    p2p = std::make_shared<P2P>(p2pParams, ChainStatus(&chainActive, Params()));
 
     // Read asmap file if configured
     if (mapArgs.count("-asmap")) {
