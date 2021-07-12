@@ -247,6 +247,30 @@ public:
     void RelayTransaction(const CTransaction& tx, const CDataStream& ss);
     void RelayTransaction(const CTransaction& tx);
     NodeId GetNextNodeId();
+    /***
+     * Add a node to the list of nodes to be connected to
+     * @param in the address
+     * @returns false if already exists in the list
+     */
+    bool AddNode(const std::string& in);
+    /****
+     * Remove a node from the list of nodes that should be connected to
+     * @param in the address to be removed from the list
+     * @returns false if address does not exist in the list
+     */
+    bool RemoveNode(const std::string& in);
+    /****
+     * Determine if a node exists in the list of nodes that should be connected to
+     * @param in the address
+     * @returns true if the address already exists in the collection
+     */
+    bool NodeExists(const std::string& in);
+    /****
+     * Retrieve the list of nodes that should be connected to
+     * (normally added via --addnode on the command line)
+     * @returns the addresses
+     */
+    std::set<std::string> GetAddedNodes();
 public:
     std::mutex cs_mapLocalHost;
     std::map<CNetAddr, LocalServiceInfo> mapLocalHost;    
@@ -255,8 +279,7 @@ public:
     CAddrMan addrman;
     CCriticalSection cs_mapRelay;
     std::map<CInv, CDataStream> mapRelay;    
-    std::vector<std::string> vAddedNodes;
-    CCriticalSection cs_vAddedNodes;    
+   
 private:
     P2PParameters params;
     ChainStatus chainStatus;
@@ -269,6 +292,8 @@ private:
     std::list<CNode*> vNodesDisconnected; // nodes that have been disconnected
     std::set<CNetAddr> setservAddNodeAddresses;
     std::mutex cs_setservAddNodeAddresses;
+    std::set<std::string> vAddedNodes;
+    std::mutex cs_vAddedNodes;    
     CNodeSignals g_signals; // signals for message handling
     boost::condition_variable messageHandlerCondition; // triggered when a message is received
     // Whitelisted ranges: Any node connecting from these is automatically

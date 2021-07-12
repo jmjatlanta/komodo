@@ -735,18 +735,47 @@ void P2P::ThreadSocketHandler()
     }
 }
 
+bool P2P::AddNode(const std::string& in)
+{
+    std::lock_guard<std::mutex> lock(cs_vAddedNodes);
+    return vAddedNodes.insert(in).second;
+}
+
+bool P2P::RemoveNode(const std::string& in)
+{
+    std::lock_guard<std::mutex> lock(cs_vAddedNodes);
+    auto itr = vAddedNodes.find(in);
+    if (itr == vAddedNodes.end())
+        return false;
+    vAddedNodes.erase(in);
+    return true;
+}
+
+bool P2P::NodeExists(const std::string& in)
+{
+    std::lock_guard<std::mutex> lock(cs_vAddedNodes);
+    return vAddedNodes.find(in) != vAddedNodes.end();
+}
+
+std::set<std::string> P2P::GetAddedNodes()
+{
+    std::lock_guard<std::mutex> lock(cs_vAddedNodes);
+    return vAddedNodes;
+}
+
 void P2P::ThreadOpenAddedConnections()
 {
     {
-        LOCK(cs_vAddedNodes);
-        vAddedNodes = mapMultiArgs["-addnode"];
+        std::vector<std::string> nodes = mapMultiArgs["-addnode"];
+        for(auto n : nodes)
+            AddNode(n);
     }
 
     if (HaveNameProxy()) {
         while(true) {
             std::list<std::string> lAddresses(0);
             {
-                LOCK(cs_vAddedNodes);
+                std::lock_guard<std::mutex> lock(cs_vAddedNodes);
                 for(const std::string& strAddNode : vAddedNodes)
                     lAddresses.push_back(strAddNode);
             }
@@ -764,7 +793,7 @@ void P2P::ThreadOpenAddedConnections()
     {
         std::list<std::string> lAddresses(0);
         {
-            LOCK(cs_vAddedNodes);
+            std::lock_guard<std::mutex> lock(cs_vAddedNodes);
             for(const std::string& strAddNode : vAddedNodes)
                 lAddresses.push_back(strAddNode);
         }

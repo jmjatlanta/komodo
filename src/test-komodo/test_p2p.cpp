@@ -52,10 +52,10 @@ TEST(TestP2P, two_nodes)
         CScheduler::Function serviceLoop = boost::bind(&CScheduler::serviceQueue, &scheduler2);
         threadGroup2.create_thread(boost::bind(&TraceThread<CScheduler::Function>, "scheduler", serviceLoop));
         p2p2 = std::make_shared<P2P>( p2pParameters2, ChainStatus(&activeChain2, Params()));
-        p2p2->AddOneShot("127.0.0.1:10001");
+        p2p2->AddNode("127.0.0.1:10001");
         p2p2->StartNode(threadGroup2, scheduler2);
     }
-    // see if one is talking to the other
+    // TODO: see if one is talking to the other
     std::this_thread::sleep_for(std::chrono::seconds(5));
     // shut down threads
     threadGroup2.interrupt_all();

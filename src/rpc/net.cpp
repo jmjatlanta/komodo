@@ -258,23 +258,15 @@ UniValue addnode(const UniValue& params, bool fHelp, const CPubKey& mypk)
         return NullUniValue;
     }
 
-    LOCK(p2p->cs_vAddedNodes);
-    vector<string>::iterator it = p2p->vAddedNodes.begin();
-    for(; it != p2p->vAddedNodes.end(); it++)
-        if (strNode == *it)
-            break;
-
     if (strCommand == "add")
     {
-        if (it != p2p->vAddedNodes.end())
+        if (p2p->AddNode(strNode))
             throw JSONRPCError(RPC_CLIENT_NODE_ALREADY_ADDED, "Error: Node already added");
-        p2p->vAddedNodes.push_back(strNode);
     }
     else if(strCommand == "remove")
     {
-        if (it == p2p->vAddedNodes.end())
+        if (!p2p->RemoveNode(strNode))
             throw JSONRPCError(RPC_CLIENT_NODE_NOT_ADDED, "Error: Node has not been added.");
-        p2p->vAddedNodes.erase(it);
     }
 
     return NullUniValue;
@@ -340,21 +332,16 @@ UniValue getaddednodeinfo(const UniValue& params, bool fHelp, const CPubKey& myp
     list<string> laddedNodes(0);
     if (params.size() == 1)
     {
-        LOCK(p2p->cs_vAddedNodes);
-        for(const std::string& strAddNode : p2p->vAddedNodes)
+        // get a list of all added nodes
+        for(const std::string& strAddNode : p2p->GetAddedNodes())
             laddedNodes.push_back(strAddNode);
     }
     else
     {
+        // see if 1 particular node exists in the list
         string strNode = params[1].get_str();
-        LOCK(p2p->cs_vAddedNodes);
-        for(const std::string& strAddNode : p2p->vAddedNodes) {
-            if (strAddNode == strNode)
-            {
-                laddedNodes.push_back(strAddNode);
-                break;
-            }
-        }
+        if (p2p->NodeExists(strNode))
+            laddedNodes.push_back(strNode);
         if (laddedNodes.size() == 0)
             throw JSONRPCError(RPC_CLIENT_NODE_NOT_ADDED, "Error: Node has not been added.");
     }
