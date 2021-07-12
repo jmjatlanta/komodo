@@ -100,7 +100,7 @@ public:
     bool fWhitelisted; // This peer can bypass DoS banning.
     bool fOneShot;
     bool fClient;
-    bool fInbound;
+    bool fInbound; // they connected to us, we did not request to be connected to them
     bool fNetworkNode;
     bool fSuccessfullyConnected;
     bool fDisconnect;

@@ -336,7 +336,6 @@ libbitcoin_server_a_SOURCES = \
   p2p/net_message.cpp \
   p2p/node.cpp \
   p2p/p2p.cpp \
-  chain_status.cpp \
   notaries_staked.cpp \
   noui.cpp \
   notarisationdb.cpp \

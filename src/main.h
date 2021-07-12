@@ -33,7 +33,6 @@
 #include "consensus/upgrades.h"
 #include "p2p/p2p.h"
 #include "p2p/node.h"
-#include "chain_status.h"
 #include "primitives/block.h"
 #include "primitives/transaction.h"
 #include "script/script.h"

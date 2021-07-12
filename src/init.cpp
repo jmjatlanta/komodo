@@ -1450,7 +1450,9 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler, P2PParame
 #endif // ENABLE_WALLET
     // ********************************************************* Step 6: network initialization
 
-    RegisterNodeSignals(p2p->GetNodeSignals());
+    // see Step 2: parameter interactions for more information about these
+    p2pParams.listen = GetBoolArg("-listen", p2pDefaults.listen);
+    p2pParams.discover = GetBoolArg("-discover", true);
 
     // sanitize comments per BIP-0014, format user agent and check total size
     std::vector<string> uacomments;
@@ -1460,6 +1462,7 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler, P2PParame
             return InitError(strprintf("User Agent comment (%s) contains unsafe characters.", cmt));
         uacomments.push_back(SanitizeString(cmt, SAFE_CHARS_UA_COMMENT));
     }
+    
     p2pParams.subVersion = FormatSubVersion(CLIENT_NAME, CLIENT_VERSION, uacomments);
     auto maximum = P2PParameters::MAX_SUBVERSION_LENGTH;
     if (p2pParams.subVersion.size() > maximum) 
@@ -1467,6 +1470,11 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler, P2PParame
         return InitError(strprintf("Total length of network version string %i exceeds maximum of %i characters. Reduce the number and/or size of uacomments.",
                 p2pParams.subVersion.size(), maximum));
     }
+
+    // all necessary P2PParameters should be set. create the P2P object
+    p2p = std::make_shared<P2P>(p2pParams, Params());
+
+    RegisterNodeSignals(p2p->GetNodeSignals());
 
     if (mapArgs.count("-onlynet")) {
         std::set<enum Network> nets;
@@ -1525,9 +1533,6 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler, P2PParame
         }
     }
 
-    // see Step 2: parameter interactions for more information about these
-    p2pParams.listen = GetBoolArg("-listen", p2pDefaults.listen);
-    p2pParams.discover = GetBoolArg("-discover", true);
     fNameLookup = GetBoolArg("-dns", true);
 
     bool fBound = false;
@@ -1557,8 +1562,6 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler, P2PParame
         if (!fBound)
             return InitError(_("Failed to listen on any port. Use -listen=0 if you want this."));
     }
-
-    p2p = std::make_shared<P2P>(p2pParams, ChainStatus(&chainActive, Params()));
 
     // Read asmap file if configured
     if (mapArgs.count("-asmap")) {

@@ -20,6 +20,7 @@
 #include "p2p/node.h" // CNode
 #include "p2p/addr_db.h"
 #include "p2p.h"
+#include "consensus/upgrades.h" // NextEpoch()
 
 /***
  * Helps in cleaning up nodes
@@ -107,7 +108,7 @@ public:
 /***
  * ctor
  */
-P2P::P2P(const P2PParameters& params, ChainStatus chainStatus) : params(params), chainStatus(chainStatus)
+P2P::P2P(const P2PParameters& params, const CChainParams& chainParams) : params(params), chainParams(chainParams)
 {
 } 
 
@@ -121,7 +122,7 @@ void P2P::StartNode(boost::thread_group& threadGroup, CScheduler& scheduler)
     // Load addresses for peers.dat
     int64_t nStart = GetTimeMillis();
     {
-        CAddrDB adb(GetChainParams());
+        CAddrDB adb(chainParams);
         if (!adb.Read(addrman))
             LogPrintf("Invalid or missing peers.dat; recreating\n");
     }
@@ -1046,7 +1047,7 @@ void P2P::DumpAddresses()
 {
     int64_t nStart = GetTimeMillis();
 
-    CAddrDB adb(GetChainParams());
+    CAddrDB adb(chainParams);
     adb.Write(addrman);
 
     LogPrint("net", "Flushed %d addresses to peers.dat  %dms\n",
@@ -1077,6 +1078,26 @@ bool P2P::GetLocal(CService& addr, const CNetAddr *paddrPeer)
     return nBestScore >= 0;
 }
 
+int P2P::NextProtocolVersion(uint32_t preferredUpgradePeriod)
+{
+    int height = g_signals.GetHeight().get_value_or(0);
+
+    const Consensus::Params& params = Params().GetConsensus();
+    auto nextEpoch = NextEpoch(height, params);
+    if (nextEpoch) {
+        auto idx = nextEpoch.get();
+        int nActivationHeight = params.vUpgrades[idx].nActivationHeight;
+
+        if (nActivationHeight > 0 &&
+            height < nActivationHeight &&
+            height >= nActivationHeight - preferredUpgradePeriod)
+        {
+            return params.vUpgrades[idx].nProtocolVersion;
+        }
+    }
+    return 0;    
+}
+
 bool P2P::AttemptToEvictConnection(bool fPreferNewConnection) {
     std::vector<CNodeRef> vEvictionCandidates;
     {
@@ -1099,7 +1120,7 @@ bool P2P::AttemptToEvictConnection(bool fPreferNewConnection) {
 
     // Check version of eviction candidates and prioritize nodes which do not support network upgrade.
     std::vector<CNodeRef> vTmpEvictionCandidates;
-    int nextProtocolVersion = chainStatus.NextProtocolVersion(params.networkUpgragedPeerPreferenceBlockPeriod);
+    int nextProtocolVersion = NextProtocolVersion(params.networkUpgragedPeerPreferenceBlockPeriod);
     if (nextProtocolVersion != 0)
     {
         for (const CNodeRef &node : vEvictionCandidates) {

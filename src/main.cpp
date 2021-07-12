@@ -360,10 +360,10 @@ namespace {
 
     int GetHeight()
     {
-        CBlockIndex *pindex;
-        if ( (pindex= chainActive.LastTip()) != 0 )
-            return pindex->GetHeight();
-        else return(0);
+        CBlockIndex *pindex = chainActive.LastTip();
+        if ( pindex == nullptr )
+            return 0;
+        return pindex->GetHeight();
     }
 
     void UpdatePreferredDownload(CNode* node, CNodeState* state)

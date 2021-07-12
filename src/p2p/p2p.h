@@ -21,7 +21,6 @@
 #include "p2p/addrman.h"
 #include "p2p/p2p_parameters.h"
 #include "p2p/node.h"
-#include "chain_status.h"
 #include "chainparams.h"
 
 struct ListenSocket {
@@ -56,7 +55,7 @@ public:
     /***
      * ctor
      */
-    P2P(const P2PParameters& params, ChainStatus chainStatus);
+    P2P(const P2PParameters& params, const CChainParams& chainParams);
     /***
      * Shuts down the network
      */
@@ -65,7 +64,7 @@ public:
      * @returns the p2p parameters
      */
     const P2PParameters& GetParams() { return params; }
-    const CChainParams GetChainParams() { return chainStatus.Params(); }
+    const CChainParams GetChainParams() { return chainParams; }
     /***
      * Does the heavy lifting to get the P2P network started
      * @param threadGroup the thread group
@@ -86,7 +85,13 @@ public:
      * @returns true on success
      */
     bool AddLocal(const CNetAddr &addr, int nScore);
-    void ProcessOneShot();
+    /***
+     * Permit foreign connections by listening on a port
+     * @param addrBind the address to bind to
+     * @param[out] strError any error
+     * @param fWhitelisted true if this address should appear in the whitelist
+     * @returns true on success
+     */
     bool BindListenPort(const CService &addrBind, std::string& strError, bool fWhitelisted);
     /****
      * @brief Open a connection to a remote node
@@ -99,16 +104,42 @@ public:
      */
     bool OpenNetworkConnection(const CAddress& addrConnect, CSemaphoreGrant *grantOutbound = NULL, 
             const char *strDest = NULL, bool fOneShot = false);
+    /****
+     * Finds a particular node by address
+     * @param[in] ip the address
+     * @returns the node (nullptr if not found)
+     */
     CNode* FindNode(const CNetAddr& ip);
+    /****
+     * Finds a connected node within a subnet
+     * @param[in] subNet the subnet to search
+     * @returns a node within the subnet (nullptr if not found)
+     */
     CNode* FindNode(const CSubNet& subNet);
+    /****
+     * Find a node that has a particular address name
+     * @param[in] addrName the name to search for
+     * @returns the found node (nullptr if not found)
+     */
     CNode* FindNode(const std::string& addrName);
+    /***
+     * Find a node that has a particular address
+     * @param[in] addr the address
+     * @returns the found node (nullptr if not found)
+     */
     CNode* FindNode(const CService& addr);
+    /***
+     * @returns the number of nodes currently connected
+     */
     size_t GetNumberConnected() { return nodes.size(); }
+    /****
+     * @returns the collection of connected nodes
+     */
     std::vector<CNode*> GetNodes() { return nodes; }
     /****
      * Add a destination to the list of "one shot"s 
      * (will attempt a connect, retrieve response from "getaddr", and disconnect)
-     * @param strDest the destination
+     * @param in the destination
      */
     void AddOneShot(const std::string& in);
     /****
@@ -118,10 +149,12 @@ public:
     void AddWhitelistedRange(const CSubNet &subnet);
     /****
      * A node received a message that should be processed
+     * (usually fired by the node itself)
      */
     void NotifyMessageReceived();
     /***
-     * Retrieve the height
+     * Retrieve the height of the local node
+     * @see CNode::PushVersion
      * @returns the height
      */
     int GetHeight();
@@ -281,7 +314,7 @@ public:
    
 private:
     P2PParameters params;
-    ChainStatus chainStatus;
+    const CChainParams& chainParams;
     bool addressesInitialized = false; // if peers.dat has been read
     CSemaphore* semOutbound = nullptr; // semaphore to control outbound network traffic
     std::deque<std::string> vOneShots; // collections of addresses where we just want to query and hang up
@@ -349,5 +382,14 @@ private:
      * @param hListenSocket the socket
      */    
     void AcceptConnection(const ListenSocket& hListenSocket); 
-
+    /***
+     * Process the OneShot entries (attempt to connect briefly to foreign node)
+     */
+    void ProcessOneShot();
+    /****
+     * Determine the protocol version
+     * @param perferredUpgradePeriod get future version if we're close to the upgrade
+     * @returns the next protocol version or 0
+     */
+    int NextProtocolVersion(uint32_t preferredUpgradePeriod);
 };
