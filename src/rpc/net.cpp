@@ -198,7 +198,6 @@ int32_t komodo_longestchain()
         depth++;
         for(const CNodeStats& stats : p2p->GetNodeStats())
         {
-            //fprintf(stderr,"komodo_longestchain iter.%d\n",n);
             CNodeStateStats statestats;
             bool fStateStats = GetNodeStateStats(stats.nodeid,statestats);
             if ( statestats.nSyncHeight < 0 )

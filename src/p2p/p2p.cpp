@@ -1082,7 +1082,7 @@ int P2P::NextProtocolVersion(uint32_t preferredUpgradePeriod)
 {
     int height = g_signals.GetHeight().get_value_or(0);
 
-    const Consensus::Params& params = Params().GetConsensus();
+    const Consensus::Params& params = chainParams.GetConsensus();
     auto nextEpoch = NextEpoch(height, params);
     if (nextEpoch) {
         auto idx = nextEpoch.get();

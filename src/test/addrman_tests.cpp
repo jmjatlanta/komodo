@@ -1,7 +1,7 @@
 // Copyright (c) 2012-2013 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
-#include "addrman.h"
+#include "p2p/addrman.h"
 #include "test/test_bitcoin.h"
 #include <string>
 #include <boost/test/unit_test.hpp>
@@ -414,26 +414,27 @@ BOOST_AUTO_TEST_CASE(caddrinfo_get_tried_bucket)
     uint256 nKey1 = (uint256)(CHashWriter(SER_GETHASH, 0) << 1).GetHash();
     uint256 nKey2 = (uint256)(CHashWriter(SER_GETHASH, 0) << 2).GetHash();
 
+    std::vector<bool> asmap;
 
-    BOOST_CHECK(info1.GetTriedBucket(nKey1) == 40);
+    BOOST_CHECK(info1.GetTriedBucket(nKey1, asmap) == 40);
 
     // Test 26: Make sure key actually randomizes bucket placement. A fail on
     //  this test could be a security issue.
-    BOOST_CHECK(info1.GetTriedBucket(nKey1) != info1.GetTriedBucket(nKey2));
+    BOOST_CHECK(info1.GetTriedBucket(nKey1, asmap) != info1.GetTriedBucket(nKey2, asmap));
 
     // Test 27: Two addresses with same IP but different ports can map to
     //  different buckets because they have different keys.
     CAddrInfo info2 = CAddrInfo(addr2, source1);
 
     BOOST_CHECK(info1.GetKey() != info2.GetKey());
-    BOOST_CHECK(info1.GetTriedBucket(nKey1) != info2.GetTriedBucket(nKey1));
+    BOOST_CHECK(info1.GetTriedBucket(nKey1, asmap) != info2.GetTriedBucket(nKey1, asmap));
 
     set<int> buckets;
     for (int i = 0; i < 255; i++) {
         CAddrInfo infoi = CAddrInfo(
             CAddress(CService("250.1.1." + boost::to_string(i))),
             CNetAddr("250.1.1." + boost::to_string(i)));
-        int bucket = infoi.GetTriedBucket(nKey1);
+        int bucket = infoi.GetTriedBucket(nKey1, asmap);
         buckets.insert(bucket);
     }
     // Test 28: IP addresses in the same group (\16 prefix for IPv4) should
@@ -445,7 +446,7 @@ BOOST_AUTO_TEST_CASE(caddrinfo_get_tried_bucket)
         CAddrInfo infoj = CAddrInfo(
             CAddress(CService("250." + boost::to_string(j) + ".1.1")),
             CNetAddr("250." + boost::to_string(j) + ".1.1"));
-        int bucket = infoj.GetTriedBucket(nKey1);
+        int bucket = infoj.GetTriedBucket(nKey1, asmap);
         buckets.insert(bucket);
     }
     // Test 29: IP addresses in the different groups should map to more than
@@ -470,23 +471,25 @@ BOOST_AUTO_TEST_CASE(caddrinfo_get_new_bucket)
     uint256 nKey1 = (uint256)(CHashWriter(SER_GETHASH, 0) << 1).GetHash();
     uint256 nKey2 = (uint256)(CHashWriter(SER_GETHASH, 0) << 2).GetHash();
 
-    BOOST_CHECK(info1.GetNewBucket(nKey1) == 786);
+    std::vector<bool> asmap;
+
+    BOOST_CHECK(info1.GetNewBucket(nKey1, asmap) == 786);
 
     // Test 30: Make sure key actually randomizes bucket placement. A fail on
     //  this test could be a security issue.
-    BOOST_CHECK(info1.GetNewBucket(nKey1) != info1.GetNewBucket(nKey2));
+    BOOST_CHECK(info1.GetNewBucket(nKey1, asmap) != info1.GetNewBucket(nKey2, asmap));
 
     // Test 31: Ports should not affect bucket placement in the addr
     CAddrInfo info2 = CAddrInfo(addr2, source1);
     BOOST_CHECK(info1.GetKey() != info2.GetKey());
-    BOOST_CHECK(info1.GetNewBucket(nKey1) == info2.GetNewBucket(nKey1));
+    BOOST_CHECK(info1.GetNewBucket(nKey1, asmap) == info2.GetNewBucket(nKey1, asmap));
 
     set<int> buckets;
     for (int i = 0; i < 255; i++) {
         CAddrInfo infoi = CAddrInfo(
             CAddress(CService("250.1.1." + boost::to_string(i))),
             CNetAddr("250.1.1." + boost::to_string(i)));
-        int bucket = infoi.GetNewBucket(nKey1);
+        int bucket = infoi.GetNewBucket(nKey1, asmap);
         buckets.insert(bucket);
     }
     // Test 32: IP addresses in the same group (\16 prefix for IPv4) should
@@ -499,7 +502,7 @@ BOOST_AUTO_TEST_CASE(caddrinfo_get_new_bucket)
                                         CService(
                                             boost::to_string(250 + (j / 255)) + "." + boost::to_string(j % 256) + ".1.1")),
             CNetAddr("251.4.1.1"));
-        int bucket = infoj.GetNewBucket(nKey1);
+        int bucket = infoj.GetNewBucket(nKey1, asmap);
         buckets.insert(bucket);
     }
     // Test 33: IP addresses in the same source groups should map to no more
@@ -511,7 +514,7 @@ BOOST_AUTO_TEST_CASE(caddrinfo_get_new_bucket)
         CAddrInfo infoj = CAddrInfo(
             CAddress(CService("250.1.1.1")),
             CNetAddr("250." + boost::to_string(p) + ".1.1"));
-        int bucket = infoj.GetNewBucket(nKey1);
+        int bucket = infoj.GetNewBucket(nKey1, asmap);
         buckets.insert(bucket);
     }
     // Test 34: IP addresses in the different source groups should map to more

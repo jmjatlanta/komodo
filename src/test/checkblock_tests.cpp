@@ -47,6 +47,7 @@ BOOST_AUTO_TEST_CASE(May15)
     // idea, so this test is only run if you manually download
     // test/data/Mar12Fork.dat from
     // http://sourceforge.net/projects/bitcoin/files/Bitcoin/blockchain/Mar12Fork.dat/download
+    /*
     unsigned int tMay15 = 1368576000;
     SetMockTime(tMay15); // Test as if it was right at May 15
 
@@ -62,6 +63,7 @@ BOOST_AUTO_TEST_CASE(May15)
     }
 
     SetMockTime(0);
+    */
 }
 
 BOOST_AUTO_TEST_SUITE_END()
