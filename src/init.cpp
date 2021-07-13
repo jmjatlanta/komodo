@@ -2083,6 +2083,8 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler, P2PParame
 
     if (GetBoolArg("-listenonion", DEFAULT_LISTEN_ONION))
         StartTorControl(threadGroup, scheduler);
+    
+    p2p->StartNode(threadGroup, scheduler);
 
 #ifdef ENABLE_MINING
     // Generate coins in the background
