@@ -29,9 +29,9 @@
 
 #include "librustzcash.h"
 
-CClientUIInterface uiInterface; // Declared but not defined in ui_interface.h
-CWallet* pwalletMain;
-ZCJoinSplit *pzcashParams;
+extern CClientUIInterface uiInterface;
+extern CWallet* pwalletMain;
+extern ZCJoinSplit *pzcashParams;
 
 extern bool fPrintToConsole;
 extern void noui_connect();
@@ -111,12 +111,14 @@ TestingSetup::TestingSetup()
         nScriptCheckThreads = 3;
         for (int i=0; i < nScriptCheckThreads-1; i++)
             threadGroup.create_thread(&ThreadScriptCheck);
-        RegisterNodeSignals(GetNodeSignals());
+        P2PParameters p2pParams;
+        p2p = std::make_shared<P2P>(p2pParams, Params());
+        RegisterNodeSignals(p2p->GetNodeSignals());
 }
 
 TestingSetup::~TestingSetup()
 {
-        UnregisterNodeSignals(GetNodeSignals());
+        UnregisterNodeSignals(p2p->GetNodeSignals());
         threadGroup.interrupt_all();
         threadGroup.join_all();
 #ifdef ENABLE_WALLET
@@ -142,6 +144,7 @@ CTxMemPoolEntry TestMemPoolEntryHelper::FromTx(CMutableTransaction &tx, CTxMemPo
                            spendsCoinbase, nBranchId);
 }
 
+/*
 void Shutdown(void* parg)
 {
   exit(0);
@@ -156,3 +159,4 @@ bool ShutdownRequested()
 {
   return false;
 }
+*/

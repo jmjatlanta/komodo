@@ -20,6 +20,7 @@
 
 #include "clientversion.h"
 #include "rpc/server.h"
+#include "p2p/p2p_parameters.h"
 #include "init.h"
 #include "main.h"
 #include "noui.h"
@@ -155,10 +156,11 @@ bool AppInit(int argc, char* argv[])
             fprintf(stderr, "Error: Invalid combination of -regtest and -testnet.\n");
             return false;
         }
-        void komodo_args(char *argv0);
-        komodo_args(argv[0]);
-        void chainparams_commandline();
-        chainparams_commandline();
+        void komodo_args(char *argv0, P2PParameters& p2pParams);
+        P2PParameters p2pParams;
+        komodo_args(argv[0], p2pParams);
+        void chainparams_commandline(P2PParameters& p2pParams);
+        chainparams_commandline(p2pParams);
 
         fprintf(stderr,"call komodo_args.(%s) NOTARY_PUBKEY.(%s)\n",argv[0],NOTARY_PUBKEY.c_str());
         printf("initialized %s at %u\n",ASSETCHAINS_SYMBOL,(uint32_t)time(NULL));
@@ -231,7 +233,7 @@ bool AppInit(int argc, char* argv[])
 #endif
         SoftSetBoolArg("-server", true);
 
-        fRet = AppInit2(threadGroup, scheduler);
+        fRet = AppInit2(threadGroup, scheduler, p2pParams);
     }
     catch (const std::exception& e) {
         PrintExceptionContinue(&e, "AppInit()");

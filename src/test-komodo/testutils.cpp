@@ -36,9 +36,14 @@ int64_t nMockTime;
 extern uint32_t USE_EXTERNAL_PUBKEY;
 extern std::string NOTARY_PUBKEY;
 
+extern std::shared_ptr<P2P> p2p;
+P2PParameters p2pParameters;
+
 void setupChain()
 {
     SelectParams(CBaseChainParams::REGTEST);
+
+    p2p = std::make_shared<P2P>( p2pParameters, Params());
 
     // Settings to get block reward
     NOTARY_PUBKEY = notaryPubkey;

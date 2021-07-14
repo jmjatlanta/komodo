@@ -14,6 +14,7 @@
 #include "util.h"
 #include "version.h"
 #include "sodium.h"
+#include "utilstrencodings.h" // ParseHex
 
 #include <iostream>
 #include <random>
@@ -307,18 +308,18 @@ BOOST_AUTO_TEST_CASE(sighash_from_data)
                   tx.nExpiryHeight >= TX_EXPIRY_HEIGHT_THRESHOLD)
               {
                   // Transaction must be invalid
-                  BOOST_CHECK_MESSAGE(!CheckTransactionWithoutProofVerification(tx, state), strTest);
+                  BOOST_CHECK_MESSAGE(!CheckTransactionWithoutProofVerification(0, tx, state), strTest);
                   BOOST_CHECK(!state.IsValid());
               } else {
-                  BOOST_CHECK_MESSAGE(CheckTransactionWithoutProofVerification(tx, state), strTest);
+                  BOOST_CHECK_MESSAGE(CheckTransactionWithoutProofVerification(0, tx, state), strTest);
                   BOOST_CHECK(state.IsValid());
               }
           } else if (tx.nVersion < SPROUT_MIN_TX_VERSION) {
               // Transaction must be invalid
-              BOOST_CHECK_MESSAGE(!CheckTransactionWithoutProofVerification(tx, state), strTest);
+              BOOST_CHECK_MESSAGE(!CheckTransactionWithoutProofVerification(0, tx, state), strTest);
               BOOST_CHECK(!state.IsValid());
           } else {
-              BOOST_CHECK_MESSAGE(CheckTransactionWithoutProofVerification(tx, state), strTest);
+              BOOST_CHECK_MESSAGE(CheckTransactionWithoutProofVerification(0, tx, state), strTest);
               BOOST_CHECK(state.IsValid());
           }
 

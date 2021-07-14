@@ -4,14 +4,13 @@
 
 #include "key.h"
 #include "keystore.h"
-#include "script/ismine.h"
+//#include "script/ismine.h"
 #include "script/script.h"
 #include "script/script_error.h"
 #include "script/standard.h"
 #include "test/test_bitcoin.h"
 
 #include <boost/test/unit_test.hpp>
-
 
 BOOST_FIXTURE_TEST_SUITE(script_standard_tests, BasicTestingSetup)
 
@@ -320,10 +319,12 @@ BOOST_AUTO_TEST_CASE(script_standard_GetScriptFor_)
     BOOST_CHECK(result == expected);
 
     // GetScriptForRawPubKey
+    /*
     expected.clear();
     expected << ToByteVector(pubkeys[0]) << OP_CHECKSIG;
     result = GetScriptForRawPubKey(pubkeys[0]);
     BOOST_CHECK(result == expected);
+    */
 
     // GetScriptForMultisig
     expected.clear();
@@ -336,6 +337,7 @@ BOOST_AUTO_TEST_CASE(script_standard_GetScriptFor_)
     BOOST_CHECK(result == expected);
 }
 
+/*
 BOOST_AUTO_TEST_CASE(script_standard_IsMine)
 {
     CKey keys[2];
@@ -523,5 +525,6 @@ BOOST_AUTO_TEST_CASE(script_standard_IsMine)
         BOOST_CHECK_EQUAL(result, ISMINE_NO);
     }
 }
+*/
 
 BOOST_AUTO_TEST_SUITE_END()

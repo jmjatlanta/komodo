@@ -15,6 +15,7 @@
 #include "script/sign.h"
 #include "util.h"
 #include "test/test_bitcoin.h"
+#include "utilstrencodings.h" // ParseHex
 
 #if defined(HAVE_CONSENSUS_LIB)
 #include "script/zcashconsensus.h"

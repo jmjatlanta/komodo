@@ -27,7 +27,6 @@
 #include "keystore.h"
 #include "main.h"
 #include "merkleblock.h"
-#include "net.h"
 #include "primitives/transaction.h"
 #include "rpc/server.h"
 #include "script/script.h"
@@ -1389,7 +1388,7 @@ UniValue sendrawtransaction(const UniValue& params, bool fHelp, const CPubKey& m
         } else if (fHaveChain) {
             throw JSONRPCError(RPC_TRANSACTION_ALREADY_IN_CHAIN, "transaction already in block chain");
         }
-        RelayTransaction(tx);
+        p2p->RelayTransaction(tx);
     }
     else
     {

@@ -31,7 +31,8 @@
 #include "coins.h"
 #include "consensus/consensus.h"
 #include "consensus/upgrades.h"
-#include "net.h"
+#include "p2p/p2p.h"
+#include "p2p/node.h"
 #include "primitives/block.h"
 #include "primitives/transaction.h"
 #include "script/script.h"
@@ -120,11 +121,6 @@ static const unsigned int DATABASE_FLUSH_INTERVAL = 24 * 60 * 60;
 static const unsigned int MAX_REJECT_MESSAGE_LENGTH = 111;
 static const int64_t DEFAULT_MAX_TIP_AGE = 24 * 60 * 60;
 
-/** Default NSPV support enabled */
-static const bool DEFAULT_NSPV_PROCESSING = false;
-
-//static const bool DEFAULT_ADDRESSINDEX = false;
-//static const bool DEFAULT_SPENTINDEX = false;
 #define DEFAULT_ADDRESSINDEX (GetArg("-ac_cc",0) != 0 || GetArg("-ac_ccactivate",0) != 0)
 #define DEFAULT_SPENTINDEX (GetArg("-ac_cc",0) != 0 || GetArg("-ac_ccactivate",0) != 0)
 static const bool DEFAULT_TIMESTAMPINDEX = false;
@@ -137,7 +133,7 @@ BOOST_STATIC_ASSERT(DEFAULT_BLOCK_PRIORITY_SIZE <= DEFAULT_BLOCK_MAX_SIZE);
 
 #define equihash_parameters_acceptable(N, K) \
     ((CBlockHeader::HEADER_SIZE + equihash_solution_size(N, K))*MAX_HEADERS_RESULTS < \
-     MAX_PROTOCOL_MESSAGE_LENGTH-1000)
+    P2PParameters::MAX_PROTOCOL_MESSAGE_LENGTH-1000)
 
 struct BlockHasher
 {

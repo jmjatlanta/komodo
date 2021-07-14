@@ -11,7 +11,6 @@
 #include "consensus/upgrades.h"
 #include "keystore.h"
 #include "main.h"
-#include "net.h"
 #include "pow.h"
 #include "script/sign.h"
 #include "serialize.h"
@@ -49,65 +48,71 @@ BOOST_FIXTURE_TEST_SUITE(DoS_tests, TestingSetup)
 
 BOOST_AUTO_TEST_CASE(DoS_banning)
 {
-    CNode::ClearBanned();
+    P2PParameters p2pParams;
+    P2P p2p{p2pParams, Params()};
+    p2p.ClearBanned();
     CAddress addr1(ip(0xa0b0c001));
-    CNode dummyNode1(INVALID_SOCKET, addr1, "", true);
+    CNode dummyNode1(&p2p, INVALID_SOCKET, addr1, "", true);
     dummyNode1.nVersion = 1;
     Misbehaving(dummyNode1.GetId(), 100); // Should get banned
     SendMessages(&dummyNode1, false);
-    BOOST_CHECK(CNode::IsBanned(addr1));
-    BOOST_CHECK(!CNode::IsBanned(ip(0xa0b0c001|0x0000ff00))); // Different IP, not banned
+    BOOST_CHECK(p2p.IsBanned(addr1));
+    BOOST_CHECK(!p2p.IsBanned(ip(0xa0b0c001|0x0000ff00))); // Different IP, not banned
 
     CAddress addr2(ip(0xa0b0c002));
-    CNode dummyNode2(INVALID_SOCKET, addr2, "", true);
+    CNode dummyNode2(&p2p, INVALID_SOCKET, addr2, "", true);
     dummyNode2.nVersion = 1;
     Misbehaving(dummyNode2.GetId(), 50);
     SendMessages(&dummyNode2, false);
-    BOOST_CHECK(!CNode::IsBanned(addr2)); // 2 not banned yet...
-    BOOST_CHECK(CNode::IsBanned(addr1));  // ... but 1 still should be
+    BOOST_CHECK(!p2p.IsBanned(addr2)); // 2 not banned yet...
+    BOOST_CHECK(p2p.IsBanned(addr1));  // ... but 1 still should be
     Misbehaving(dummyNode2.GetId(), 50);
     SendMessages(&dummyNode2, false);
-    BOOST_CHECK(CNode::IsBanned(addr2));
+    BOOST_CHECK(p2p.IsBanned(addr2));
 }
 
 BOOST_AUTO_TEST_CASE(DoS_banscore)
 {
-    CNode::ClearBanned();
+    P2PParameters p2pParams;
+    P2P p2p{p2pParams, Params()};
+    p2p.ClearBanned();
     mapArgs["-banscore"] = "111"; // because 11 is my favorite number
     CAddress addr1(ip(0xa0b0c001));
-    CNode dummyNode1(INVALID_SOCKET, addr1, "", true);
+    CNode dummyNode1(&p2p, INVALID_SOCKET, addr1, "", true);
     dummyNode1.nVersion = 1;
     Misbehaving(dummyNode1.GetId(), 100);
     SendMessages(&dummyNode1, false);
-    BOOST_CHECK(!CNode::IsBanned(addr1));
+    BOOST_CHECK(!p2p.IsBanned(addr1));
     Misbehaving(dummyNode1.GetId(), 10);
     SendMessages(&dummyNode1, false);
-    BOOST_CHECK(!CNode::IsBanned(addr1));
+    BOOST_CHECK(!p2p.IsBanned(addr1));
     Misbehaving(dummyNode1.GetId(), 1);
     SendMessages(&dummyNode1, false);
-    BOOST_CHECK(CNode::IsBanned(addr1));
+    BOOST_CHECK(p2p.IsBanned(addr1));
     mapArgs.erase("-banscore");
 }
 
 BOOST_AUTO_TEST_CASE(DoS_bantime)
 {
-    CNode::ClearBanned();
+    P2PParameters p2pParams;
+    P2P p2p{p2pParams, Params()};    
+    p2p.ClearBanned();
     int64_t nStartTime = GetTime();
     SetMockTime(nStartTime); // Overrides future calls to GetTime()
 
     CAddress addr(ip(0xa0b0c001));
-    CNode dummyNode(INVALID_SOCKET, addr, "", true);
+    CNode dummyNode(&p2p, INVALID_SOCKET, addr, "", true);
     dummyNode.nVersion = 1;
 
     Misbehaving(dummyNode.GetId(), 100);
     SendMessages(&dummyNode, false);
-    BOOST_CHECK(CNode::IsBanned(addr));
+    BOOST_CHECK(p2p.IsBanned(addr));
 
     SetMockTime(nStartTime+60*60);
-    BOOST_CHECK(CNode::IsBanned(addr));
+    BOOST_CHECK(p2p.IsBanned(addr));
 
     SetMockTime(nStartTime+60*60*24+1);
-    BOOST_CHECK(!CNode::IsBanned(addr));
+    BOOST_CHECK(!p2p.IsBanned(addr));
 }
 
 CTransaction RandomOrphan()

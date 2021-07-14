@@ -3074,8 +3074,6 @@ UniValue dilithium_rawtxresult(UniValue &result,std::string rawtx)
         result.push_back(Pair("hex",rawtx));
         if ( DecodeHexTx(tx,rawtx) != 0 )
         {
-            //if ( broadcastflag != 0 && myAddtomempool(tx) != 0 )
-            //    RelayTransaction(tx);
             result.push_back(Pair("txid",tx.GetHash().ToString()));
             result.push_back(Pair("result","success"));
         } else result.push_back(Pair("error","decode hex"));

@@ -89,7 +89,6 @@ static CBlock CreateGenesisBlock(uint32_t nTime, const uint256& nNonce, const st
  *    timestamp before)
  * + Contains no strange transactions
  */
-void *chainparams_commandline();
 #include "komodo_defs.h"
 int32_t ASSETCHAINS_BLOCKTIME = 60;
 uint64_t ASSETCHAINS_NK[2];
@@ -322,7 +321,7 @@ public:
         vFixedSeeds = std::vector<SeedSpec6>(pnSeed6_test, pnSeed6_test + ARRAYLEN(pnSeed6_test));
 
         //fRequireRPCPassword = true;
-        fMiningRequiresPeers = false;//true;
+        fMiningRequiresPeers = false;
         fDefaultConsistencyChecks = false;
         fRequireStandard = true;
         fMineBlocksOnDemand = false;
@@ -552,11 +551,10 @@ void komodo_setactivation(int32_t height)
     fprintf(stderr,"SET SAPLING ACTIVATION height.%d\n",height);
 }
 
-void *chainparams_commandline()
+void *chainparams_commandline(P2PParameters& p2pParams)
 {
     fprintf(stderr,"chainparams_commandline called\n");
     CChainParams::CCheckpointData checkpointData;
-    //fprintf(stderr,">>>>>>>> port.%u\n",ASSETCHAINS_P2PPORT);
     if ( ASSETCHAINS_SYMBOL[0] != 0 )
     {
         if ( ASSETCHAINS_BLOCKTIME != 60 )
@@ -564,7 +562,7 @@ void *chainparams_commandline()
             pCurrentParams->consensus.nMaxFutureBlockTime = 7 * ASSETCHAINS_BLOCKTIME; // 7 blocks
             pCurrentParams->consensus.nPowTargetSpacing = ASSETCHAINS_BLOCKTIME;
         }
-        pCurrentParams->SetDefaultPort(ASSETCHAINS_P2PPORT);
+        pCurrentParams->SetDefaultPort(p2pParams.port);
         if ( ASSETCHAINS_NK[0] != 0 && ASSETCHAINS_NK[1] != 0 )
         {
             //BOOST_STATIC_ASSERT(equihash_parameters_acceptable(ASSETCHAINS_NK[0], ASSETCHAINS_NK[1]));
@@ -574,12 +572,12 @@ void *chainparams_commandline()
         if ( KOMODO_TESTNODE != 0 )
             pCurrentParams->SetMiningRequiresPeers(false);
         if ( ASSETCHAINS_RPCPORT == 0 )
-            ASSETCHAINS_RPCPORT = ASSETCHAINS_P2PPORT + 1;
+            ASSETCHAINS_RPCPORT = p2pParams.port + 1;
         pCurrentParams->pchMessageStart[0] = ASSETCHAINS_MAGIC & 0xff;
         pCurrentParams->pchMessageStart[1] = (ASSETCHAINS_MAGIC >> 8) & 0xff;
         pCurrentParams->pchMessageStart[2] = (ASSETCHAINS_MAGIC >> 16) & 0xff;
         pCurrentParams->pchMessageStart[3] = (ASSETCHAINS_MAGIC >> 24) & 0xff;
-        fprintf(stderr,">>>>>>>>>> %s: p2p.%u rpc.%u magic.%08x %u %u coins\n",ASSETCHAINS_SYMBOL,ASSETCHAINS_P2PPORT,ASSETCHAINS_RPCPORT,ASSETCHAINS_MAGIC,ASSETCHAINS_MAGIC,(uint32_t)ASSETCHAINS_SUPPLY);
+        fprintf(stderr,">>>>>>>>>> %s: p2p.%u rpc.%u magic.%08x %u %u coins\n",ASSETCHAINS_SYMBOL,p2pParams.port,ASSETCHAINS_RPCPORT,ASSETCHAINS_MAGIC,ASSETCHAINS_MAGIC,(uint32_t)ASSETCHAINS_SUPPLY);
         if (ASSETCHAINS_ALGO == ASSETCHAINS_VERUSHASH)
         {
             // this is only good for 60 second blocks with an averaging window of 45. for other parameters, use:

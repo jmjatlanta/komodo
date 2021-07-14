@@ -150,7 +150,7 @@ LIBZCASH_H = \
 BITCOIN_CORE_H = \
   addressindex.h \
   spentindex.h \
-  addrman.h \
+  p2p/addrman.h \
   alert.h \
   amount.h \
   amqp/amqpabstractnotifier.h \
@@ -205,7 +205,7 @@ BITCOIN_CORE_H = \
   metrics.h \
   miner.h \
   mruset.h \
-  net.h \
+  p2p/p2p.h \
   netbase.h \
   notaries_staked.h \
   noui.h \
@@ -284,7 +284,6 @@ libbitcoin_server_a_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES) $(EVENT_CFLAGS
 libbitcoin_server_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
 libbitcoin_server_a_SOURCES = \
   sendalert.cpp \
-  addrman.cpp \
   alert.cpp \
   alertkeys.h \
   asyncrpcoperation.cpp \
@@ -332,7 +331,11 @@ libbitcoin_server_a_SOURCES = \
   merkleblock.cpp \
   metrics.h \
   miner.cpp \
-  net.cpp \
+  p2p/addr_db.cpp \
+  p2p/addrman.cpp \
+  p2p/net_message.cpp \
+  p2p/node.cpp \
+  p2p/p2p.cpp \
   notaries_staked.cpp \
   noui.cpp \
   notarisationdb.cpp \

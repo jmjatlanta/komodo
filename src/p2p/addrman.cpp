@@ -17,7 +17,7 @@
  *                                                                            *
  ******************************************************************************/
 
-#include "addrman.h"
+#include "p2p/addrman.h"
 
 #include "hash.h"
 #include "serialize.h"

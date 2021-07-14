@@ -17,6 +17,11 @@
 #ifndef KOMODO_NSPVSUPERLITE_H
 #define KOMODO_NSPVSUPERLITE_H
 
+#include <memory>
+#include "p2p/p2p.h"
+
+extern std::shared_ptr<P2P> p2p;
+
 // nSPV client. VERY simplistic "single threaded" networking model. for production GUI best to multithread, etc.
 // no caching, no optimizations, no reducing the number of ntzsproofs needed by detecting overlaps, etc.
 // advantage is that it is simpler to implement and understand to create a design for a more performant version
@@ -222,12 +227,11 @@ CNode *NSPV_req(CNode *pnode,uint8_t *msg,int32_t len,uint64_t mask,int32_t ind)
     int32_t n,flag = 0; CNode *pnodes[64]; uint32_t timestamp = (uint32_t)time(NULL);
     if ( KOMODO_NSPV_FULLNODE )
         return(0);
-    if ( pnode == 0 )
+    if ( pnode == nullptr )
     {
         memset(pnodes,0,sizeof(pnodes));
-        //LOCK(cs_vNodes);
         n = 0;
-        BOOST_FOREACH(CNode *ptr,vNodes)
+        for(CNode *ptr : p2p->GetNodes() )
         {
             if ( ptr->prevtimes[ind] > timestamp )
                 ptr->prevtimes[ind] = 0;
@@ -239,7 +243,7 @@ CNode *NSPV_req(CNode *pnode,uint8_t *msg,int32_t len,uint64_t mask,int32_t ind)
                 pnodes[n++] = ptr;
                 if ( n == sizeof(pnodes)/sizeof(*pnodes) )
                     break;
-            } // else fprintf(stderr,"nServices %llx vs mask %llx, t%u vs %u, ind.%d\n",(long long)ptr->nServices,(long long)mask,timestamp,ptr->prevtimes[ind],ind);
+            } 
         }
         if ( n > 0 )
             pnode = pnodes[rand() % n];

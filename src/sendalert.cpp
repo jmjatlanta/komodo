@@ -54,7 +54,6 @@ the bad alert.
 */
 
 #include "main.h"
-#include "net.h"
 #include "alert.h"
 #include "init.h"
 
@@ -63,13 +62,15 @@ the bad alert.
 #include "key.h"
 #include "clientversion.h"
 #include "chainparams.h"
+#include "utilstrencodings.h" // ParseHex
+#include "p2p/p2p.h"
+#include "p2p/node.h"
 
 #include "alertkeys.h"
 
-
 static const int64_t DAYS = 24 * 60 * 60;
 
-void ThreadSendAlert()
+void ThreadSendAlert(std::shared_ptr<P2P> network)
 {
     if (!mapArgs.count("-sendalert") && !mapArgs.count("-printalert"))
         return;
@@ -162,7 +163,7 @@ void ThreadSendAlert()
     // Confirm
     if (!mapArgs.count("-sendalert"))
         return;
-    while (vNodes.size() < 1 && !ShutdownRequested())
+    while (network->GetNumberConnected() < 1 && !ShutdownRequested())
         MilliSleep(500);
     if (ShutdownRequested())
         return;
@@ -171,8 +172,8 @@ void ThreadSendAlert()
     printf("ThreadSendAlert() : Sending alert\n");
     int nSent = 0;
     {
-        LOCK(cs_vNodes);
-        BOOST_FOREACH(CNode* pnode, vNodes)
+        LOCK(network->cs_vNodes);
+        for(CNode* pnode : network->GetNodes())
         {
             if (alert2.RelayTo(pnode))
             {

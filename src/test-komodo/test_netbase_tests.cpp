@@ -3,7 +3,7 @@
 #include <boost/filesystem.hpp>
 #include <boost/thread.hpp>
 
-#include "addrman.h"
+#include "p2p/addrman.h"
 #include <string>
 #include "netbase.h"
 

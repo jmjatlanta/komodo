@@ -68,30 +68,31 @@ BOOST_AUTO_TEST_CASE(rpc_addmultisig)
 
     UniValue v;
     CTxDestination address;
-    BOOST_CHECK_NO_THROW(v = addmultisig(createArgs(1, address1Hex), false));
+    CPubKey mypk;
+    BOOST_CHECK_NO_THROW(v = addmultisig(createArgs(1, address1Hex), false, mypk));
     address = DecodeDestination(v.get_str());
     BOOST_CHECK(IsValidDestination(address) && boost::get<CScriptID>(&address) != nullptr);
 
-    BOOST_CHECK_NO_THROW(v = addmultisig(createArgs(1, address1Hex, address2Hex), false));
+    BOOST_CHECK_NO_THROW(v = addmultisig(createArgs(1, address1Hex, address2Hex), false, mypk));
     address = DecodeDestination(v.get_str());
     BOOST_CHECK(IsValidDestination(address) && boost::get<CScriptID>(&address) != nullptr);
 
-    BOOST_CHECK_NO_THROW(v = addmultisig(createArgs(2, address1Hex, address2Hex), false));
+    BOOST_CHECK_NO_THROW(v = addmultisig(createArgs(2, address1Hex, address2Hex), false, mypk));
     address = DecodeDestination(v.get_str());
     BOOST_CHECK(IsValidDestination(address) && boost::get<CScriptID>(&address) != nullptr);
 
-    BOOST_CHECK_THROW(addmultisig(createArgs(0), false), runtime_error);
-    BOOST_CHECK_THROW(addmultisig(createArgs(1), false), runtime_error);
-    BOOST_CHECK_THROW(addmultisig(createArgs(2, address1Hex), false), runtime_error);
+    BOOST_CHECK_THROW(addmultisig(createArgs(0), false, mypk), runtime_error);
+    BOOST_CHECK_THROW(addmultisig(createArgs(1), false, mypk), runtime_error);
+    BOOST_CHECK_THROW(addmultisig(createArgs(2, address1Hex), false, mypk), runtime_error);
 
-    BOOST_CHECK_THROW(addmultisig(createArgs(1, ""), false), runtime_error);
-    BOOST_CHECK_THROW(addmultisig(createArgs(1, "NotAValidPubkey"), false), runtime_error);
+    BOOST_CHECK_THROW(addmultisig(createArgs(1, ""), false, mypk), runtime_error);
+    BOOST_CHECK_THROW(addmultisig(createArgs(1, "NotAValidPubkey"), false, mypk), runtime_error);
 
     string short1(address1Hex, address1Hex + sizeof(address1Hex) - 2); // last byte missing
-    BOOST_CHECK_THROW(addmultisig(createArgs(2, short1.c_str()), false), runtime_error);
+    BOOST_CHECK_THROW(addmultisig(createArgs(2, short1.c_str()), false, mypk), runtime_error);
 
     string short2(address1Hex + 1, address1Hex + sizeof(address1Hex)); // first byte missing
-    BOOST_CHECK_THROW(addmultisig(createArgs(2, short2.c_str()), false), runtime_error);
+    BOOST_CHECK_THROW(addmultisig(createArgs(2, short2.c_str()), false, mypk), runtime_error);
 }
 
 BOOST_AUTO_TEST_CASE(rpc_wallet)
@@ -1758,25 +1759,28 @@ BOOST_AUTO_TEST_CASE(rpc_z_mergetoaddress_parameters)
         "zcMuhvq8sEkHALuSU2i4NbNQxshSAYrpCExec45ZjtivYPbuiFPwk6WHy4SvsbeZ4siy1WheuRGjtaJmoD1J8bFqNXhsG6U",
         "mainnet memo");
 
+    boost::optional<TransactionBuilder> builder;
     try {
-        std::shared_ptr<AsyncRPCOperation> operation(new AsyncRPCOperation_mergetoaddress(mtx, {}, {}, testnetzaddr, -1 ));
+        std::shared_ptr<AsyncRPCOperation> operation(new AsyncRPCOperation_mergetoaddress(builder, mtx, {}, {}, {}, testnetzaddr, -1 ));
         BOOST_FAIL("Should have caused an error");
     } catch (const UniValue& objError) {
         BOOST_CHECK( find_error(objError, "Fee is out of range"));
     }
 
     try {
-        std::shared_ptr<AsyncRPCOperation> operation(new AsyncRPCOperation_mergetoaddress(mtx, {}, {}, testnetzaddr, 1));
+        std::shared_ptr<AsyncRPCOperation> operation(new AsyncRPCOperation_mergetoaddress(builder, mtx, {}, {}, {}, testnetzaddr, 1));
         BOOST_FAIL("Should have caused an error");
     } catch (const UniValue& objError) {
         BOOST_CHECK( find_error(objError, "No inputs"));
     }
 
-    std::vector<MergeToAddressInputUTXO> inputs = { MergeToAddressInputUTXO{ COutPoint{uint256(), 0}, 0} };
+    CScript script;
+
+    std::vector<MergeToAddressInputUTXO> inputs = { MergeToAddressInputUTXO{ COutPoint{uint256(), 0}, 0, script} };
 
     try {
         MergeToAddressRecipient badaddr("", "memo");
-        std::shared_ptr<AsyncRPCOperation> operation(new AsyncRPCOperation_mergetoaddress(mtx, inputs, {}, badaddr, 1));
+        std::shared_ptr<AsyncRPCOperation> operation(new AsyncRPCOperation_mergetoaddress(builder, mtx, inputs, {}, {}, badaddr, 1));
         BOOST_FAIL("Should have caused an error");
     } catch (const UniValue& objError) {
         BOOST_CHECK( find_error(objError, "Recipient parameter missing"));
@@ -1784,8 +1788,8 @@ BOOST_AUTO_TEST_CASE(rpc_z_mergetoaddress_parameters)
 
     // Testnet payment addresses begin with 'zt'.  This test detects an incorrect prefix.
     try {
-        std::vector<MergeToAddressInputUTXO> inputs = { MergeToAddressInputUTXO{ COutPoint{uint256(), 0}, 0} };
-        std::shared_ptr<AsyncRPCOperation> operation( new AsyncRPCOperation_mergetoaddress(mtx, inputs, {}, mainnetzaddr, 1) );
+        std::vector<MergeToAddressInputUTXO> inputs = { MergeToAddressInputUTXO{ COutPoint{uint256(), 0}, 0, script} };
+        std::shared_ptr<AsyncRPCOperation> operation( new AsyncRPCOperation_mergetoaddress(builder, mtx, inputs, {}, {}, mainnetzaddr, 1) );
         BOOST_FAIL("Should have caused an error");
     } catch (const UniValue& objError) {
         BOOST_CHECK( find_error(objError, "Invalid recipient address"));
@@ -1814,13 +1818,16 @@ BOOST_AUTO_TEST_CASE(rpc_z_mergetoaddress_internals)
     auto pa = pwalletMain->GenerateNewSproutZKey();
     MergeToAddressRecipient zaddr1(EncodePaymentAddress(pa), "DEADBEEF");
 
+    boost::optional<TransactionBuilder> builder;
+    CScript script;
+
     // Supply 2 inputs when mempool limit is 1
     {
         std::vector<MergeToAddressInputUTXO> inputs = {
-            MergeToAddressInputUTXO{COutPoint{uint256(),0},0},
-            MergeToAddressInputUTXO{COutPoint{uint256(),0},0}
+            MergeToAddressInputUTXO{COutPoint{uint256(),0},0, script},
+            MergeToAddressInputUTXO{COutPoint{uint256(),0},0, script}
         };
-        std::shared_ptr<AsyncRPCOperation> operation( new AsyncRPCOperation_mergetoaddress(mtx, inputs, {}, zaddr1) );
+        std::shared_ptr<AsyncRPCOperation> operation( new AsyncRPCOperation_mergetoaddress(builder, mtx, inputs, {}, {}, zaddr1) );
         operation->main();
         BOOST_CHECK(operation->isFailed());
         std::string msg = operation->getErrorMessage();
@@ -1829,8 +1836,8 @@ BOOST_AUTO_TEST_CASE(rpc_z_mergetoaddress_internals)
 
     // Insufficient funds
     {
-        std::vector<MergeToAddressInputUTXO> inputs = { MergeToAddressInputUTXO{COutPoint{uint256(),0},0} };
-        std::shared_ptr<AsyncRPCOperation> operation( new AsyncRPCOperation_mergetoaddress(mtx, inputs, {}, zaddr1) );
+        std::vector<MergeToAddressInputUTXO> inputs = { MergeToAddressInputUTXO{COutPoint{uint256(),0},0, script} };
+        std::shared_ptr<AsyncRPCOperation> operation( new AsyncRPCOperation_mergetoaddress(builder, mtx, inputs, {}, {}, zaddr1) );
         operation->main();
         BOOST_CHECK(operation->isFailed());
         std::string msg = operation->getErrorMessage();
@@ -1839,8 +1846,8 @@ BOOST_AUTO_TEST_CASE(rpc_z_mergetoaddress_internals)
 
     // get_memo_from_hex_string())
     {
-        std::vector<MergeToAddressInputUTXO> inputs = { MergeToAddressInputUTXO{COutPoint{uint256(),0},100000} };
-        std::shared_ptr<AsyncRPCOperation> operation( new AsyncRPCOperation_mergetoaddress(mtx, inputs, {}, zaddr1) );
+        std::vector<MergeToAddressInputUTXO> inputs = { MergeToAddressInputUTXO{COutPoint{uint256(),0},100000, script} };
+        std::shared_ptr<AsyncRPCOperation> operation( new AsyncRPCOperation_mergetoaddress(builder, mtx, inputs, {}, {}, zaddr1) );
         std::shared_ptr<AsyncRPCOperation_mergetoaddress> ptr = std::dynamic_pointer_cast<AsyncRPCOperation_mergetoaddress> (operation);
         TEST_FRIEND_AsyncRPCOperation_mergetoaddress proxy(ptr);
 
@@ -1893,8 +1900,8 @@ BOOST_AUTO_TEST_CASE(rpc_z_mergetoaddress_internals)
     // Test the perform_joinsplit methods.
     {
         // Dummy input so the operation object can be instantiated.
-        std::vector<MergeToAddressInputUTXO> inputs = { MergeToAddressInputUTXO{COutPoint{uint256(),0},100000} };
-        std::shared_ptr<AsyncRPCOperation> operation( new AsyncRPCOperation_mergetoaddress(mtx, inputs, {}, zaddr1) );
+        std::vector<MergeToAddressInputUTXO> inputs = { MergeToAddressInputUTXO{COutPoint{uint256(),0},100000, script} };
+        std::shared_ptr<AsyncRPCOperation> operation( new AsyncRPCOperation_mergetoaddress(builder, mtx, inputs, {}, {}, zaddr1) );
         std::shared_ptr<AsyncRPCOperation_mergetoaddress> ptr = std::dynamic_pointer_cast<AsyncRPCOperation_mergetoaddress> (operation);
         TEST_FRIEND_AsyncRPCOperation_mergetoaddress proxy(ptr);
 
@@ -1954,8 +1961,8 @@ BOOST_AUTO_TEST_CASE(rpc_z_mergetoaddress_internals)
         obj.push_back(Pair("rawtxn", raw));
 
         // we have the spending key for the dummy recipient zaddr1
-        std::vector<MergeToAddressInputUTXO> inputs = { MergeToAddressInputUTXO{COutPoint{uint256(),0},100000} };
-        std::shared_ptr<AsyncRPCOperation> operation( new AsyncRPCOperation_mergetoaddress(mtx, inputs, {}, zaddr1) );
+        std::vector<MergeToAddressInputUTXO> inputs = { MergeToAddressInputUTXO{COutPoint{uint256(),0},100000, script} };
+        std::shared_ptr<AsyncRPCOperation> operation( new AsyncRPCOperation_mergetoaddress(builder, mtx, inputs, {}, {}, zaddr1) );
         std::shared_ptr<AsyncRPCOperation_mergetoaddress> ptr = std::dynamic_pointer_cast<AsyncRPCOperation_mergetoaddress> (operation);
         TEST_FRIEND_AsyncRPCOperation_mergetoaddress proxy(ptr);
 

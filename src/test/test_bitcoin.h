@@ -4,6 +4,7 @@
 #include "consensus/upgrades.h"
 #include "pubkey.h"
 #include "txdb.h"
+#include "p2p/p2p.h"
 
 #include <boost/filesystem.hpp>
 #include <boost/thread.hpp>
@@ -32,6 +33,7 @@ struct TestingSetup: public JoinSplitTestingSetup {
     CCoinsViewDB *pcoinsdbview;
     boost::filesystem::path pathTemp;
     boost::thread_group threadGroup;
+    std::shared_ptr<P2P> p2p;
 
     TestingSetup();
     ~TestingSetup();

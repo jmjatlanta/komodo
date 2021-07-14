@@ -12,6 +12,7 @@
  * Removal or modification of this copyright notice is prohibited.            *
  *                                                                            *
  ******************************************************************************/
+#pragma once
 #include "komodo_defs.h"
 #include "key_io.h"
 #include "cc/CCinclude.h"
@@ -31,6 +32,8 @@
 #define portable_mutex_unlock pthread_mutex_unlock
 
 extern void verus_hash(void *result, const void *data, size_t len);
+
+int32_t komodo_baseid(char *origbase); // defined in komodo_globals.h
 
 struct allocitem { uint32_t allocsize,type; };
 struct queueitem { struct queueitem *next,*prev; uint32_t allocsize,type;  };
@@ -1695,7 +1698,7 @@ int8_t equihash_params_possible(uint64_t n, uint64_t k)
     return(-1);
 }
 
-void komodo_args(char *argv0)
+void komodo_args(char *argv0, P2PParameters& p2pParams)
 {
     std::string name,addn,hexstr,symbol; char *dirname,fname[512],arg0str[64],magicstr[9]; uint8_t magic[4],extrabuf[32756],disablebits[32],*extraptr=0;
     FILE *fp; uint64_t val; uint16_t port, dest_rpc_port; int32_t i,nonz=0,baseid,len,n,extralen = 0; uint64_t ccenables[256], ccEnablesHeight[512] = {0}; CTransaction earlytx; uint256 hashBlock;
@@ -2248,13 +2251,14 @@ fprintf(stderr,"extralen.%d before disable bits\n",extralen);
         if ( KOMODO_BIT63SET(MAX_MONEY) != 0 )
             MAX_MONEY = KOMODO_MAXNVALUE;
         fprintf(stderr,"MAX_MONEY %llu %.8f\n",(long long)MAX_MONEY,(double)MAX_MONEY/SATOSHIDEN);
-        //printf("baseid.%d MAX_MONEY.%s %.8f\n",baseid,ASSETCHAINS_SYMBOL,(double)MAX_MONEY/SATOSHIDEN);
         uint16_t tmpport = komodo_port(ASSETCHAINS_SYMBOL,ASSETCHAINS_SUPPLY,&ASSETCHAINS_MAGIC,extraptr,extralen);
         if ( GetArg("-port",0) != 0 )
         {
-            ASSETCHAINS_P2PPORT = GetArg("-port",0);
-            fprintf(stderr,"set p2pport.%u\n",ASSETCHAINS_P2PPORT);
-        } else ASSETCHAINS_P2PPORT = tmpport;
+            p2pParams.port = GetArg("-port",0);
+            fprintf(stderr,"set p2pport.%u\n",p2pParams.port);
+        } 
+        else 
+            p2pParams.port = tmpport;
 
         while ( (dirname= (char *)GetDataDir(false).string().c_str()) == 0 || dirname[0] == 0 )
         {
@@ -2268,7 +2272,6 @@ fprintf(stderr,"extralen.%d before disable bits\n",extralen);
         //fprintf(stderr,"Got datadir.(%s)\n",dirname);
         if ( ASSETCHAINS_SYMBOL[0] != 0 )
         {
-            int32_t komodo_baseid(char *origbase);
             extern int COINBASE_MATURITY;
             if ( strcmp(ASSETCHAINS_SYMBOL,"KMD") == 0 )
             {
@@ -2277,7 +2280,7 @@ fprintf(stderr,"extralen.%d before disable bits\n",extralen);
             }
             if ( (port= komodo_userpass(ASSETCHAINS_USERPASS,ASSETCHAINS_SYMBOL)) != 0 )
                 ASSETCHAINS_RPCPORT = port;
-            else komodo_configfile(ASSETCHAINS_SYMBOL,ASSETCHAINS_P2PPORT + 1);
+            else komodo_configfile(ASSETCHAINS_SYMBOL,p2pParams.port + 1);
 
             if (ASSETCHAINS_CBMATURITY != 0)
                 COINBASE_MATURITY = ASSETCHAINS_CBMATURITY;
@@ -2291,7 +2294,7 @@ fprintf(stderr,"extralen.%d before disable bits\n",extralen);
             //fprintf(stderr,"ASSETCHAINS_RPCPORT (%s) %u\n",ASSETCHAINS_SYMBOL,ASSETCHAINS_RPCPORT);
         }
         if ( ASSETCHAINS_RPCPORT == 0 )
-            ASSETCHAINS_RPCPORT = ASSETCHAINS_P2PPORT + 1;
+            ASSETCHAINS_RPCPORT = p2pParams.port + 1;
         //ASSETCHAINS_NOTARIES = GetArg("-ac_notaries","");
         //komodo_assetchain_pubkeys((char *)ASSETCHAINS_NOTARIES.c_str());
         iguana_rwnum(1,magic,sizeof(ASSETCHAINS_MAGIC),(void *)&ASSETCHAINS_MAGIC);
@@ -2305,9 +2308,8 @@ fprintf(stderr,"extralen.%d before disable bits\n",extralen);
             int8_t notarypay = 0;
             if ( ASSETCHAINS_NOTARY_PAY[0] != 0 )
                 notarypay = 1;
-            fprintf(fp,iguanafmtstr,name.c_str(),name.c_str(),name.c_str(),name.c_str(),magicstr,ASSETCHAINS_P2PPORT,ASSETCHAINS_RPCPORT,"78.47.196.146",notarypay);
+            fprintf(fp,iguanafmtstr,name.c_str(),name.c_str(),name.c_str(),name.c_str(),magicstr,p2pParams.port,ASSETCHAINS_RPCPORT,"78.47.196.146",notarypay);
             fclose(fp);
-            //printf("created (%s)\n",fname);
         } else printf("error creating (%s)\n",fname);
 #endif
         if ( ASSETCHAINS_CC < 2 )
@@ -2327,7 +2329,7 @@ fprintf(stderr,"extralen.%d before disable bits\n",extralen);
     else
     {
         char fname[512],username[512],password[4096]; int32_t iter; FILE *fp;
-        ASSETCHAINS_P2PPORT = 7770;
+        p2pParams.port = 7770;
         ASSETCHAINS_RPCPORT = 7771;
         for (iter=0; iter<2; iter++)
         {

@@ -28,7 +28,6 @@
 #include "init.h"
 #include "key_io.h"
 #include "main.h"
-#include "net.h"
 #include "rpc/protocol.h"
 #include "script/script.h"
 #include "script/sign.h"
@@ -3014,7 +3013,7 @@ bool CWalletTx::RelayWalletTransaction()
         {
             // if tx is expired, dont relay
             LogPrintf("Relaying wtx %s\n", GetHash().ToString());
-            RelayTransaction((CTransaction)*this);
+            p2p->RelayTransaction((CTransaction)*this);
             return true;
         }
     }
