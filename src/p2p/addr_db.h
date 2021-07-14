@@ -22,9 +22,13 @@ class CAddrDB
 {
 private:
     boost::filesystem::path pathAddr;
-    CChainParams chainParams;
+    const CMessageHeader::MessageStartChars& chainMessageHeader;
 public:
-    CAddrDB(const CChainParams& chainParams);
+    /***
+     * ctor
+     * @param chainMessageHeader the message header for this chain
+     */
+    CAddrDB(const CMessageHeader::MessageStartChars& chainMessageHeader);
     bool Write(const CAddrMan& addr);
     bool Read(CAddrMan& addr);
 };

@@ -122,7 +122,7 @@ void P2P::StartNode(boost::thread_group& threadGroup, CScheduler& scheduler)
     // Load addresses for peers.dat
     int64_t nStart = GetTimeMillis();
     {
-        CAddrDB adb(chainParams);
+        CAddrDB adb(chainParams.MessageStart());
         if (!adb.Read(addrman))
             LogPrintf("Invalid or missing peers.dat; recreating\n");
     }
@@ -1047,7 +1047,7 @@ void P2P::DumpAddresses()
 {
     int64_t nStart = GetTimeMillis();
 
-    CAddrDB adb(chainParams);
+    CAddrDB adb(chainParams.MessageStart());
     adb.Write(addrman);
 
     LogPrint("net", "Flushed %d addresses to peers.dat  %dms\n",

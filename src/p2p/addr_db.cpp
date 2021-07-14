@@ -17,7 +17,7 @@
 
 #include "p2p/addr_db.h"
 
-CAddrDB::CAddrDB(const CChainParams& chainParams) : chainParams(chainParams)
+CAddrDB::CAddrDB(const CMessageHeader::MessageStartChars& chainMessageHeader) : chainMessageHeader(chainMessageHeader)
 {
     pathAddr = GetDataDir() / "peers.dat";
 }
@@ -31,7 +31,7 @@ bool CAddrDB::Write(const CAddrMan& addr)
 
     // serialize addresses, checksum data up to that point, then append csum
     CDataStream ssPeers(SER_DISK, CLIENT_VERSION);
-    ssPeers << FLATDATA(chainParams.MessageStart());
+    ssPeers << FLATDATA(chainMessageHeader);
     ssPeers << addr;
     uint256 hash = Hash(ssPeers.begin(), ssPeers.end());
     ssPeers << hash;
@@ -101,7 +101,7 @@ bool CAddrDB::Read(CAddrMan& addr)
         ssPeers >> FLATDATA(pchMsgTmp);
 
         // ... verify the network matches ours
-        if (memcmp(pchMsgTmp, chainParams.MessageStart(), sizeof(pchMsgTmp)))
+        if (memcmp(pchMsgTmp, chainMessageHeader, sizeof(pchMsgTmp)))
             return error("%s: Invalid network magic number", __func__);
 
         // de-serialize address data into one CAddrMan object
