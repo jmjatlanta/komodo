@@ -64,5 +64,9 @@ struct P2PParameters
     /** Maximum length of strSubVer in `version` message */
     static const uint16_t MAX_SUBVERSION_LENGTH = 256;
     /** Subversion as sent to the P2P network in `version` messages */
-    std::string subVersion;    
+    std::string subVersion;
+    uint32_t banTimeSecs = 60*60*24; // default to 24 hour ban
+    // these are undocumented and only used for testing
+    uint16_t fuzzMessageTest = 0;
+    uint16_t dropMessageTest = 0;
 };

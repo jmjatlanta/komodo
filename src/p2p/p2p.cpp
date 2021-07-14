@@ -1467,7 +1467,7 @@ void P2P::Ban(const CNetAddr& addr, int64_t bantimeoffset, bool sinceUnixEpoch) 
 }
 
 void P2P::Ban(const CSubNet& subNet, int64_t bantimeoffset, bool sinceUnixEpoch) {
-    int64_t banTime = GetTime()+GetArg("-bantime", 60*60*24);  // Default 24-hour ban
+    int64_t banTime = GetTime()+ params.banTimeSecs;  // Default 24-hour ban
     if (bantimeoffset > 0)
         banTime = (sinceUnixEpoch ? 0 : GetTime() )+bantimeoffset;
 

@@ -37,7 +37,7 @@ void CNode::PushVersion()
 {
     int nBestHeight = parent->GetHeight();
 
-    int64_t nTime = (fInbound ? GetTime() : GetTime());
+    int64_t nTime = GetTime();
     CAddress addrYou = (addr.IsRoutable() && !IsProxy(addr) ? addr : CAddress(CService("0.0.0.0",0)));
     CAddress addrMe = parent->GetLocalAddress(&addr);
     GetRandBytes((unsigned char*)&localHostNonce, sizeof(localHostNonce));
@@ -311,14 +311,14 @@ void CNode::EndMessage() UNLOCK_FUNCTION(cs_vSend)
     // The -*messagestest options are intentionally not documented in the help message,
     // since they are only used during development to debug the networking code and are
     // not intended for end-users.
-    if (mapArgs.count("-dropmessagestest") && GetRand(GetArg("-dropmessagestest", 2)) == 0)
+    if (parent->GetParams().dropMessageTest > 0 && GetRand(parent->GetParams().dropMessageTest) == 0)
     {
         LogPrint("net", "dropmessages DROPPING SEND MESSAGE\n");
         AbortMessage();
         return;
     }
-    if (mapArgs.count("-fuzzmessagestest"))
-        Fuzz(GetArg("-fuzzmessagestest", 10));
+    if (parent->GetParams().fuzzMessageTest > 0)
+        Fuzz( parent->GetParams().fuzzMessageTest );
 
     if (ssSend.size() == 0)
     {

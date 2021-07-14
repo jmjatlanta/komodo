@@ -1452,7 +1452,8 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler, P2PParame
 
     // see Step 2: parameter interactions for more information about these
     p2pParams.listen = GetBoolArg("-listen", p2pDefaults.listen);
-    p2pParams.discover = GetBoolArg("-discover", true);
+    p2pParams.discover = GetBoolArg("-discover", p2pDefaults.discover);
+    p2pParams.banTimeSecs = GetArg("-bantime", p2pDefaults.banTimeSecs);
 
     // sanitize comments per BIP-0014, format user agent and check total size
     std::vector<string> uacomments;
