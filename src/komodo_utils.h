@@ -31,6 +31,7 @@
 #define portable_mutex_unlock pthread_mutex_unlock
 
 extern void verus_hash(void *result, const void *data, size_t len);
+int32_t komodo_baseid(char *origbase);
 
 struct allocitem { uint32_t allocsize,type; };
 struct queueitem { struct queueitem *next,*prev; uint32_t allocsize,type;  };
@@ -1126,7 +1127,7 @@ char *clonestr(char *str)
     return(clone);
 }
 
-int32_t safecopy(char *dest,char *src,long len)
+int32_t safecopy(char *dest, const char *src,long len)
 {
     int32_t i = -1;
     if ( src != 0 && dest != 0 && src != dest )
@@ -1356,43 +1357,59 @@ uint16_t _komodo_userpass(char *username,char *password,FILE *fp)
     return(port);
 }
 
-void komodo_statefname(char *fname,char *symbol,char *str)
+/*****
+ * @brief retrieve the full path of the file
+ * @param symbol the symbol that forms part of the path
+ * @param filename the file
+ * @returns the full path of the file
+ */
+std::string komodo_statefname(const std::string& symbol, const std::string& filename)
 {
-    int32_t n,len;
-    sprintf(fname,"%s",GetDataDir(false).string().c_str());
+    std::string fname = GetDataDir(false).string();
+    
+    size_t n;
     if ( (n= (int32_t)strlen(ASSETCHAINS_SYMBOL)) != 0 )
     {
-        len = (int32_t)strlen(fname);
+        size_t len = fname.size();
         if ( !mapArgs.count("-datadir") && strcmp(ASSETCHAINS_SYMBOL,&fname[len - n]) == 0 )
             fname[len - n] = 0;
-        else if(mapArgs.count("-datadir")) printf("DEBUG - komodo_utils:1363: custom datadir\n");
+        else if(mapArgs.count("-datadir")) 
+            printf("DEBUG - komodo_utils:1363: custom datadir\n");
         else
         {
-            if ( strcmp(symbol,"REGTEST") != 0 )
-                printf("unexpected fname.(%s) vs %s [%s] n.%d len.%d (%s)\n",fname,symbol,ASSETCHAINS_SYMBOL,n,len,&fname[len - n]);
-            return;
+            if ( symbol != "REGTEST" )
+                printf("unexpected fname.(%s) vs %s [%s] n.%d len.%d (%s)\n",
+                        fname.c_str(),symbol.c_str(),ASSETCHAINS_SYMBOL,(int)n,(int)len,&fname[len - n]);
+            return fname;
         }
     }
     else
     {
-#ifdef _WIN32
-        strcat(fname,"\\");
-#else
-        strcat(fname,"/");
-#endif
+        fname += boost::filesystem::path::preferred_separator;
     }
-    if ( symbol != 0 && symbol[0] != 0 && strcmp("KMD",symbol) != 0 )
+
+    if ( !symbol.empty() && "KMD" != symbol )
     {
-        if(!mapArgs.count("-datadir")) strcat(fname,symbol);
-        //printf("statefname.(%s) -> (%s)\n",symbol,fname);
-#ifdef _WIN32
-        strcat(fname,"\\");
-#else
-        strcat(fname,"/");
-#endif
+        if(!mapArgs.count("-datadir")) 
+            fname += symbol;
+        fname += boost::filesystem::path::preferred_separator;
     }
-    strcat(fname,str);
-    //printf("test.(%s) -> [%s] statename.(%s) %s\n",test,ASSETCHAINS_SYMBOL,symbol,fname);
+
+    fname += filename;
+    return fname;
+}
+
+/****
+ * @brief Retrieve the full path of a file
+ * @note replaced by the std::string version
+ * @param[out] fname the full path of the file
+ * @param[in] symbol the symbol that forms part of the path
+ * @param[in] str the filename
+ */
+void komodo_statefname(char *fname,char *symbol,char *str)
+{
+    std::string retval = komodo_statefname(symbol, str);
+    strcpy(fname, retval.c_str());
 }
 
 void komodo_configfile(char *symbol,uint16_t rpcport)
@@ -2268,7 +2285,6 @@ fprintf(stderr,"extralen.%d before disable bits\n",extralen);
         //fprintf(stderr,"Got datadir.(%s)\n",dirname);
         if ( ASSETCHAINS_SYMBOL[0] != 0 )
         {
-            int32_t komodo_baseid(char *origbase);
             extern int COINBASE_MATURITY;
             if ( strcmp(ASSETCHAINS_SYMBOL,"KMD") == 0 )
             {

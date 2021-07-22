@@ -529,52 +529,47 @@ void PrintExceptionContinue(const std::exception* pex, const char* pszThread)
 }
 
 extern char ASSETCHAINS_SYMBOL[KOMODO_ASSETCHAIN_MAXLEN];
-//int64_t MAX_MONEY = 200000000 * 100000000LL;
 
 boost::filesystem::path GetDefaultDataDir()
 {
-    namespace fs = boost::filesystem;
-    char symbol[KOMODO_ASSETCHAIN_MAXLEN];
-    if ( ASSETCHAINS_SYMBOL[0] != 0 ){
-        strcpy(symbol,ASSETCHAINS_SYMBOL);
-    }
-    
-    else symbol[0] = 0;
-    // Windows < Vista: C:\Documents and Settings\Username\Application Data\Zcash
-    // Windows >= Vista: C:\Users\Username\AppData\Roaming\Zcash
-    // Mac: ~/Library/Application Support/Zcash
-    // Unix: ~/.zcash
+    // Windows < Vista: C:\Documents and Settings\Username\Application Data\Komodo
+    // Windows >= Vista: C:\Users\Username\AppData\Roaming\Komodo
+    // Mac: ~/Library/Application Support/Komodo
+    // Unix: ~/.komodo
+
+    std::string komodo = "Komodo";
+    boost::filesystem::path pathRet;
+
 #ifdef _WIN32
-    // Windows
-    if ( symbol[0] == 0 )
-        return GetSpecialFolderPath(CSIDL_APPDATA) / "Komodo";
-    else return GetSpecialFolderPath(CSIDL_APPDATA) / "Komodo" / symbol;
+    // windows
+    pathRet = GetSpecialFolderPath(CSIDL_APPDATA);
 #else
-    fs::path pathRet;
-    char* pszHome = getenv("HOME");
-    if (pszHome == NULL || strlen(pszHome) == 0)
-        pathRet = fs::path("/");
+    // max & Unix
+    std::string home = getenv("HOME");
+    if (home.empty())
+        pathRet = boost::filesystem::path("/");
     else
-        pathRet = fs::path(pszHome);
+        pathRet = boost::filesystem::path(home);
+
 #ifdef MAC_OSX
     // Mac
     pathRet /= "Library/Application Support";
-    TryCreateDirectory(pathRet);
-    if ( symbol[0] == 0 )
-        return pathRet / "Komodo";
-    else
-    {
-        pathRet /= "Komodo";
-        TryCreateDirectory(pathRet);
-        return pathRet / symbol;
-    }
 #else
-    // Unix
-    if ( symbol[0] == 0 )
-        return pathRet / ".komodo";
-    else return pathRet / ".komodo" / symbol;
+    komodo = ".komodo";
 #endif
 #endif
+
+    pathRet /= komodo;
+
+    std::string symbol(ASSETCHAINS_SYMBOL);
+    if (!symbol.empty())
+        pathRet /= symbol;
+
+#ifdef MAC_OSX
+    TryCreateDirectory(pathRet);
+#endif
+
+    return pathRet;
 }
 
 static boost::filesystem::path pathCached;
@@ -778,7 +773,7 @@ bool TryCreateDirectory(const boost::filesystem::path& p)
 {
     try
     {
-        return boost::filesystem::create_directory(p);
+        return boost::filesystem::create_directories(p);
     } catch (const boost::filesystem::filesystem_error&) {
         if (!boost::filesystem::exists(p) || !boost::filesystem::is_directory(p))
             throw;

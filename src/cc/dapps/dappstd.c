@@ -218,7 +218,7 @@ char *parse_conf_line(char *line,char *field)
     return(clonestr(line));
 }
 
-int32_t safecopy(char *dest,char *src,long len)
+int32_t safecopy(char *dest, const char *src,long len)
 {
     int32_t i = -1;
     if ( src != 0 && dest != 0 && src != dest )
@@ -253,7 +253,7 @@ gamesevent *games_keystrokesload(int32_t *numkeysp,uint64_t seed,int32_t counter
 
 int GAMEMAIN(int argc, char **argv);
 
-void *OS_loadfile(char *fname,uint8_t **bufp,long *lenp,long *allocsizep)
+void *OS_loadfile(const char *fname,uint8_t **bufp,long *lenp,long *allocsizep)
 {
     FILE *fp;
     long  filesize,buflen = *allocsizep;
@@ -291,7 +291,7 @@ void *OS_loadfile(char *fname,uint8_t **bufp,long *lenp,long *allocsizep)
     return(buf);
 }
 
-uint8_t *OS_fileptr(long *allocsizep,char *fname)
+uint8_t *OS_fileptr(long *allocsizep, const char *fname)
 {
     long filesize = 0; uint8_t *buf = 0; void *retptr;
     *allocsizep = 0;
@@ -660,7 +660,6 @@ uint16_t komodo_userpass(char *userpass,char *symbol)
 #endif
     }
     else sprintf(confname,"%s.conf",symbol);
-    //komodo_statefname(fname,symbol,confname);
     if ( (fp= fopen(confname,"rb")) != 0 )
     {
         port = _komodo_userpass(username,password,fp);
