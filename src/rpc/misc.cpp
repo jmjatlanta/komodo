@@ -308,7 +308,8 @@ UniValue getinfo(const UniValue& params, bool fHelp, const CPubKey& mypk)
     obj.push_back(Pair("name",        ASSETCHAINS_SYMBOL[0] == 0 ? "KMD" : ASSETCHAINS_SYMBOL));
 
     obj.push_back(Pair("p2pport", p2p->GetParams().port));
-    obj.push_back(Pair("rpcport",        ASSETCHAINS_RPCPORT));
+    // JMJ TODO: Handle this
+    //obj.push_back(Pair("rpcport",        ASSETCHAINS_RPCPORT));
     if ( ASSETCHAINS_SYMBOL[0] != 0 )
     {
         if ( is_STAKED(ASSETCHAINS_SYMBOL) != 0 )

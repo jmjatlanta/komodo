@@ -360,7 +360,8 @@ int32_t komodo_parsestatefiledata(struct komodo_state *sp,uint8_t *filedata,long
 void komodo_stateupdate(int32_t height,uint8_t notarypubs[][33],uint8_t numnotaries,uint8_t notaryid,uint256 txhash,uint64_t voutmask,uint8_t numvouts,uint32_t *pvals,uint8_t numpvals,int32_t KMDheight,uint32_t KMDtimestamp,uint64_t opretvalue,uint8_t *opretbuf,uint16_t opretlen,uint16_t vout,uint256 MoM,int32_t MoMdepth)
 {
     static FILE *fp; static int32_t errs,didinit; static uint256 zero;
-    struct komodo_state *sp; char fname[512],symbol[KOMODO_ASSETCHAIN_MAXLEN],dest[KOMODO_ASSETCHAIN_MAXLEN]; int32_t retval,ht,func; uint8_t num,pubkeys[64][33];
+    struct komodo_state *sp; 
+    char    symbol[KOMODO_ASSETCHAIN_MAXLEN],dest[KOMODO_ASSETCHAIN_MAXLEN]; int32_t retval,ht,func; uint8_t num,pubkeys[64][33];
     if ( didinit == 0 )
     {
         portable_mutex_init(&KOMODO_KV_mutex);
@@ -376,10 +377,10 @@ void komodo_stateupdate(int32_t height,uint8_t notarypubs[][33],uint8_t numnotar
     //printf("[%s] (%s) -> (%s)\n",ASSETCHAINS_SYMBOL,symbol,dest);
     if ( fp == 0 )
     {
-        komodo_statefname(fname,ASSETCHAINS_SYMBOL,(char *)"komodostate");
-        if ( (fp= fopen(fname,"rb+")) != 0 )
+        std::string fname = komodo_statefname(ASSETCHAINS_SYMBOL,(char *)"komodostate");
+        if ( (fp= fopen(fname.c_str(),"rb+")) != 0 )
         {
-            if ( (retval= komodo_faststateinit(sp,fname,symbol,dest)) > 0 )
+            if ( (retval= komodo_faststateinit(sp,fname.c_str(),symbol,dest)) > 0 )
                 fseek(fp,0,SEEK_END);
             else
             {
@@ -387,7 +388,7 @@ void komodo_stateupdate(int32_t height,uint8_t notarypubs[][33],uint8_t numnotar
                 while ( komodo_parsestatefile(sp,fp,symbol,dest) >= 0 )
                     ;
             }
-        } else fp = fopen(fname,"wb+");
+        } else fp = fopen(fname.c_str(),"wb+");
         KOMODO_INITDONE = (uint32_t)time(NULL);
     }
     if ( height <= 0 )
@@ -725,10 +726,9 @@ int32_t komodo_voutupdate(bool fJustCheck,int32_t *isratificationp,int32_t notar
                     {
                         if ( signedfp == 0 )
                         {
-                            char fname[512];
-                            komodo_statefname(fname,ASSETCHAINS_SYMBOL,(char *)"signedmasks");
-                            if ( (signedfp= fopen(fname,"rb+")) == 0 )
-                                signedfp = fopen(fname,"wb");
+                            std::string fname = komodo_statefname(ASSETCHAINS_SYMBOL,(char *)"signedmasks");
+                            if ( (signedfp= fopen(fname.c_str(),"rb+")) == 0 )
+                                signedfp = fopen(fname.c_str(),"wb");
                             else fseek(signedfp,0,SEEK_END);
                         }
                         if ( signedfp != 0 )
@@ -739,14 +739,10 @@ int32_t komodo_voutupdate(bool fJustCheck,int32_t *isratificationp,int32_t notar
                         }
                         if ( opretlen > len && scriptbuf[len] == 'A' )
                         {
-                            //for (i=0; i<opretlen-len; i++)
-                            //    printf("%02x",scriptbuf[len+i]);
-                            //printf(" Found extradata.[%d] %d - %d\n",opretlen-len,opretlen,len);
                             komodo_stateupdate(height,0,0,0,txhash,0,0,0,0,0,0,value,&scriptbuf[len],opretlen-len+4+3+(scriptbuf[1] == 0x4d),j,zero,0);
                         }
                     }
-                } //else if ( fJustCheck )
-                //    return (-3); // if the notarisation is only invalid because its out of order it cannot be mined in a block with a valid one!
+                }
             } else if ( opretlen != 149 && height > 600000 && matched != 0 )
                 printf("%s validated.%d notarized.%d %llx reject ht.%d NOTARIZED.%d prev.%d %s.%s DESTTXID.%s len.%d opretlen.%d\n",ccdata.symbol,validated,notarized,(long long)signedmask,height,*notarizedheightp,sp->NOTARIZED_HEIGHT,ASSETCHAINS_SYMBOL[0]==0?"KMD":ASSETCHAINS_SYMBOL,srchash.ToString().c_str(),desttxid.ToString().c_str(),len,opretlen);
         }
@@ -913,8 +909,7 @@ int32_t komodo_connectblock(bool fJustCheck, CBlockIndex *pindex,CBlock& block)
                     static FILE *signedfp;
                     if ( signedfp == 0 )
                     {
-                        char fname[512];
-                        komodo_statefname(fname,ASSETCHAINS_SYMBOL,(char *)"signedmasks");
+                        const char* fname = komodo_statefname(ASSETCHAINS_SYMBOL,(char *)"signedmasks").c_str();
                         if ( (signedfp= fopen(fname,"rb+")) == 0 )
                             signedfp = fopen(fname,"wb");
                         else fseek(signedfp,0,SEEK_END);

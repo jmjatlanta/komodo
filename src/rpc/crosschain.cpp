@@ -735,6 +735,8 @@ UniValue selfimport(const UniValue& params, bool fHelp, const CPubKey& mypk)
 
     source = ASSETCHAINS_SELFIMPORT;   //defaults to -ac_import=... param
 
+    // JMJ TODO: Handle this
+    /*
     if (source == "BEAM")
     {
         if (ASSETCHAINS_BEAMPORT == 0)
@@ -751,7 +753,8 @@ UniValue selfimport(const UniValue& params, bool fHelp, const CPubKey& mypk)
         // return(0);
         return -1;
     }
-    else if (source == "PEGSCC")
+
+    else */ if (source == "PEGSCC")
     {
         return -1;
     }
@@ -820,16 +823,20 @@ UniValue importdual(const UniValue& params, bool fHelp, const CPubKey& mypk)
 
     if (source == "BEAM")
     {
-        if (ASSETCHAINS_BEAMPORT == 0)
-            return(-1);
+        // JMJ TODO: handle this
+        //
+        //if (ASSETCHAINS_BEAMPORT == 0)
+        //    return(-1);
+
         // confirm via ASSETCHAINS_BEAMPORT that burnTx/hash is a valid BEAM burn
         // return(0);
         return -1;
     }
     else if (source == "CODA")
     {
-        if (ASSETCHAINS_CODAPORT == 0)
-            return(-1);
+        // JMJU TODO: Handle this
+        //if (ASSETCHAINS_CODAPORT == 0)
+        //    return(-1);
         hex=MakeCodaImportTx(0,burntxid,sourceaddr,vouts);
         // confirm via ASSETCHAINS_CODAPORT that burnTx/hash is a valid CODA burn
         // return(0);

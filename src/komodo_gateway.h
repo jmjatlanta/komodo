@@ -1259,7 +1259,7 @@ void komodo_stateind_set(struct komodo_state *sp,uint32_t *inds,int32_t n,uint8_
     else if ( func == 'R' ) // opreturn:*/
 }
 
-void *OS_loadfile(char *fname,uint8_t **bufp,long *lenp,long *allocsizep)
+void *OS_loadfile(const char *fname,uint8_t **bufp,long *lenp,long *allocsizep)
 {
     FILE *fp;
     long  filesize,buflen = *allocsizep;
@@ -1297,7 +1297,7 @@ void *OS_loadfile(char *fname,uint8_t **bufp,long *lenp,long *allocsizep)
     return(buf);
 }
 
-uint8_t *OS_fileptr(long *allocsizep,char *fname)
+uint8_t *OS_fileptr(long *allocsizep, const char *fname)
 {
     long filesize = 0; uint8_t *buf = 0; void *retptr;
     *allocsizep = 0;
@@ -1369,7 +1369,7 @@ long komodo_indfile_update(FILE *indfp,uint32_t *prevpos100p,long lastfpos,long 
     return(newfpos);
 }
 
-int32_t komodo_faststateinit(struct komodo_state *sp,char *fname,char *symbol,char *dest)
+int32_t komodo_faststateinit(struct komodo_state *sp,const char *fname,char *symbol,char *dest)
 {
     FILE *indfp; char indfname[1024]; uint8_t *filedata; long validated=-1,datalen,fpos,lastfpos; uint32_t tmp,prevpos100,indcounter,starttime; int32_t func,finished = 0;
     starttime = (uint32_t)time(NULL);
@@ -1439,7 +1439,8 @@ void komodo_passport_iteration()
 {
     static long lastpos[34]; static char userpass[33][1024]; static uint32_t lasttime,callcounter,lastinterest;
     int32_t maxseconds = 10;
-    FILE *fp; uint8_t *filedata; long fpos,datalen,lastfpos; int32_t baseid,limit,n,ht,isrealtime,expired,refid,blocks,longest; struct komodo_state *sp,*refsp; char *retstr,fname[512],*base,symbol[KOMODO_ASSETCHAIN_MAXLEN],dest[KOMODO_ASSETCHAIN_MAXLEN]; uint32_t buf[3],starttime; uint64_t RTmask = 0; //CBlockIndex *pindex;
+    FILE *fp; uint8_t *filedata; long fpos,datalen,lastfpos; int32_t baseid,limit,n,ht,isrealtime,expired,refid,blocks,longest; struct komodo_state *sp,*refsp; char *retstr;
+    char *base,symbol[KOMODO_ASSETCHAIN_MAXLEN],dest[KOMODO_ASSETCHAIN_MAXLEN]; uint32_t buf[3],starttime; uint64_t RTmask = 0; //CBlockIndex *pindex;
     expired = 0;
     while ( 0 && KOMODO_INITDONE == 0 )
     {
@@ -1486,35 +1487,34 @@ void komodo_passport_iteration()
         sp = 0;
         isrealtime = 0;
         base = (char *)CURRENCIES[baseid];
-        //printf("PASSPORT %s baseid+1 %d refid.%d\n",ASSETCHAINS_SYMBOL,baseid+1,refid);
         if ( baseid+1 != refid ) // only need to import state from a different coin
         {
             if ( baseid == 32 ) // only care about KMD's state
             {
                 refsp->RTmask &= ~(1LL << baseid);
-                komodo_statefname(fname,baseid<32?base:(char *)"",(char *)"komodostate");
+                std::string fname = komodo_statefname(baseid<32?base:(char *)"",(char *)"komodostate");
                 komodo_nameset(symbol,dest,base);
                 sp = komodo_stateptrget(symbol);
                 n = 0;
-                if ( lastpos[baseid] == 0 && (filedata= OS_fileptr(&datalen,fname)) != 0 )
+                if ( lastpos[baseid] == 0 && (filedata= OS_fileptr(&datalen,fname.c_str())) != 0 )
                 {
                     fpos = 0;
-                    fprintf(stderr,"%s processing %s %ldKB\n",ASSETCHAINS_SYMBOL,fname,datalen/1024);
+                    fprintf(stderr,"%s processing %s %ldKB\n",ASSETCHAINS_SYMBOL,fname.c_str(),datalen/1024);
                     while ( komodo_parsestatefiledata(sp,filedata,&fpos,datalen,symbol,dest) >= 0 )
                         lastfpos = fpos;
-                    fprintf(stderr,"%s took %d seconds to process %s %ldKB\n",ASSETCHAINS_SYMBOL,(int32_t)(time(NULL)-starttime),fname,datalen/1024);
+                    fprintf(stderr,"%s took %d seconds to process %s %ldKB\n",ASSETCHAINS_SYMBOL,(int32_t)(time(NULL)-starttime),fname.c_str(),datalen/1024);
                     lastpos[baseid] = lastfpos;
                     free(filedata), filedata = 0;
                     datalen = 0;
                 }
-                else if ( (fp= fopen(fname,"rb")) != 0 && sp != 0 )
+                else if ( (fp= fopen(fname.c_str(),"rb")) != 0 && sp != 0 )
                 {
                     fseek(fp,0,SEEK_END);
-                    //fprintf(stderr,"couldnt OS_fileptr(%s), freading %ldKB\n",fname,ftell(fp)/1024);
                     if ( ftell(fp) > lastpos[baseid] )
                     {
                         if ( ASSETCHAINS_SYMBOL[0] != 0 )
-                            printf("%s passport refid.%d %s fname.(%s) base.%s %ld %ld\n",ASSETCHAINS_SYMBOL,refid,symbol,fname,base,ftell(fp),lastpos[baseid]);
+                            printf("%s passport refid.%d %s fname.(%s) base.%s %ld %ld\n",ASSETCHAINS_SYMBOL,
+                                    refid,symbol,fname.c_str(),base,ftell(fp),lastpos[baseid]);
                         fseek(fp,lastpos[baseid],SEEK_SET);
                         while ( komodo_parsestatefile(sp,fp,symbol,dest) >= 0 && n < limit )
                         {
@@ -1535,9 +1535,11 @@ void komodo_passport_iteration()
                             printf("from.(%s) lastpos[%s] %ld isrt.%d\n",ASSETCHAINS_SYMBOL,CURRENCIES[baseid],lastpos[baseid],komodo_isrealtime(&ht));
                     } //else fprintf(stderr,"%s.%ld ",CURRENCIES[baseid],ftell(fp));
                     fclose(fp);
-                } else fprintf(stderr,"load error.(%s) %p\n",fname,sp);
-                komodo_statefname(fname,baseid<32?base:(char *)"",(char *)"realtime");
-                if ( (fp= fopen(fname,"rb")) != 0 )
+                } 
+                else 
+                    fprintf(stderr,"load error.(%s) %p\n",fname.c_str(),sp);
+                fname = komodo_statefname(baseid<32?base:(char *)"",(char *)"realtime");
+                if ( (fp= fopen(fname.c_str(),"rb")) != 0 )
                 {
                     if ( fread(buf,1,sizeof(buf),fp) == sizeof(buf) )
                     {
@@ -1550,16 +1552,16 @@ void komodo_passport_iteration()
                         }
                         else if ( KOMODO_PAX != 0 && (time(NULL)-buf[2]) > 60 && ASSETCHAINS_SYMBOL[0] != 0 )
                             fprintf(stderr,"[%s]: %s not RT %u %u %d\n",ASSETCHAINS_SYMBOL,base,buf[0],buf[1],(int32_t)(time(NULL)-buf[2]));
-                    } //else fprintf(stderr,"%s size error RT\n",base);
+                    }
                     fclose(fp);
-                } //else fprintf(stderr,"%s open error RT\n",base);
+                }
             }
         }
         else
         {
             refsp->RTmask &= ~(1LL << baseid);
-            komodo_statefname(fname,baseid<32?base:(char *)"",(char *)"realtime");
-            if ( (fp= fopen(fname,"wb")) != 0 )
+            std::string fname = komodo_statefname(baseid<32?base:(char *)"",(char *)"realtime");
+            if ( (fp= fopen(fname.c_str(),"wb")) != 0 )
             {
                 buf[0] = (uint32_t)chainActive.LastTip()->GetHeight();
                 buf[1] = (uint32_t)komodo_longestchain();
@@ -1574,12 +1576,13 @@ void komodo_passport_iteration()
                 if ( fwrite(buf,1,sizeof(buf),fp) != sizeof(buf) )
                     fprintf(stderr,"[%s] %s error writing realtime\n",ASSETCHAINS_SYMBOL,base);
                 fclose(fp);
-            } else fprintf(stderr,"%s create error RT\n",base);
+            } 
+            else 
+                fprintf(stderr,"%s create error RT\n",base);
         }
         if ( sp != 0 && isrealtime == 0 )
             refsp->RTbufs[0][2] = 0;
     }
-    //komodo_paxtotal(); // calls komodo_isrealtime(), which calls komodo_longestchain()
     refsp->RTmask |= RTmask;
     if ( expired == 0 && KOMODO_PASSPORT_INITDONE == 0 )
     {

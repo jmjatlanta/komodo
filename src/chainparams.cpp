@@ -571,13 +571,14 @@ void *chainparams_commandline(P2PParameters& p2pParams)
         }
         if ( KOMODO_TESTNODE != 0 )
             pCurrentParams->SetMiningRequiresPeers(false);
-        if ( ASSETCHAINS_RPCPORT == 0 )
-            ASSETCHAINS_RPCPORT = p2pParams.port + 1;
+        // JMJ TODO: handle this
+        //if ( ASSETCHAINS_RPCPORT == 0 )
+        //    ASSETCHAINS_RPCPORT = p2pParams.port + 1;
         pCurrentParams->pchMessageStart[0] = ASSETCHAINS_MAGIC & 0xff;
         pCurrentParams->pchMessageStart[1] = (ASSETCHAINS_MAGIC >> 8) & 0xff;
         pCurrentParams->pchMessageStart[2] = (ASSETCHAINS_MAGIC >> 16) & 0xff;
         pCurrentParams->pchMessageStart[3] = (ASSETCHAINS_MAGIC >> 24) & 0xff;
-        fprintf(stderr,">>>>>>>>>> %s: p2p.%u rpc.%u magic.%08x %u %u coins\n",ASSETCHAINS_SYMBOL,p2pParams.port,ASSETCHAINS_RPCPORT,ASSETCHAINS_MAGIC,ASSETCHAINS_MAGIC,(uint32_t)ASSETCHAINS_SUPPLY);
+        // JMJ TODO: fix ASSETCHAINS_RPCPORT fprintf(stderr,">>>>>>>>>> %s: p2p.%u rpc.%u magic.%08x %u %u coins\n",ASSETCHAINS_SYMBOL,p2pParams.port,ASSETCHAINS_RPCPORT,ASSETCHAINS_MAGIC,ASSETCHAINS_MAGIC,(uint32_t)ASSETCHAINS_SUPPLY);
         if (ASSETCHAINS_ALGO == ASSETCHAINS_VERUSHASH)
         {
             // this is only good for 60 second blocks with an averaging window of 45. for other parameters, use:

@@ -237,7 +237,7 @@ FILE *OS_appendfile(char *origfname);
 int32_t OS_compare_files(char *fname,char *fname2);
 int64_t OS_copyfile(char *src,char *dest,int32_t cmpflag);
 void _OS_closemap(struct OS_mappedptr *mp);
-void *OS_loadfile(char *fname,char **bufp,long *lenp,long *allocsizep);
+void *OS_loadfile(const char *fname,char **bufp,long *lenp,long *allocsizep);
 void *OS_filestr(long *allocsizep,char *fname);
 void OS_closemap(struct OS_mappedptr *mp);
 int32_t OS_openmap(struct OS_mappedptr *mp);
@@ -375,7 +375,7 @@ void calc_base64_encodestr(char *hexstr,uint8_t *buf,uint8_t *msg,int32_t len);
 void calc_base64_decodestr(char *hexstr,uint8_t *buf,uint8_t *msg,int32_t len);
 void calc_hexstr(char *hexstr,uint8_t *buf,uint8_t *msg,int32_t len);
 void calc_unhexstr(char *hexstr,uint8_t *buf,uint8_t *msg,int32_t len);
-int32_t safecopy(char *dest,char *src,long len);
+int32_t safecopy(char *dest,const char *src,long len);
 double dxblend(double *destp,double val,double decay);
 
 uint64_t calc_ipbits(char *ip_port);

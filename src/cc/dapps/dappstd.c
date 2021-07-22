@@ -218,7 +218,7 @@ char *parse_conf_line(char *line,char *field)
     return(clonestr(line));
 }
 
-int32_t safecopy(char *dest,char *src,long len)
+int32_t safecopy(char *dest,const char *src,long len)
 {
     int32_t i = -1;
     if ( src != 0 && dest != 0 && src != dest )
@@ -253,7 +253,7 @@ gamesevent *games_keystrokesload(int32_t *numkeysp,uint64_t seed,int32_t counter
 
 int GAMEMAIN(int argc, char **argv);
 
-void *OS_loadfile(char *fname,uint8_t **bufp,long *lenp,long *allocsizep)
+void *OS_loadfile(const char *fname,uint8_t **bufp,long *lenp,long *allocsizep)
 {
     FILE *fp;
     long  filesize,buflen = *allocsizep;
@@ -291,7 +291,7 @@ void *OS_loadfile(char *fname,uint8_t **bufp,long *lenp,long *allocsizep)
     return(buf);
 }
 
-uint8_t *OS_fileptr(long *allocsizep,char *fname)
+uint8_t *OS_fileptr(long *allocsizep, const char *fname)
 {
     long filesize = 0; uint8_t *buf = 0; void *retptr;
     *allocsizep = 0;
@@ -618,7 +618,6 @@ uint16_t _komodo_userpass(char *username, char *password, FILE *fp)
     {
         if ( line[0] == '#' )
             continue;
-        //printf("line.(%s) %p %p\n",line,strstr(line,(char *)"rpcuser"),strstr(line,(char *)"rpcpassword"));
         if ( (str= strstr(line,(char *)"rpcuser")) != 0 )
             rpcuser = parse_conf_line(str,(char *)"rpcuser");
         else if ( (str= strstr(line,(char *)"rpcpassword")) != 0 )
@@ -626,7 +625,6 @@ uint16_t _komodo_userpass(char *username, char *password, FILE *fp)
         else if ( (str= strstr(line,(char *)"rpcport")) != 0 )
         {
             port = atoi(parse_conf_line(str,(char *)"rpcport"));
-            //fprintf(stderr,"rpcport.%u in file\n",port);
         }
         else if ( (str= strstr(line,(char *)"ipaddress")) != 0 )
         {
@@ -639,7 +637,6 @@ uint16_t _komodo_userpass(char *username, char *password, FILE *fp)
         strcpy(username,rpcuser);
         strcpy(password,rpcpassword);
     }
-    //printf("rpcuser.(%s) rpcpassword.(%s) %u ipaddress.%s\n",rpcuser,rpcpassword,port,ipaddress);
     if ( rpcuser != 0 )
         free(rpcuser);
     if ( rpcpassword != 0 )
@@ -718,17 +715,6 @@ int32_t games_sendrawtransaction(char *rawtx)
             }
             free_json(retjson);
         }
-        
-        /* log sendrawtx result in file */
-        
-        /*
-         FILE *debug_file;
-         debug_file = fopen("tx_debug.log", "a");
-         fprintf(debug_file, "%s\n", retstr);
-         fflush(debug_file);
-         fclose(debug_file);
-         */
-        
         free(retstr);
     }
     free(params);

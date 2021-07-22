@@ -142,7 +142,18 @@ bool TryCreateDirectory(const boost::filesystem::path& p);
 boost::filesystem::path GetDefaultDataDir();
 const boost::filesystem::path &GetDataDir(bool fNetSpecific = true);
 void ClearDatadirCache();
-boost::filesystem::path GetConfigFile();
+/***
+ * @brief Get the full path of the config file, taking into account platform-specific data paths
+ * @param force_komodo ignore `-conf` command line parameter
+ * @returns the full path to the config file
+ */
+boost::filesystem::path GetConfigFile(bool force_komodo=false);
+/***
+ * @brief takes into account the `-notary` command line param and platform-specific data paths
+ * @param confname the configuration file name (may or may not include the path)
+ * @returns the full path to the config file
+ */
+boost::filesystem::path GetNotaryConfigFile(std::string confname);
 #ifndef _WIN32
 boost::filesystem::path GetPidFile();
 void CreatePidFile(const boost::filesystem::path &path, pid_t pid);
@@ -151,6 +162,11 @@ class missing_zcash_conf : public std::runtime_error {
 public:
     missing_zcash_conf() : std::runtime_error("Missing komodo.conf") { }
 };
+/*****
+ * Read a configuration file
+ * @param mapSettingsRet a map of key/values of data from the config file
+ * @param mapMultiSettingsRet a map of key/(collection of string) of data from config file for multiple values with same key
+ */
 void ReadConfigFile(std::map<std::string, std::string>& mapSettingsRet, std::map<std::string, std::vector<std::string> >& mapMultiSettingsRet);
 #ifdef _WIN32
 boost::filesystem::path GetSpecialFolderPath(int nFolder, bool fCreate = true);

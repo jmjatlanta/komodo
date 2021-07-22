@@ -722,6 +722,8 @@ bool Eval::ImportCoin(const std::vector<uint8_t> params, const CTransaction &imp
         if (!proof.IsMerkleBranch(merkleBranchProof)) 
             return Invalid("invalid-import-proof-for-0xFFFFFFFF");
 
+        // JMJ TODO: Handle this
+        /*
         if ( targetSymbol == "BEAM" )
         {
             if ( ASSETCHAINS_BEAMPORT == 0 )
@@ -736,6 +738,7 @@ bool Eval::ImportCoin(const std::vector<uint8_t> params, const CTransaction &imp
             else if ( UnmarshalBurnTx(burnTx,srcaddr,receipt)==0 || CheckCODAimport(importTx,burnTx,payouts,srcaddr,receipt) < 0 )
                 return Invalid("CODA-import-failure");
         }
+        */
         else if ( targetSymbol == "PEGSCC" )
         {
             if ( ASSETCHAINS_SELFIMPORT != "PEGSCC" )

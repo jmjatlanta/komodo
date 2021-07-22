@@ -15,6 +15,7 @@
 
 #include "komodo_defs.h"
 #include "komodo_hardfork.h"
+#include "rpc/rpc_parameters.h"
 
 void komodo_prefetch(FILE *fp);
 uint32_t komodo_heightstamp(int32_t height);
@@ -22,7 +23,14 @@ void komodo_stateupdate(int32_t height,uint8_t notarypubs[][33],uint8_t numnotar
 void komodo_init(int32_t height);
 int32_t komodo_MoMdata(int32_t *notarized_htp,uint256 *MoMp,uint256 *kmdtxidp,int32_t nHeight,uint256 *MoMoMp,int32_t *MoMoMoffsetp,int32_t *MoMoMdepthp,int32_t *kmdstartip,int32_t *kmdendip);
 int32_t komodo_notarizeddata(int32_t nHeight,uint256 *notarized_hashp,uint256 *notarized_desttxidp);
-char *komodo_issuemethod(char *userpass,char *method,char *params,uint16_t port);
+/***
+ * Issue an RPC call
+ * @param rpcDetails the RPC username/password and port to connect to
+ * @param method the RPC method to call
+ * @param params the parameters to pass with the RPC call
+ * @returns the results (as a JSON string)
+ */
+char *komodo_issuemethod(const RPCDetails& rpcDetails, char *method, char *params);
 void komodo_init(int32_t height);
 int32_t komodo_chosennotary(int32_t *notaryidp,int32_t height,uint8_t *pubkey33,uint32_t timestamp);
 int32_t komodo_isrealtime(int32_t *kmdheightp);
@@ -67,8 +75,7 @@ std::vector<std::string> vWhiteListAddress;
 char NOTARYADDRS[64][64];
 char NOTARY_ADDRESSES[NUM_KMD_SEASONS][64][64];
 
-char ASSETCHAINS_SYMBOL[KOMODO_ASSETCHAIN_MAXLEN],ASSETCHAINS_USERPASS[4096];
-uint16_t ASSETCHAINS_RPCPORT,ASSETCHAINS_BEAMPORT,ASSETCHAINS_CODAPORT;
+char ASSETCHAINS_SYMBOL[KOMODO_ASSETCHAIN_MAXLEN];
 uint32_t ASSETCHAIN_INIT,ASSETCHAINS_CC,KOMODO_STOPAT,KOMODO_DPOWCONFS = 1,STAKING_MIN_DIFF;
 uint32_t ASSETCHAINS_MAGIC = 2387029918;
 int64_t ASSETCHAINS_GENESISTXVAL = 5000000000;
@@ -117,7 +124,13 @@ int32_t ASSETCHAINS_STAKED;
 uint64_t ASSETCHAINS_COMMISSION,ASSETCHAINS_SUPPLY = 10,ASSETCHAINS_FOUNDERS_REWARD;
 
 uint32_t KOMODO_INITDONE;
-char KMDUSERPASS[8192+512+1],BTCUSERPASS[8192]; uint16_t KMD_PORT = 7771,BITCOIND_RPCPORT = 7771, DEST_PORT;
+
+// trying to get rid of all of these
+//char KMDUSERPASS[8192+512+1],BTCUSERPASS[8192]; 
+//uint16_t KMD_PORT = 7771,BITCOIND_RPCPORT = 7771, DEST_PORT;
+// temporarily store them here
+RPCParameters rpcParameters;
+
 uint64_t PENDING_KOMODO_TX;
 extern int32_t KOMODO_LOADINGBLOCKS;
 unsigned int MAX_BLOCK_SIGOPS = 20000;

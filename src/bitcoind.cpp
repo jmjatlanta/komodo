@@ -21,6 +21,7 @@
 #include "clientversion.h"
 #include "rpc/server.h"
 #include "p2p/p2p_parameters.h"
+#include "rpc/rpc_parameters.h"
 #include "init.h"
 #include "main.h"
 #include "noui.h"
@@ -156,9 +157,10 @@ bool AppInit(int argc, char* argv[])
             fprintf(stderr, "Error: Invalid combination of -regtest and -testnet.\n");
             return false;
         }
-        void komodo_args(char *argv0, P2PParameters& p2pParams);
+        void komodo_args(char *argv0, P2PParameters& p2pParams, RPCParameters& rpcParameters);
         P2PParameters p2pParams;
-        komodo_args(argv[0], p2pParams);
+        RPCParameters rpcParams;
+        komodo_args(argv[0], p2pParams, rpcParams);
         void chainparams_commandline(P2PParameters& p2pParams);
         chainparams_commandline(p2pParams);
 

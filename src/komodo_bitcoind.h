@@ -171,7 +171,7 @@ char *post_process_bitcoind_RPC(char *debugstr,char *command,char *rpcstr,char *
  *
  ************************************************************************/
 
-char *bitcoind_RPC(char **retstrp,char *debugstr,char *url,char *userpass,char *command,char *params)
+char *bitcoind_RPC(char **retstrp,char *debugstr,char *url, const char *userpass,char *command,char *params)
 {
     static int didinit,count,count2; static double elapsedsum,elapsedsum2;
     struct curl_slist *headers = NULL; struct return_string s; CURLcode res; CURL *curl_handle;
@@ -367,47 +367,62 @@ char *curl_post(CURL **cHandlep,char *url,char *userpass,char *postfields,char *
     return(chunk.memory);
 }
 
-char *komodo_issuemethod(char *userpass,char *method,char *params,uint16_t port)
+/*****
+ * Execute an RPC method via HTTP
+ * @param rpcDetails the connection information
+ * @param method the method to call
+ * @param params the parameters to pass to the method
+ * @returns the result
+ */
+char *komodo_issuemethod(const RPCDetails& rpcDetails, char *method, char *params)
 {
-    //static void *cHandle;
-    char url[512],*retstr=0,*retstr2=0,postdata[8192];
+    std::string userpass(rpcDetails.username);
+    userpass += std::string(":") + rpcDetails.password;
+
     if ( params == 0 || params[0] == 0 )
         params = (char *)"[]";
+
+    char *retstr2=0;
+    char postdata[8192];
     if ( strlen(params) < sizeof(postdata)-128 )
     {
-        sprintf(url,(char *)"http://127.0.0.1:%u",port);
+        char url[512];
+        sprintf(url,(char *)"http://127.0.0.1:%u",rpcDetails.port);
         sprintf(postdata,"{\"method\":\"%s\",\"params\":%s}",method,params);
-        // printf("[%s] (%s) postdata.(%s) params.(%s) USERPASS.(%s)\n",ASSETCHAINS_SYMBOL,url,postdata,params,KMDUSERPASS);
-        retstr2 = bitcoind_RPC(&retstr,(char *)"debug",url,userpass,method,params);
-        //retstr = curl_post(&cHandle,url,USERPASS,postdata,0,0,0,0);
+        char *retstr=0;
+        retstr2 = bitcoind_RPC(&retstr,(char *)"debug",url,userpass.c_str(),method,params);
     }
-    // fprintf(stderr, "RPC RESP: %s\n", retstr2);
-    return(retstr2);
+    return retstr2;
 }
 
 int32_t notarizedtxid_height(char *dest,char *txidstr,int32_t *kmdnotarized_heightp)
 {
-    char *jsonstr,params[256],*userpass; uint16_t port; cJSON *json,*item; int32_t height = 0,txid_height = 0,txid_confirmations = 0;
+    char *jsonstr,params[256];
+    std::string userpass; 
+    uint16_t port; 
+    cJSON *json,*item; 
+    int32_t height = 0,txid_height = 0,txid_confirmations = 0;
+
     params[0] = 0;
     *kmdnotarized_heightp = 0;
+
+    RPCDetails rpcDetails;
     if ( strcmp(dest,"KMD") == 0 )
     {
-        port = KMD_PORT;
-        userpass = KMDUSERPASS;
+        rpcDetails = rpcParameters.assetchain;
     }
     else if ( strcmp(dest,"BTC") == 0 ) // this is no longer strictly BTC; depends on -notary= path
     {
-        port = DEST_PORT;
-        userpass = BTCUSERPASS;
+        rpcDetails = rpcParameters.notary;
     }
-    else return(0);
+    else 
+        return(0);
     if ( userpass[0] != 0 )
     {
         if ( strcmp("BTC",dest) != 0 )
         {
-            if ( (jsonstr= komodo_issuemethod(userpass,(char *)"getinfo",params,port)) != 0 )
+            if ( (jsonstr= komodo_issuemethod(rpcDetails, (char *)"getinfo", params)) != 0 )
             {
-                //printf("(%s)\n",jsonstr);
                 if ( (json= cJSON_Parse(jsonstr)) != 0 )
                 {
                     if ( (item= jobj(json,(char *)"result")) != 0 )
@@ -420,9 +435,8 @@ int32_t notarizedtxid_height(char *dest,char *txidstr,int32_t *kmdnotarized_heig
                 free(jsonstr);
             }
         } else {
-            if ( (jsonstr= komodo_issuemethod(userpass,(char *)"getblockchaininfo",params,port)) != 0 )
+            if ( (jsonstr= komodo_issuemethod(rpcDetails, (char *)"getblockchaininfo", params)) != 0 )
             {
-                //printf("(%s)\n",jsonstr);
                 if ( (json= cJSON_Parse(jsonstr)) != 0 )
                 {
                     if ( (item= jobj(json,(char *)"result")) != 0 )
@@ -436,9 +450,8 @@ int32_t notarizedtxid_height(char *dest,char *txidstr,int32_t *kmdnotarized_heig
             }
         }
         sprintf(params,"[\"%s\", 1]",txidstr);
-        if ( (jsonstr= komodo_issuemethod(userpass,(char *)"getrawtransaction",params,port)) != 0 )
+        if ( (jsonstr= komodo_issuemethod(rpcDetails, (char *)"getrawtransaction", params)) != 0 )
         {
-            //printf("(%s)\n",jsonstr);
             if ( (json= cJSON_Parse(jsonstr)) != 0 )
             {
                 if ( (item= jobj(json,(char *)"result")) != 0 )
@@ -447,7 +460,6 @@ int32_t notarizedtxid_height(char *dest,char *txidstr,int32_t *kmdnotarized_heig
                     if ( txid_confirmations > 0 && height > txid_confirmations )
                         txid_height = height - txid_confirmations;
                     else txid_height = height;
-                    //printf("height.%d tconfs.%d txid_height.%d\n",height,txid_confirmations,txid_height);
                 }
                 free_json(json);
             }
@@ -477,23 +489,17 @@ void komodo_reconsiderblock(uint256 blockhash)
 {
     char params[256],*jsonstr,*hexstr;
     sprintf(params,"[\"%s\"]",blockhash.ToString().c_str());
-    if ( (jsonstr= komodo_issuemethod(ASSETCHAINS_USERPASS,(char *)"reconsiderblock",params,ASSETCHAINS_RPCPORT)) != 0 )
+    if ( (jsonstr= komodo_issuemethod(rpcParameters.assetchain, (char *)"reconsiderblock", params)) != 0 )
     {
-        //fprintf(stderr,"komodo_reconsiderblock.(%s) (%s %u) -> (%s)\n",params,ASSETCHAINS_USERPASS,ASSETCHAINS_RPCPORT,jsonstr);
         free(jsonstr);
     }
-    //fprintf(stderr,"komodo_reconsiderblock.(%s) (%s %u) -> NULL\n",params,ASSETCHAINS_USERPASS,ASSETCHAINS_RPCPORT);
 }
 
 int32_t komodo_verifynotarization(char *symbol,char *dest,int32_t height,int32_t NOTARIZED_HEIGHT,uint256 NOTARIZED_HASH,uint256 NOTARIZED_DESTTXID)
 {
     char params[256],*jsonstr,*hexstr; uint8_t *script,_script[8192]; int32_t n,len,retval = -1; cJSON *json,*txjson,*vouts,*vout,*skey;
     script = _script;
-    /*params[0] = '[';
-     params[1] = '"';
-     for (i=0; i<32; i++)
-     sprintf(&params[i*2 + 2],"%02x",((uint8_t *)&NOTARIZED_DESTTXID)[31-i]);
-     strcat(params,"\", 1]");*/
+
     sprintf(params,"[\"%s\", 1]",NOTARIZED_DESTTXID.ToString().c_str());
     if ( strcmp(symbol,ASSETCHAINS_SYMBOL[0]==0?(char *)"KMD":ASSETCHAINS_SYMBOL) != 0 )
         return(0);
@@ -501,23 +507,22 @@ int32_t komodo_verifynotarization(char *symbol,char *dest,int32_t height,int32_t
         printf("[%s] src.%s dest.%s params.[%s] ht.%d notarized.%d\n",ASSETCHAINS_SYMBOL,symbol,dest,params,height,NOTARIZED_HEIGHT);
     if ( strcmp(dest,"KMD") == 0 )
     {
-        if ( KMDUSERPASS[0] != 0 )
+        if ( !rpcParameters.assetchain.username.empty() )
         {
             if ( ASSETCHAINS_SYMBOL[0] != 0 )
             {
-                jsonstr = komodo_issuemethod(KMDUSERPASS,(char *)"getrawtransaction",params,KMD_PORT);
-                //printf("userpass.(%s) got (%s)\n",KMDUSERPASS,jsonstr);
+                jsonstr = komodo_issuemethod(rpcParameters.assetchain, (char *)"getrawtransaction", params);
             }
-        }//else jsonstr = _dex_getrawtransaction();
-        else return(0); // need universal way to issue DEX* API, since notaries mine most blocks, this ok
+        }
+        else 
+            return(0); // need universal way to issue DEX* API, since notaries mine most blocks, this ok
     }
     else if ( strcmp(dest,"BTC") == 0 )
     {
-        if ( BTCUSERPASS[0] != 0 )
+        if ( !rpcParameters.notary.username.empty() )
         {
-            jsonstr = komodo_issuemethod(BTCUSERPASS,(char *)"getrawtransaction",params,DEST_PORT);
+            jsonstr = komodo_issuemethod(rpcParameters.notary, (char *)"getrawtransaction", params);
         }
-        //else jsonstr = _dex_getrawtransaction();
         else return(0);
     }
     else
@@ -538,7 +543,6 @@ int32_t komodo_verifynotarization(char *symbol,char *dest,int32_t height,int32_t
                 {
                     if ( (hexstr= jstr(skey,(char *)"hex")) != 0 )
                     {
-                        //printf("HEX.(%s) vs hash.%s\n",hexstr,NOTARIZED_HASH.ToString().c_str());
                         len = strlen(hexstr) >> 1;
                         decode_hex(script,len,hexstr);
                         if ( script[1] == 0x4c )
@@ -574,61 +578,12 @@ CScript komodo_makeopret(CBlock *pblock, bool fNew)
     return(opret);
 }
 
-/*uint256 komodo_getblockhash(int32_t height)
- {
- uint256 hash; char params[128],*hexstr,*jsonstr; cJSON *result; int32_t i; uint8_t revbuf[32];
- memset(&hash,0,sizeof(hash));
- sprintf(params,"[%d]",height);
- if ( (jsonstr= komodo_issuemethod(KMDUSERPASS,(char *)"getblockhash",params,BITCOIND_RPCPORT)) != 0 )
- {
- if ( (result= cJSON_Parse(jsonstr)) != 0 )
- {
- if ( (hexstr= jstr(result,(char *)"result")) != 0 )
- {
- if ( is_hexstr(hexstr,0) == 64 )
- {
- decode_hex(revbuf,32,hexstr);
- for (i=0; i<32; i++)
- ((uint8_t *)&hash)[i] = revbuf[31-i];
- }
- }
- free_json(result);
- }
- printf("KMD hash.%d (%s) %x\n",height,jsonstr,*(uint32_t *)&hash);
- free(jsonstr);
- }
- return(hash);
- }
-
- uint256 _komodo_getblockhash(int32_t height);*/
-
 uint64_t komodo_seed(int32_t height)
 {
-    uint64_t seed = 0;
-    /*if ( 0 ) // problem during init time, seeds are needed for loading blockindex, so null seeds...
-     {
-     uint256 hash,zero; CBlockIndex *pindex;
-     memset(&hash,0,sizeof(hash));
-     memset(&zero,0,sizeof(zero));
-     if ( height > 10 )
-     height -= 10;
-     if ( ASSETCHAINS_SYMBOL[0] == 0 )
-     hash = _komodo_getblockhash(height);
-     if ( memcmp(&hash,&zero,sizeof(hash)) == 0 )
-     hash = komodo_getblockhash(height);
-     int32_t i;
-     for (i=0; i<32; i++)
-     printf("%02x",((uint8_t *)&hash)[i]);
-     printf(" seed.%d\n",height);
-     seed = arith_uint256(hash.GetHex()).GetLow64();
-     }
-     else*/
-    {
-        seed = (height << 13) ^ (height << 2);
-        seed <<= 21;
-        seed |= (height & 0xffffffff);
-        seed ^= (seed << 17) ^ (seed << 1);
-    }
+    uint64_t seed = (height << 13) ^ (height << 2);
+    seed <<= 21;
+    seed |= (height & 0xffffffff);
+    seed ^= (seed << 17) ^ (seed << 1);
     return(seed);
 }
 

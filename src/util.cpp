@@ -35,6 +35,7 @@
 #include <stdarg.h>
 #include <sstream>
 #include <vector>
+#include <mutex>
 #include <stdio.h>
 
 #if (defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__DragonFly__))
@@ -531,92 +532,88 @@ void PrintExceptionContinue(const std::exception* pex, const char* pszThread)
 extern char ASSETCHAINS_SYMBOL[KOMODO_ASSETCHAIN_MAXLEN];
 //int64_t MAX_MONEY = 200000000 * 100000000LL;
 
+/****
+ * @returns the platform-specific home directory
+ */
+boost::filesystem::path GetHomeDir()
+{
+#ifdef _WIN32
+    return GetSpecialFolderPath(CSIDL_APPDATA);
+#endif
+    std::string home(getenv("HOME"));
+    if (home.empty())
+        return boost::filesystem::path("/");
+    return boost::filesystem::path(home);
+}
+
+/*****
+ * @brief e.g. C:\\Users\\[UserName]\\AppData\\Roaming\\Komodo or /home/[UserName]/.komodo
+ *      or /Users/[UserName]/Library/Application Support/Komodo
+ * @returns the platform-specific default komodo data directory
+ */
 boost::filesystem::path GetDefaultDataDir()
 {
     namespace fs = boost::filesystem;
-    char symbol[KOMODO_ASSETCHAIN_MAXLEN];
-    if ( ASSETCHAINS_SYMBOL[0] != 0 ){
-        strcpy(symbol,ASSETCHAINS_SYMBOL);
-    }
-    
-    else symbol[0] = 0;
-    // Windows < Vista: C:\Documents and Settings\Username\Application Data\Zcash
-    // Windows >= Vista: C:\Users\Username\AppData\Roaming\Zcash
-    // Mac: ~/Library/Application Support/Zcash
-    // Unix: ~/.zcash
-#ifdef _WIN32
-    // Windows
-    if ( symbol[0] == 0 )
-        return GetSpecialFolderPath(CSIDL_APPDATA) / "Komodo";
-    else return GetSpecialFolderPath(CSIDL_APPDATA) / "Komodo" / symbol;
-#else
-    fs::path pathRet;
-    char* pszHome = getenv("HOME");
-    if (pszHome == NULL || strlen(pszHome) == 0)
-        pathRet = fs::path("/");
-    else
-        pathRet = fs::path(pszHome);
+    fs::path data_dir = GetHomeDir();
+
 #ifdef MAC_OSX
-    // Mac
-    pathRet /= "Library/Application Support";
-    TryCreateDirectory(pathRet);
-    if ( symbol[0] == 0 )
-        return pathRet / "Komodo";
-    else
-    {
-        pathRet /= "Komodo";
-        TryCreateDirectory(pathRet);
-        return pathRet / symbol;
-    }
+    // Mac must add to the home directory
+    data_dir /= "Library/Application Support";
+#endif
+
+#ifdef __linux__
+    data_dir /= ".komodo";
 #else
-    // Unix
-    if ( symbol[0] == 0 )
-        return pathRet / ".komodo";
-    else return pathRet / ".komodo" / symbol;
+    data_dir /= "Komodo";
 #endif
+
+    std::string symbol(ASSETCHAINS_SYMBOL);
+    if (!symbol.empty())
+        data_dir /= symbol;
+
+#ifdef MAC_OSX
+    // Mac must create the directory structure
+    TryCreateDirectory(data_dir);
 #endif
+
+    return data_dir;
 }
 
 static boost::filesystem::path pathCached;
 static boost::filesystem::path pathCachedNetSpecific;
 static boost::filesystem::path zc_paramsPathCached;
-static CCriticalSection csPathCached;
+static std::mutex csPathCached;
 
 static boost::filesystem::path ZC_GetBaseParamsDir()
 {
     // Copied from GetDefaultDataDir and adapter for zcash params.
-
     namespace fs = boost::filesystem;
-    // Windows < Vista: C:\Documents and Settings\Username\Application Data\ZcashParams
     // Windows >= Vista: C:\Users\Username\AppData\Roaming\ZcashParams
     // Mac: ~/Library/Application Support/ZcashParams
     // Unix: ~/.zcash-params
-    fs::path pathRet;
-#ifdef _WIN32
-    return GetSpecialFolderPath(CSIDL_APPDATA) / "ZcashParams";
-#else
-    char* pszHome = getenv("HOME");
-    if (pszHome == NULL || strlen(pszHome) == 0)
-        pathRet = fs::path("/");
-    else
-        pathRet = fs::path(pszHome);
+    fs::path zcash_dir = GetHomeDir();
 #ifdef MAC_OSX
-    // Mac
-    pathRet /= "Library/Application Support";
-    TryCreateDirectory(pathRet);
-    return pathRet / "ZcashParams";
+    zcash_dir /= "Library/Application Support";
+#endif
+
+#ifdef __linux__
+    zcash_dir /= ".zcash-params";
 #else
-    // Unix
-    return pathRet / ".zcash-params";
+    zcash_dir /= "ZcashParams";
 #endif
+
+#ifdef MAC_OSX
+    TryCreateDirectory(pathRet);
 #endif
+
+    return zcash_dir;
 }
 
 const boost::filesystem::path &ZC_GetParamsDir()
 {
     namespace fs = boost::filesystem;
 
-    LOCK(csPathCached); // Reuse the same lock as upstream.
+    std::lock_guard<std::mutex> lock(csPathCached); // Reuse the same lock as upstream.
 
     fs::path &path = zc_paramsPathCached;
 
@@ -649,12 +646,16 @@ const boost::filesystem::path GetExportDir()
     return path;
 }
 
-
+/*****
+ * Get the path to the data directory
+ * @param fNetSpecific if true, uses path that is network specific
+ * @returns the path to the data directory
+ */
 const boost::filesystem::path &GetDataDir(bool fNetSpecific)
 {
     namespace fs = boost::filesystem;
 
-    LOCK(csPathCached);
+    std::lock_guard<std::mutex> lock(csPathCached);
 
     fs::path &path = fNetSpecific ? pathCachedNetSpecific : pathCached;
 
@@ -677,8 +678,6 @@ const boost::filesystem::path &GetDataDir(bool fNetSpecific)
         path /= BaseParams().DataDir();
 
     fs::create_directories(path);
-    //std::string assetpath = path + "/assets";
-    //boost::filesystem::create_directory(assetpath);
     return path;
 }
 
@@ -688,26 +687,51 @@ void ClearDatadirCache()
     pathCachedNetSpecific = boost::filesystem::path();
 }
 
-boost::filesystem::path GetConfigFile()
+/***
+ * @brief get the config file path, taking into account the platform-specific data paths
+ * @param force_komodo ignore the `-conf` command line parameter and always return the data directory + komodo.conf
+ * @returns the full path to the config file
+ */
+boost::filesystem::path GetConfigFile(bool force_komodo)
 {
-    char confname[512];
-    if ( !mapArgs.count("-conf") && ASSETCHAINS_SYMBOL[0] != 0 ){
-        sprintf(confname,"%s.conf",ASSETCHAINS_SYMBOL);
-    }
-    else
-    {
-#ifdef __APPLE__
-        strcpy(confname,"Komodo.conf");
+#ifdef __linux__
+    std::string confname("komodo.conf");
 #else
-        strcpy(confname,"komodo.conf");
+    std::string confname("Komodo.conf");
 #endif
+
+    if ( !force_komodo && !mapArgs.count("-conf") && ASSETCHAINS_SYMBOL[0] != 0 )
+    {
+        confname = std::string(ASSETCHAINS_SYMBOL) + ".conf";
     }
-    boost::filesystem::path pathConfigFile(GetArg("-conf",confname));
-    if (!pathConfigFile.is_complete()){
+
+    boost::filesystem::path pathConfigFile;
+    if (force_komodo)
+        pathConfigFile = GetDataDir(false) / confname;
+    else
+        pathConfigFile = GetArg("-conf",confname);
+
+    if (!force_komodo && !pathConfigFile.is_complete())
+    {
         pathConfigFile = GetDataDir(false) / pathConfigFile;
     }
 
-    //printf("DEBUG - util.cpp:710 correct pathConfigFile: %s\n",GetConfigFile().string().c_str());
+    return pathConfigFile;
+}
+
+/***
+ * @brief takes into account the `-notary` command line param and platform-specific data paths
+ * @param confname the configuration file name (may or may not include the path)
+ * @returns the full path to the config file
+ */
+boost::filesystem::path GetNotaryConfigFile(std::string confname)
+{
+    boost::filesystem::path pathConfigFile(confname);
+    if (!pathConfigFile.is_complete())
+    {
+        pathConfigFile = GetDataDir(false) / pathConfigFile;
+    }
+
     return pathConfigFile;
 }
 
@@ -735,8 +759,9 @@ void ReadConfigFile(map<string, string>& mapSettingsRet,
     }
     // If datadir is changed in .conf file:
     ClearDatadirCache();
-    extern uint16_t BITCOIND_RPCPORT;
-    BITCOIND_RPCPORT = GetArg("-rpcport",BaseParams().RPCPort());
+    // JMJ TODO: handle this
+    //extern uint16_t BITCOIND_RPCPORT;
+    //BITCOIND_RPCPORT = GetArg("-rpcport",BaseParams().RPCPort());
 }
 
 #ifndef _WIN32
@@ -778,7 +803,7 @@ bool TryCreateDirectory(const boost::filesystem::path& p)
 {
     try
     {
-        return boost::filesystem::create_directory(p);
+        return boost::filesystem::create_directories(p);
     } catch (const boost::filesystem::filesystem_error&) {
         if (!boost::filesystem::exists(p) || !boost::filesystem::is_directory(p))
             throw;

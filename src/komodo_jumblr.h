@@ -54,10 +54,10 @@ struct jumblr_item
 char Jumblr_secretaddrs[JUMBLR_MAXSECRETADDRS][64],Jumblr_deposit[64];
 int32_t Jumblr_numsecretaddrs; // if 0 -> run silent mode
 
-char *jumblr_issuemethod(char *userpass,char *method,char *params,uint16_t port)
+char *jumblr_issuemethod(const RPCDetails& rpcDetails, char *method, char *params)
 {
     cJSON *retjson,*resjson = 0; char *retstr;
-    if ( (retstr= komodo_issuemethod(userpass,method,params,port)) != 0 )
+    if ( (retstr= komodo_issuemethod(rpcDetails, method, params)) != 0 )
     {
         if ( (retjson= cJSON_Parse(retstr)) != 0 )
         {
@@ -75,15 +75,27 @@ char *jumblr_issuemethod(char *userpass,char *method,char *params,uint16_t port)
         free(retstr);
     }
     if ( resjson != 0 )
-        return(jprint(resjson,1));
-    else return(clonestr((char *)"{\"error\":\"unknown error\"}"));
+        return jprint(resjson,1);
+    else 
+        return clonestr((char *)"{\"error\":\"unknown error\"}");
 }
 
 char *jumblr_importaddress(char *address)
 {
     char params[1024];
     sprintf(params,"[\"%s\", \"%s\", false]",address,address);
-    return(jumblr_issuemethod(KMDUSERPASS,(char *)"importaddress",params,BITCOIND_RPCPORT));
+    return jumblr_issuemethod(rpcParameters.assetchain, (char *)"importaddress", params);
+}
+
+/****
+ * The jumblr needs RPC details mixed between assetchain and notary
+ * @returns an RPCDetails with the correct info
+ */
+RPCDetails jumblr_get_rpc_details()
+{
+    RPCDetails retval = rpcParameters.assetchain;
+    retval.port = rpcParameters.notary.port;
+    return retval;
 }
 
 char *jumblr_validateaddress(char *addr)
@@ -91,7 +103,7 @@ char *jumblr_validateaddress(char *addr)
     char params[1024];
     sprintf(params,"[\"%s\"]",addr);
     printf("validateaddress.%s\n",params);
-    return(jumblr_issuemethod(KMDUSERPASS,(char *)"validateaddress",params,BITCOIND_RPCPORT));
+    return jumblr_issuemethod(jumblr_get_rpc_details(), (char *)"validateaddress", params);
 }
 
 int32_t Jumblr_secretaddrfind(char *searchaddr)
@@ -222,28 +234,28 @@ char *jumblr_zgetnewaddress()
 {
     char params[1024];
     sprintf(params,"[]");
-    return(jumblr_issuemethod(KMDUSERPASS,(char *)"z_getnewaddress",params,BITCOIND_RPCPORT));
+    return jumblr_issuemethod(jumblr_get_rpc_details(), (char *)"z_getnewaddress", params);
 }
 
 char *jumblr_zlistoperationids()
 {
     char params[1024];
     sprintf(params,"[]");
-    return(jumblr_issuemethod(KMDUSERPASS,(char *)"z_listoperationids",params,BITCOIND_RPCPORT));
+    return jumblr_issuemethod(jumblr_get_rpc_details(), (char *)"z_listoperationids", params);
 }
 
 char *jumblr_zgetoperationresult(char *opid)
 {
     char params[1024];
     sprintf(params,"[[\"%s\"]]",opid);
-    return(jumblr_issuemethod(KMDUSERPASS,(char *)"z_getoperationresult",params,BITCOIND_RPCPORT));
+    return jumblr_issuemethod(jumblr_get_rpc_details(), (char *)"z_getoperationresult", params);
 }
 
 char *jumblr_zgetoperationstatus(char *opid)
 {
     char params[1024];
     sprintf(params,"[[\"%s\"]]",opid);
-    return(jumblr_issuemethod(KMDUSERPASS,(char *)"z_getoperationstatus",params,BITCOIND_RPCPORT));
+    return jumblr_issuemethod(jumblr_get_rpc_details(), (char *)"z_getoperationstatus", params);
 }
 
 char *jumblr_sendt_to_z(char *taddr,char *zaddr,double amount)
@@ -253,7 +265,7 @@ char *jumblr_sendt_to_z(char *taddr,char *zaddr,double amount)
         return(clonestr((char *)"{\"error\":\"illegal address in t to z\"}"));
     sprintf(params,"[\"%s\", [{\"address\":\"%s\",\"amount\":%.8f}, {\"address\":\"%s\",\"amount\":%.8f}], 1, %.8f]",taddr,zaddr,amount-fee-JUMBLR_TXFEE,JUMBLR_ADDR,fee,JUMBLR_TXFEE);
     printf("t -> z: %s\n",params);
-    return(jumblr_issuemethod(KMDUSERPASS,(char *)"z_sendmany",params,BITCOIND_RPCPORT));
+    return jumblr_issuemethod(jumblr_get_rpc_details(), (char *)"z_sendmany", params);
 }
 
 char *jumblr_sendz_to_z(char *zaddrS,char *zaddrD,double amount)
@@ -264,7 +276,7 @@ char *jumblr_sendz_to_z(char *zaddrS,char *zaddrD,double amount)
     //sprintf(params,"[\"%s\", [{\"address\":\"%s\",\"amount\":%.8f}, {\"address\":\"%s\",\"amount\":%.8f}], 1, %.8f]",zaddrS,zaddrD,amount-fee-JUMBLR_TXFEE,JUMBLR_ADDR,fee,JUMBLR_TXFEE);
     sprintf(params,"[\"%s\", [{\"address\":\"%s\",\"amount\":%.8f}], 1, %.8f]",zaddrS,zaddrD,amount-fee-JUMBLR_TXFEE,JUMBLR_TXFEE);
     printf("z -> z: %s\n",params);
-    return(jumblr_issuemethod(KMDUSERPASS,(char *)"z_sendmany",params,BITCOIND_RPCPORT));
+    return jumblr_issuemethod(jumblr_get_rpc_details(), (char *)"z_sendmany", params);
 }
 
 char *jumblr_sendz_to_t(char *zaddr,char *taddr,double amount)
@@ -274,56 +286,56 @@ char *jumblr_sendz_to_t(char *zaddr,char *taddr,double amount)
         return(clonestr((char *)"{\"error\":\"illegal address in z to t\"}"));
     sprintf(params,"[\"%s\", [{\"address\":\"%s\",\"amount\":%.8f}, {\"address\":\"%s\",\"amount\":%.8f}], 1, %.8f]",zaddr,taddr,amount-fee-JUMBLR_TXFEE,JUMBLR_ADDR,fee,JUMBLR_TXFEE);
     printf("z -> t: %s\n",params);
-    return(jumblr_issuemethod(KMDUSERPASS,(char *)"z_sendmany",params,BITCOIND_RPCPORT));
+    return jumblr_issuemethod(jumblr_get_rpc_details(), (char *)"z_sendmany", params);
 }
 
 char *jumblr_zlistaddresses()
 {
     char params[1024];
     sprintf(params,"[]");
-    return(jumblr_issuemethod(KMDUSERPASS,(char *)"z_listaddresses",params,BITCOIND_RPCPORT));
+    return jumblr_issuemethod(jumblr_get_rpc_details(), (char *)"z_listaddresses", params);
 }
 
 char *jumblr_zlistreceivedbyaddress(char *addr)
 {
     char params[1024];
     sprintf(params,"[\"%s\", 1]",addr);
-    return(jumblr_issuemethod(KMDUSERPASS,(char *)"z_listreceivedbyaddress",params,BITCOIND_RPCPORT));
+    return jumblr_issuemethod(jumblr_get_rpc_details(), (char *)"z_listreceivedbyaddress", params);
 }
 
 char *jumblr_getreceivedbyaddress(char *addr)
 {
     char params[1024];
     sprintf(params,"[\"%s\", 1]",addr);
-    return(jumblr_issuemethod(KMDUSERPASS,(char *)"getreceivedbyaddress",params,BITCOIND_RPCPORT));
+    return jumblr_issuemethod(jumblr_get_rpc_details(), (char *)"getreceivedbyaddress", params);
 }
 
 char *jumblr_importprivkey(char *wifstr)
 {
     char params[1024];
     sprintf(params,"[\"%s\", \"\", false]",wifstr);
-    return(jumblr_issuemethod(KMDUSERPASS,(char *)"importprivkey",params,BITCOIND_RPCPORT));
+    return jumblr_issuemethod(jumblr_get_rpc_details(), (char *)"importprivkey", params);
 }
 
 char *jumblr_zgetbalance(char *addr)
 {
     char params[1024];
     sprintf(params,"[\"%s\", 1]",addr);
-    return(jumblr_issuemethod(KMDUSERPASS,(char *)"z_getbalance",params,BITCOIND_RPCPORT));
+    return jumblr_issuemethod(jumblr_get_rpc_details(), (char *)"z_getbalance", params);
 }
 
 char *jumblr_listunspent(char *coinaddr)
 {
     char params[1024];
     sprintf(params,"[1, 99999999, [\"%s\"]]",coinaddr);
-    return(jumblr_issuemethod(KMDUSERPASS,(char *)"listunspent",params,BITCOIND_RPCPORT));
+    return jumblr_issuemethod(jumblr_get_rpc_details(), (char *)"listunspent", params);
 }
 
 char *jumblr_gettransaction(char *txidstr)
 {
     char params[1024];
     sprintf(params,"[\"%s\", 1]",txidstr);
-    return(jumblr_issuemethod(KMDUSERPASS,(char *)"getrawtransaction",params,BITCOIND_RPCPORT));
+    return jumblr_issuemethod(jumblr_get_rpc_details(), (char *)"getrawtransaction", params);
 }
 
 int32_t jumblr_numvins(bits256 txid)
