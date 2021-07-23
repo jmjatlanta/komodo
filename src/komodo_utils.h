@@ -1324,16 +1324,23 @@ void iguana_initQ(queue_t *Q,char *name)
         free(item);
 }
 
+/****
+ * Read values from file
+ * @param[out] username the username found
+ * @param[out] password the password found
+ * @param[in] fp the file pointer
+ * @returns the port (0 if not found)
+ */
 uint16_t _komodo_userpass(char *username,char *password,FILE *fp)
 {
-    char *rpcuser,*rpcpassword,*str,line[8192]; uint16_t port = 0;
+    char *rpcuser,*rpcpassword,*str,line[8192]; 
+    uint16_t port = 0;
     rpcuser = rpcpassword = 0;
     username[0] = password[0] = 0;
     while ( fgets(line,sizeof(line),fp) != 0 )
     {
         if ( line[0] == '#' )
             continue;
-        //printf("line.(%s) %p %p\n",line,strstr(line,(char *)"rpcuser"),strstr(line,(char *)"rpcpassword"));
         if ( (str= strstr(line,(char *)"rpcuser")) != 0 )
             rpcuser = parse_conf_line(str,(char *)"rpcuser");
         else if ( (str= strstr(line,(char *)"rpcpassword")) != 0 )
@@ -1341,7 +1348,6 @@ uint16_t _komodo_userpass(char *username,char *password,FILE *fp)
         else if ( (str= strstr(line,(char *)"rpcport")) != 0 )
         {
             port = atoi(parse_conf_line(str,(char *)"rpcport"));
-            //fprintf(stderr,"rpcport.%u in file\n",port);
         }
     }
     if ( rpcuser != 0 && rpcpassword != 0 )
@@ -1349,7 +1355,6 @@ uint16_t _komodo_userpass(char *username,char *password,FILE *fp)
         strcpy(username,rpcuser);
         strcpy(password,rpcpassword);
     }
-    //printf("rpcuser.(%s) rpcpassword.(%s) KMDUSERPASS.(%s) %u\n",rpcuser,rpcpassword,KMDUSERPASS,port);
     if ( rpcuser != 0 )
         free(rpcuser);
     if ( rpcpassword != 0 )
@@ -1399,96 +1404,132 @@ std::string komodo_statefname(const std::string& symbol, const std::string& file
     return fname;
 }
 
-/****
- * @brief Retrieve the full path of a file
- * @note replaced by the std::string version
- * @param[out] fname the full path of the file
- * @param[in] symbol the symbol that forms part of the path
- * @param[in] str the filename
+/******
+ * Generate a random username and password
+ * @param[in] salt to help generate randomization
+ * @param[out] user the resultant username
+ * @param[out] pw the resultant password
  */
-void komodo_statefname(char *fname,char *symbol,char *str)
+void generate_random_user_pw(const std::string& salt, std::string& user, std::string& pw)
 {
-    std::string retval = komodo_statefname(symbol, str);
-    strcpy(fname, retval.c_str());
+    uint32_t crc,r,r2;
+    char buf[128];
+    uint8_t buf2[33]; 
+    r = (uint32_t)time(NULL);
+    r2 = OS_milliseconds();
+    memcpy(buf,&r,sizeof(r));
+    memcpy(&buf[sizeof(r)],&r2,sizeof(r2));
+    memcpy(&buf[sizeof(r)+sizeof(r2)],salt.c_str(),salt.size());
+    crc = calc_crc32(0,(uint8_t *)buf,(int32_t)(sizeof(r)+sizeof(r2)+salt.size()));
+#ifdef _WIN32
+    randombytes_buf(buf2,sizeof(buf2));
+#else
+    OS_randombytes(buf2,sizeof(buf2));
+#endif
+    char password[8192];
+    uint32_t i;
+    for (uint32_t i=0; i<sizeof(buf2); i++)
+        sprintf(&password[i*2],"%02x",buf2[i]);
+    password[i*2] = 0;
+    pw = std::string("pass") + password;
+    user = "user" + std::to_string(crc);
+    return;
 }
 
+/***
+ * Read or create a [symbol].conf file. Also sets the globals
+ *    BITCOIND_RPCPORT (based on passed in value)
+ *    KMD_PORT (based on komodo.conf)
+ *    KMDUSERPASS (based on komodo.conf)
+ * and the mapArgs (randomly generated)
+ *    -rpcusername
+ *    -rpcpassword
+ * if symbol or rpcport are not passed, only komodo.conf is read
+ * @note only seems to be called if ASSETCHAINS_SYMBOL is set, so only on KMD subchains
+ * @param[in] symbol the symbol for the asset chain
+ * @param[in] rpcport the rpc port for the asset chain
+ */
 void komodo_configfile(char *symbol,uint16_t rpcport)
 {
-    static char myusername[512],mypassword[8192];
-    FILE *fp; uint16_t kmdport; uint8_t buf2[33]; char fname[512],buf[128],username[512],password[8192]; uint32_t crc,r,r2,i;
     if ( symbol != 0 && rpcport != 0 )
     {
-        r = (uint32_t)time(NULL);
-        r2 = OS_milliseconds();
-        memcpy(buf,&r,sizeof(r));
-        memcpy(&buf[sizeof(r)],&r2,sizeof(r2));
-        memcpy(&buf[sizeof(r)+sizeof(r2)],symbol,strlen(symbol));
-        crc = calc_crc32(0,(uint8_t *)buf,(int32_t)(sizeof(r)+sizeof(r2)+strlen(symbol)));
-				#ifdef _WIN32
-				randombytes_buf(buf2,sizeof(buf2));
-				#else
-        OS_randombytes(buf2,sizeof(buf2));
-				#endif
-        for (i=0; i<sizeof(buf2); i++)
-            sprintf(&password[i*2],"%02x",buf2[i]);
-        password[i*2] = 0;
-        sprintf(buf,"%s.conf",symbol);
         BITCOIND_RPCPORT = rpcport;
-#ifdef _WIN32
-        sprintf(fname,"%s\\%s",GetDataDir(false).string().c_str(),buf);
-#else
-        sprintf(fname,"%s/%s",GetDataDir(false).string().c_str(),buf);
-#endif
-        if(mapArgs.count("-conf")) sprintf(fname, "%s", GetConfigFile().string().c_str());
-        if ( (fp= fopen(fname,"rb")) == 0 )
+        std::string filename;
+        if( mapArgs.count("-conf") )
+            filename = GetConfigFile().string();
+        else
+            filename = GetDataDir(false).string() 
+                + boost::filesystem::path::preferred_separator
+                + symbol + ".conf";
+        FILE *fp;
+        if ( (fp= fopen(filename.c_str(),"rb")) == 0 )
         {
-#ifndef FROM_CLI
-            if ( (fp= fopen(fname,"wb")) != 0 )
+            // we were unable to open the config file
+            // attempt to create one
+            if ( (fp= fopen(filename.c_str(),"wb")) != 0 )
             {
-                fprintf(fp,"rpcuser=user%u\nrpcpassword=pass%s\nrpcport=%u\nserver=1\ntxindex=1\nrpcworkqueue=256\nrpcallowip=127.0.0.1\nrpcbind=127.0.0.1\n",crc,password,rpcport);
+                std::string user;
+                std::string pw;
+                generate_random_user_pw(symbol, user, pw);
+                fprintf(fp,"rpcuser=%s\nrpcpassword=%s\nrpcport=%u\nserver=1\ntxindex=1\n"
+                        "rpcworkqueue=256\nrpcallowip=127.0.0.1\nrpcbind=127.0.0.1\n",user.c_str(),pw.c_str(),rpcport);
                 fclose(fp);
-                printf("Created (%s)\n",fname);
-            } else printf("Couldnt create (%s)\n",fname);
-#endif
+                printf("Created (%s)\n",filename.c_str());
+            } 
+            else 
+                printf("Couldnt create (%s)\n",filename.c_str());
         }
         else
         {
+            // read the config file
+            static char myusername[512];
+            static char mypassword[8192];
             _komodo_userpass(myusername,mypassword,fp);
             mapArgs["-rpcpassword"] = mypassword;
             mapArgs["-rpcusername"] = myusername;
-            //fprintf(stderr,"myusername.(%s)\n",myusername);
             fclose(fp);
         }
     }
-    strcpy(fname,GetDataDir().string().c_str());
-#ifdef _WIN32
-    while ( fname[strlen(fname)-1] != '\\' )
-        fname[strlen(fname)-1] = 0;
-    strcat(fname,"komodo.conf");
+
+    std::string filename = GetDataDir().string();
+    // erase everything after the last path separator
+    auto pos = filename.rfind( boost::filesystem::path::preferred_separator );
+    if (pos + 1 < filename.size())
+        filename = filename.substr(0,pos+1);
+#ifdef __linux__
+    filename += "komodo.conf";
 #else
-    while ( fname[strlen(fname)-1] != '/' )
-        fname[strlen(fname)-1] = 0;
-#ifdef __APPLE__
-    strcat(fname,"Komodo.conf");
-#else
-    strcat(fname,"komodo.conf");
+    filename += "Komodo.conf";
 #endif
-#endif
-    if ( (fp= fopen(fname,"rb")) != 0 )
+    FILE *fp;
+    if ( (fp= fopen(filename.c_str(),"rb")) != 0 )
     {
+        // set the KMD_PORT, and KMDUSERPASS based on komodo.conf
+        uint16_t kmdport;
+        char username[512];
+        char password[8192];
         if ( (kmdport= _komodo_userpass(username,password,fp)) != 0 )
             KMD_PORT = kmdport;
         sprintf(KMDUSERPASS,"%s:%s",username,password);
         fclose(fp);
-//printf("KOMODO.(%s) -> userpass.(%s)\n",fname,KMDUSERPASS);
-    } //else printf("couldnt open.(%s)\n",fname);
+    }
 }
 
-uint16_t komodo_userpass(char *userpass,char *symbol)
+/******
+ * @brief read configuration file for username, password, and port
+ * @param[out] userpass the username:password
+ * @param[in] symbol the chain symbol
+ * @returns the port or 0 if not found
+ */
+uint16_t komodo_userpass(char *userpass, const std::string& symbol)
 {
-    FILE *fp; uint16_t port = 0; char fname[512],username[512],password[512],confname[KOMODO_ASSETCHAIN_MAXLEN];
+    FILE *fp; 
+    uint16_t port = 0; 
+    char username[512],password[512],confname[KOMODO_ASSETCHAIN_MAXLEN];
+    std::string fname;
+
     userpass[0] = 0;
-    if ( strcmp("KMD",symbol) == 0 )
+    if ( symbol == "KMD" )
     {
 #ifdef __APPLE__
         sprintf(confname,"Komodo.conf");
@@ -1496,16 +1537,22 @@ uint16_t komodo_userpass(char *userpass,char *symbol)
         sprintf(confname,"komodo.conf");
 #endif
     }
-    else if(!mapArgs.count("-conf")) {
-        sprintf(confname,"%s.conf",symbol);
-        komodo_statefname(fname,symbol,confname);
-    } else sprintf(fname,"%s",GetDataDir().string().c_str());
+    else
+    { 
+        if(!mapArgs.count("-conf")) 
+        {
+            sprintf(confname,"%s.conf",symbol.c_str());
+            fname = komodo_statefname(symbol,confname);
+        } 
+        else 
+            fname = GetDataDir().string();
+    }
     
-    if ( (fp= fopen(fname,"rb")) != 0 )
+    if ( (fp= fopen(fname.c_str(),"rb")) != 0 )
     {
         port = _komodo_userpass(username,password,fp);
         sprintf(userpass,"%s:%s",username,password);
-        if ( strcmp(symbol,ASSETCHAINS_SYMBOL) == 0 )
+        if ( symbol == std::string(ASSETCHAINS_SYMBOL) )
             strcpy(ASSETCHAINS_USERPASS,userpass);
         fclose(fp);
     }
@@ -2282,19 +2329,21 @@ fprintf(stderr,"extralen.%d before disable bits\n",extralen);
             boost::this_thread::sleep(boost::posix_time::milliseconds(3000));
 #endif
         }
-        //fprintf(stderr,"Got datadir.(%s)\n",dirname);
         if ( ASSETCHAINS_SYMBOL[0] != 0 )
         {
-            extern int COINBASE_MATURITY;
             if ( strcmp(ASSETCHAINS_SYMBOL,"KMD") == 0 )
             {
                 fprintf(stderr,"cant have assetchain named KMD\n");
                 StartShutdown();
             }
             if ( (port= komodo_userpass(ASSETCHAINS_USERPASS,ASSETCHAINS_SYMBOL)) != 0 )
+                // config file found and read
                 ASSETCHAINS_RPCPORT = port;
-            else komodo_configfile(ASSETCHAINS_SYMBOL,ASSETCHAINS_P2PPORT + 1);
+            else 
+                // config file was not found, generate default
+                komodo_configfile(ASSETCHAINS_SYMBOL,ASSETCHAINS_P2PPORT + 1);
 
+            extern int COINBASE_MATURITY;
             if (ASSETCHAINS_CBMATURITY != 0)
                 COINBASE_MATURITY = ASSETCHAINS_CBMATURITY;
             else if (ASSETCHAINS_LASTERA == 0 || is_STAKED(ASSETCHAINS_SYMBOL) != 0)
@@ -2304,17 +2353,13 @@ fprintf(stderr,"extralen.%d before disable bits\n",extralen);
                 fprintf(stderr,"ac_cbmaturity must be >0, shutting down\n");
                 StartShutdown();
             }
-            //fprintf(stderr,"ASSETCHAINS_RPCPORT (%s) %u\n",ASSETCHAINS_SYMBOL,ASSETCHAINS_RPCPORT);
         }
         if ( ASSETCHAINS_RPCPORT == 0 )
             ASSETCHAINS_RPCPORT = ASSETCHAINS_P2PPORT + 1;
-        //ASSETCHAINS_NOTARIES = GetArg("-ac_notaries","");
-        //komodo_assetchain_pubkeys((char *)ASSETCHAINS_NOTARIES.c_str());
         iguana_rwnum(1,magic,sizeof(ASSETCHAINS_MAGIC),(void *)&ASSETCHAINS_MAGIC);
         for (i=0; i<4; i++)
             sprintf(&magicstr[i<<1],"%02x",magic[i]);
         magicstr[8] = 0;
-#ifndef FROM_CLI
         sprintf(fname,"%s_7776",ASSETCHAINS_SYMBOL);
         if ( (fp= fopen(fname,"wb")) != 0 )
         {
@@ -2325,7 +2370,6 @@ fprintf(stderr,"extralen.%d before disable bits\n",extralen);
             fclose(fp);
             //printf("created (%s)\n",fname);
         } else printf("error creating (%s)\n",fname);
-#endif
         if ( ASSETCHAINS_CC < 2 )
         {
             if ( KOMODO_CCACTIVATE != 0 )

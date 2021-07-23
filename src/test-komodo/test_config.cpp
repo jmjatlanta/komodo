@@ -3,15 +3,39 @@
  */
 #include <gtest/gtest.h>
 #include <boost/filesystem.hpp>
+#include "komodo_config.h"
 
 std::string komodo_statefname(const std::string& symbol, const std::string& str);
 void ClearDatadirCache();
 boost::filesystem::path GetDefaultDataDir();
+uint16_t komodo_userpass(char *userpass, const std::string& symbol);
 extern char ASSETCHAINS_SYMBOL[65];
 extern std::map<std::string, std::string> mapArgs;
 
 namespace TestConfig
 {
+
+TEST(TestConfig, userpass)
+{
+    ASSETCHAINS_SYMBOL[0] = 0;
+    char userpass[512];
+    std::string token = "J_M_J";
+
+    boost::filesystem::path jmj_path = boost::filesystem::temp_directory_path();
+    jmj_path /= token;
+    boost::filesystem::create_directories(jmj_path);
+    mapArgs["-datadir"] = jmj_path.string();
+    //mapArgs["-conf"] = token + ".conf";
+    ClearDatadirCache();
+    boost::filesystem::path config_file = jmj_path / (token + ".conf");
+    {
+        std::ofstream out(config_file.string());
+        out << "rpcuser=abc\nrpcpassword=123\nrpcport=456\n";
+    }
+    uint16_t port = komodo_userpass(userpass, token);
+    ASSERT_EQ(port, 456);
+    ASSERT_EQ(std::string(userpass), "abc:123");
+}
 
 TEST(TestConfig, DefaultDataDir)
 {
@@ -37,6 +61,9 @@ TEST(TestConfig, DefaultDataDir)
  */    
 TEST(TestConfig, statefname)
 {
+    mapArgs.clear();
+    ASSETCHAINS_SYMBOL[0] = 0;
+    ClearDatadirCache();
 #ifdef __linux__
     std::string fname;
     // gather the expected results
@@ -45,7 +72,6 @@ TEST(TestConfig, statefname)
     symbol[0] = 0;
     char str[32];
     str[0] = 0;
-    ASSETCHAINS_SYMBOL[0] = 0;
     // defaults
     std::string expected(home_dir);
     expected += "/.komodo/";
@@ -165,6 +191,51 @@ TEST(TestConfig, statefname)
     fname = komodo_statefname(symbol, str);
     ASSERT_EQ(fname, std::string(expected));
 
+#endif
+}
+
+TEST(TestConfig, configFile)
+{
+#ifdef __linux__
+    boost::filesystem::path badpath("/root/.jmjcoin");
+    boost::filesystem::path noexist_path = boost::filesystem::temp_directory_path() / "jmjBlahBlah.txt";
+    boost::filesystem::path good_path = boost::filesystem::temp_directory_path() / "jmjGoodFile.conf";
+    if ( boost::filesystem::exists(noexist_path) )
+        boost::filesystem::remove( noexist_path );
+    if ( boost::filesystem::exists( good_path ) )
+        boost::filesystem::remove( good_path );
+    
+    // try to read a file we probably can't get to
+    ConfigFile bad(badpath);
+    ASSERT_FALSE( bad.Has("rpcport") );
+    // try to read a file that does not exist
+    ConfigFile not_exist(noexist_path);
+    ASSERT_FALSE( not_exist.Has("rpcport") );
+    // try to create a good config file
+    {
+        ConfigFile good( good_path );
+        ASSERT_FALSE( good.Has("rpcport") );
+        std::multimap<std::string, std::string> entries;
+        entries.emplace("rpcport", "123");
+        entries.emplace("rpcuser", "abc");
+        entries.emplace("rpcpassword", "def");
+        entries.emplace("Hello", "World!");
+        entries.emplace("Hello", "Again!");
+        good.SetEntries(entries);
+        ASSERT_TRUE( good.Save(good_path, false) );
+    }
+    // now try to read the file we just created
+    ConfigFile good( good_path );
+    ASSERT_TRUE( good.Has("rpcport") );
+    ASSERT_EQ( good.Value("rpcport"), "123");
+    ASSERT_EQ( good.Value("rpcuser"), "abc" );
+    ASSERT_EQ( good.Value("rpcpassword"), "def");
+    ASSERT_EQ( good.Value("Hello"), "World!");
+    std::vector<std::string> values = good.Values("Hello");
+    ASSERT_EQ( values.size(), 2 );
+    ASSERT_EQ( good.Entries().size(), 5 );
+    // now clean up the mess
+    boost::filesystem::remove( good_path );
 #endif
 }
 

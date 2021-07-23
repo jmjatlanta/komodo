@@ -22,6 +22,7 @@
 #include <unistd.h>
 #include <curl/curl.h>
 #include <curl/easy.h>
+#include <cc/config_util.h>
 
 extern struct games_state globalR;
 void *gamesiterate(struct games_state *rs);
@@ -609,68 +610,6 @@ char *curl_post(CURL **cHandlep,char *url,char *userpass,char *postfields,char *
     return(chunk.memory);
 }
 
-uint16_t _komodo_userpass(char *username, char *password, FILE *fp)
-{
-    char *rpcuser,*rpcpassword,*str,*ipaddress,line[8192]; uint16_t port = 0;
-    rpcuser = rpcpassword = 0;
-    username[0] = password[0] = 0;
-    while ( fgets(line,sizeof(line),fp) != 0 )
-    {
-        if ( line[0] == '#' )
-            continue;
-        //printf("line.(%s) %p %p\n",line,strstr(line,(char *)"rpcuser"),strstr(line,(char *)"rpcpassword"));
-        if ( (str= strstr(line,(char *)"rpcuser")) != 0 )
-            rpcuser = parse_conf_line(str,(char *)"rpcuser");
-        else if ( (str= strstr(line,(char *)"rpcpassword")) != 0 )
-            rpcpassword = parse_conf_line(str,(char *)"rpcpassword");
-        else if ( (str= strstr(line,(char *)"rpcport")) != 0 )
-        {
-            port = atoi(parse_conf_line(str,(char *)"rpcport"));
-            //fprintf(stderr,"rpcport.%u in file\n",port);
-        }
-        else if ( (str= strstr(line,(char *)"ipaddress")) != 0 )
-        {
-            ipaddress = parse_conf_line(str,(char *)"ipaddress");
-            strcpy(IPADDRESS,ipaddress);
-        }
-    }
-    if ( rpcuser != 0 && rpcpassword != 0 )
-    {
-        strcpy(username,rpcuser);
-        strcpy(password,rpcpassword);
-    }
-    //printf("rpcuser.(%s) rpcpassword.(%s) %u ipaddress.%s\n",rpcuser,rpcpassword,port,ipaddress);
-    if ( rpcuser != 0 )
-        free(rpcuser);
-    if ( rpcpassword != 0 )
-        free(rpcpassword);
-    return(port);
-}
-
-uint16_t komodo_userpass(char *userpass,char *symbol)
-{
-    FILE *fp; uint16_t port = 0; char fname[512],username[512],password[512],confname[KOMODO_ASSETCHAIN_MAXLEN];
-    userpass[0] = 0;
-    if ( strcmp("KMD",symbol) == 0 )
-    {
-#ifdef __APPLE__
-        sprintf(confname,"Komodo.conf");
-#else
-        sprintf(confname,"komodo.conf");
-#endif
-    }
-    else sprintf(confname,"%s.conf",symbol);
-    if ( (fp= fopen(confname,"rb")) != 0 )
-    {
-        port = _komodo_userpass(username,password,fp);
-        sprintf(userpass,"%s:%s",username,password);
-        if ( strcmp(symbol,ASSETCHAINS_SYMBOL) == 0 )
-            strcpy(USERPASS,userpass);
-        fclose(fp);
-    }
-    return(port);
-}
-
 #define is_cJSON_True(json) ((json) != 0 && ((json)->type & 0xff) == cJSON_True)
 
 char *komodo_issuemethod(char *userpass,char *method,char *params,uint16_t port)
@@ -1046,9 +985,33 @@ static inline bool is_x64(void) {
 #endif // _WIN32
 #endif // _MSC_VER
 
+/******
+ * Fills in GAMES_PORT, IPADDRESS, and USERPASS
+ * @param[in] symbol the symbol of the chain
+ * @returns 1 on success, 0 on failure
+ */
+uint8_t read_config(const char* symbol)
+{
+    // set defaults
+    GAMES_PORT = 0;
+    strcpy(IPADDRESS, "127.0.0.1");
+    USERPASS[0] = 0;
+    struct rpc_info rpc;
+    memset(&rpc, 0, sizeof(struct rpc_info) );
+
+    if ( komodo_rpc_info(&rpc, ASSETCHAINS_SYMBOL) )
+    {
+        GAMES_PORT = rpc.port;
+        strcpy(IPADDRESS, rpc.ipaddress);
+        sprintf(USERPASS, "%s:%s", rpc.username, rpc.password);
+        return 1;
+    }
+    return 0;
+}
+
 int main(int argc, char **argv)
 {
-    uint64_t seed; FILE *fp = 0; int32_t i,j,c; char userpass[8192];
+    uint64_t seed; FILE *fp = 0; int32_t i,j,c;
 #ifdef _WIN32
 #ifdef _MSC_VER
     printf("*** games for Windows [ Build %s ] ***\n", BUILD_DATE);
@@ -1080,10 +1043,8 @@ int main(int argc, char **argv)
 #endif
 #endif
     strcpy(ASSETCHAINS_SYMBOL,CHAINNAME);
-    
-    GAMES_PORT = komodo_userpass(userpass,ASSETCHAINS_SYMBOL);
-    if ( IPADDRESS[0] == 0 )
-        strcpy(IPADDRESS,"127.0.0.1");
+
+    read_config(ASSETCHAINS_SYMBOL);   
     printf("ASSETCHAINS_SYMBOL.(%s) port.%u (%s) IPADDRESS.%s \n",ASSETCHAINS_SYMBOL,GAMES_PORT,USERPASS,IPADDRESS); sleep(1);
     if ( argc == 2 && (fp=fopen(argv[1],"rb")) == 0 )
     {
