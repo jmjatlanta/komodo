@@ -142,7 +142,14 @@ bool TryCreateDirectory(const boost::filesystem::path& p);
 boost::filesystem::path GetDefaultDataDir();
 const boost::filesystem::path &GetDataDir(bool fNetSpecific = true);
 void ClearDatadirCache();
-boost::filesystem::path GetConfigFile();
+/*****
+ * Get the full path to the config file
+ * @note if symbol is empty, looks for komodo.conf
+ * @note the `-conf` command line parameter overrides most logic
+ * @param symbol the symbol to use
+ * @returns the full path to the config file
+ */
+boost::filesystem::path GetConfigFile(const std::string& symbol);
 #ifndef _WIN32
 boost::filesystem::path GetPidFile();
 void CreatePidFile(const boost::filesystem::path &path, pid_t pid);

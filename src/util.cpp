@@ -683,34 +683,45 @@ void ClearDatadirCache()
     pathCachedNetSpecific = boost::filesystem::path();
 }
 
-boost::filesystem::path GetConfigFile()
+/*****
+ * Get the full path to the config file
+ * @note if symbol is empty, looks for komodo.conf
+ * @note the `-conf` command line parameter overrides most logic
+ * @param symbol the symbol to use
+ * @returns the full path to the config file
+ */
+boost::filesystem::path GetConfigFile(const std::string& symbol)
 {
-    char confname[512];
-    if ( !mapArgs.count("-conf") && ASSETCHAINS_SYMBOL[0] != 0 ){
-        sprintf(confname,"%s.conf",ASSETCHAINS_SYMBOL);
-    }
+    boost::filesystem::path retval;
+    if (mapArgs.count("-conf"))
+        retval = mapArgs["-conf"];
     else
     {
-#ifdef __APPLE__
-        strcpy(confname,"Komodo.conf");
+        if (symbol.empty())
+        {
+#ifdef __linux__
+            std::string komodo_conf("komodo.conf");
 #else
-        strcpy(confname,"komodo.conf");
+            std::string komodo_conf("Komodo.conf");
 #endif
+            retval /= komodo_conf;
+        }
+        else
+            retval /= (symbol + ".conf");
     }
-    boost::filesystem::path pathConfigFile(GetArg("-conf",confname));
-    if (!pathConfigFile.is_complete()){
-        pathConfigFile = GetDataDir(false) / pathConfigFile;
+    if (!retval.is_complete())
+    {
+        // try prefixing with GetDataDir
+        retval = GetDataDir(false) / retval;
     }
-
-    //printf("DEBUG - util.cpp:710 correct pathConfigFile: %s\n",GetConfigFile().string().c_str());
-    return pathConfigFile;
+    return retval;
 }
 
 void ReadConfigFile(map<string, string>& mapSettingsRet,
                     map<string, vector<string> >& mapMultiSettingsRet)
 {
 
-    boost::filesystem::ifstream streamConfig(GetConfigFile());
+    boost::filesystem::ifstream streamConfig(GetConfigFile(ASSETCHAINS_SYMBOL));
     if (!streamConfig.good())
         throw missing_zcash_conf();
     set<string> setOptions;

@@ -16,6 +16,7 @@
 #include "key_io.h"
 #include "cc/CCinclude.h"
 #include <string.h>
+#include "komodo_config.h"
 
 #ifdef _WIN32
 #include <sodium.h>
@@ -1324,44 +1325,6 @@ void iguana_initQ(queue_t *Q,char *name)
         free(item);
 }
 
-/****
- * Read values from file
- * @param[out] username the username found
- * @param[out] password the password found
- * @param[in] fp the file pointer
- * @returns the port (0 if not found)
- */
-uint16_t _komodo_userpass(char *username,char *password,FILE *fp)
-{
-    char *rpcuser,*rpcpassword,*str,line[8192]; 
-    uint16_t port = 0;
-    rpcuser = rpcpassword = 0;
-    username[0] = password[0] = 0;
-    while ( fgets(line,sizeof(line),fp) != 0 )
-    {
-        if ( line[0] == '#' )
-            continue;
-        if ( (str= strstr(line,(char *)"rpcuser")) != 0 )
-            rpcuser = parse_conf_line(str,(char *)"rpcuser");
-        else if ( (str= strstr(line,(char *)"rpcpassword")) != 0 )
-            rpcpassword = parse_conf_line(str,(char *)"rpcpassword");
-        else if ( (str= strstr(line,(char *)"rpcport")) != 0 )
-        {
-            port = atoi(parse_conf_line(str,(char *)"rpcport"));
-        }
-    }
-    if ( rpcuser != 0 && rpcpassword != 0 )
-    {
-        strcpy(username,rpcuser);
-        strcpy(password,rpcpassword);
-    }
-    if ( rpcuser != 0 )
-        free(rpcuser);
-    if ( rpcpassword != 0 )
-        free(rpcpassword);
-    return(port);
-}
-
 /*****
  * @brief retrieve the full path of the file
  * @param symbol the symbol that forms part of the path
@@ -1454,64 +1417,47 @@ void komodo_configfile(char *symbol,uint16_t rpcport)
     if ( symbol != 0 && rpcport != 0 )
     {
         BITCOIND_RPCPORT = rpcport;
-        std::string filename;
-        if( mapArgs.count("-conf") )
-            filename = GetConfigFile().string();
-        else
-            filename = GetDataDir(false).string() 
-                + boost::filesystem::path::preferred_separator
-                + symbol + ".conf";
-        FILE *fp;
-        if ( (fp= fopen(filename.c_str(),"rb")) == 0 )
+        try
         {
-            // we were unable to open the config file
-            // attempt to create one
-            if ( (fp= fopen(filename.c_str(),"wb")) != 0 )
-            {
-                std::string user;
-                std::string pw;
-                generate_random_user_pw(symbol, user, pw);
-                fprintf(fp,"rpcuser=%s\nrpcpassword=%s\nrpcport=%u\nserver=1\ntxindex=1\n"
-                        "rpcworkqueue=256\nrpcallowip=127.0.0.1\nrpcbind=127.0.0.1\n",user.c_str(),pw.c_str(),rpcport);
-                fclose(fp);
-                printf("Created (%s)\n",filename.c_str());
-            } 
-            else 
-                printf("Couldnt create (%s)\n",filename.c_str());
+            ConfigFile config(GetConfigFile(symbol));
+            mapArgs["-rpcuser"] = config.Value("rpcuser");
+            mapArgs["-rpcpassword"] = config.Value("rpcpassword");
         }
-        else
+        catch (const ios_base::failure&)
         {
-            // read the config file
-            static char myusername[512];
-            static char mypassword[8192];
-            _komodo_userpass(myusername,mypassword,fp);
-            mapArgs["-rpcpassword"] = mypassword;
-            mapArgs["-rpcusername"] = myusername;
-            fclose(fp);
+            // attempt to create a config file
+            ConfigFile config;
+            std::multimap<std::string, std::string> entries;
+            std::string user;
+            std::string pw;
+            generate_random_user_pw(symbol, user, pw);
+            entries.emplace("rpcuser", user);
+            entries.emplace("rpcpassword", pw);
+            entries.emplace("rpcport", std::to_string(rpcport));
+            entries.emplace("server", "1");
+            entries.emplace("txindex", "1");
+            entries.emplace("rpcworkqueue", "256");
+            entries.emplace("rpcallowip", "127.0.0.1");
+            entries.emplace("rpcbind", "127.0.0.1");
+            if (!config.Save(GetConfigFile(symbol), false))
+            {
+                LogPrintf("Unable to create config file [%s]\n", GetConfigFile(symbol).c_str());
+            }
+            mapArgs["-rpcuser"] = config.Value("rpcuser");
+            mapArgs["-rpcpassword"] = config.Value("rpcpassword");
         }
     }
-
-    std::string filename = GetDataDir().string();
-    // erase everything after the last path separator
-    auto pos = filename.rfind( boost::filesystem::path::preferred_separator );
-    if (pos + 1 < filename.size())
-        filename = filename.substr(0,pos+1);
-#ifdef __linux__
-    filename += "komodo.conf";
-#else
-    filename += "Komodo.conf";
-#endif
-    FILE *fp;
-    if ( (fp= fopen(filename.c_str(),"rb")) != 0 )
+    // now try to load the komodo.conf
+    try
     {
-        // set the KMD_PORT, and KMDUSERPASS based on komodo.conf
-        uint16_t kmdport;
-        char username[512];
-        char password[8192];
-        if ( (kmdport= _komodo_userpass(username,password,fp)) != 0 )
-            KMD_PORT = kmdport;
-        sprintf(KMDUSERPASS,"%s:%s",username,password);
-        fclose(fp);
+        ConfigFile config(GetConfigFile("KMD"));
+        if (config.Has("rpcport"))
+            KMD_PORT = std::stoi(config.Value("rpcport"));
+        strcpy(KMDUSERPASS, (config.Value("rpcuser") + ":" + config.Value("rpcpassword")).c_str());
+    }
+    catch( const ios_base::failure& ex)
+    {
+        LogPrintf("Unable to open komodo.conf: %s\n", ex.what() );
     }
 }
 
@@ -1523,40 +1469,18 @@ void komodo_configfile(char *symbol,uint16_t rpcport)
  */
 uint16_t komodo_userpass(char *userpass, const std::string& symbol)
 {
-    FILE *fp; 
-    uint16_t port = 0; 
-    char username[512],password[512],confname[KOMODO_ASSETCHAIN_MAXLEN];
-    std::string fname;
-
-    userpass[0] = 0;
-    if ( symbol == "KMD" )
+    uint16_t port = 0;
+    try
     {
-#ifdef __APPLE__
-        sprintf(confname,"Komodo.conf");
-#else
-        sprintf(confname,"komodo.conf");
-#endif
+        ConfigFile config(GetConfigFile(symbol));
+        port = std::stoi(config.Value("rpcport"));
+        strcpy(userpass, (config.Value("rpcuser") + ":" + config.Value("rpcpassword")).c_str());
     }
-    else
-    { 
-        if(!mapArgs.count("-conf")) 
-        {
-            sprintf(confname,"%s.conf",symbol.c_str());
-            fname = komodo_statefname(symbol,confname);
-        } 
-        else 
-            fname = GetDataDir().string();
-    }
-    
-    if ( (fp= fopen(fname.c_str(),"rb")) != 0 )
+    catch(const ios_base::failure& ex)
     {
-        port = _komodo_userpass(username,password,fp);
-        sprintf(userpass,"%s:%s",username,password);
-        if ( symbol == std::string(ASSETCHAINS_SYMBOL) )
-            strcpy(ASSETCHAINS_USERPASS,userpass);
-        fclose(fp);
+        LogPrintf("Unable to open config file: %s\n", ex.what() );
     }
-    return(port);
+    return port;
 }
 
 uint32_t komodo_assetmagic(char *symbol,uint64_t supply,uint8_t *extraptr,int32_t extralen)
@@ -1762,7 +1686,7 @@ int8_t equihash_params_possible(uint64_t n, uint64_t k)
 void komodo_args(char *argv0)
 {
     std::string name,addn,hexstr,symbol; char *dirname,fname[512],arg0str[64],magicstr[9]; uint8_t magic[4],extrabuf[32756],disablebits[32],*extraptr=0;
-    FILE *fp; uint64_t val; uint16_t port, dest_rpc_port; int32_t i,nonz=0,baseid,len,n,extralen = 0; uint64_t ccenables[256], ccEnablesHeight[512] = {0}; CTransaction earlytx; uint256 hashBlock;
+    FILE *fp; uint64_t val; int32_t i,nonz=0,baseid,len,n,extralen = 0; uint64_t ccenables[256], ccEnablesHeight[512] = {0}; CTransaction earlytx; uint256 hashBlock;
 
     std::string ntz_dest_path;
     ntz_dest_path = GetArg("-notary", "");
@@ -2336,6 +2260,7 @@ fprintf(stderr,"extralen.%d before disable bits\n",extralen);
                 fprintf(stderr,"cant have assetchain named KMD\n");
                 StartShutdown();
             }
+            uint16_t port;
             if ( (port= komodo_userpass(ASSETCHAINS_USERPASS,ASSETCHAINS_SYMBOL)) != 0 )
                 // config file found and read
                 ASSETCHAINS_RPCPORT = port;
@@ -2384,49 +2309,39 @@ fprintf(stderr,"extralen.%d before disable bits\n",extralen);
             }
         }
     }
-    else
+    else // no -ac_name set, assume komodo chain
     {
-        char fname[512],username[512],password[4096]; int32_t iter; FILE *fp;
         ASSETCHAINS_P2PPORT = 7770;
         ASSETCHAINS_RPCPORT = 7771;
-        for (iter=0; iter<2; iter++)
+        DEST_PORT = 0;
+        try
         {
-            strcpy(fname,GetDataDir().string().c_str());
-#ifdef _WIN32
-            while ( fname[strlen(fname)-1] != '\\' )
-                fname[strlen(fname)-1] = 0;
-            if ( iter == 0 )
-                strcat(fname,"Komodo\\komodo.conf");
-            else strcat(fname,ntz_dest_path.c_str());
-#else
-            while ( fname[strlen(fname)-1] != '/' )
-                fname[strlen(fname)-1] = 0;
-#ifdef __APPLE__
-            if ( iter == 0 )
-                strcat(fname,"Komodo/Komodo.conf");
-            else strcat(fname,ntz_dest_path.c_str());
-#else
-            if ( iter == 0 )
-                strcat(fname,".komodo/komodo.conf");
-            else strcat(fname,ntz_dest_path.c_str());
-#endif
-#endif
-            if ( (fp= fopen(fname,"rb")) != 0 )
+            ConfigFile config(GetConfigFile("KMD"));
+            strcpy(KMDUSERPASS, (config.Value("rpcuser") + ":" + config.Value("rpcpassword")).c_str());
+        }
+        catch(const ios_base::failure& ex)
+        {
+            LogPrintf("Unable to open komodo.conf: %s\n", ex.what() );
+        }
+        if (IS_KOMODO_NOTARY)
+        {
+            try
             {
-                dest_rpc_port = _komodo_userpass(username,password,fp);
-                DEST_PORT = iter == 1 ? dest_rpc_port : 0;
-                sprintf(iter == 0 ? KMDUSERPASS : BTCUSERPASS,"%s:%s",username,password);
-                fclose(fp);
-            } else printf("couldnt open.(%s) will not validate dest notarizations\n",fname);
-            if ( IS_KOMODO_NOTARY == 0 )
-                break;
+                ConfigFile config{ boost::filesystem::path(ntz_dest_path) };
+                DEST_PORT = std::stoi(config.Value("rpcport"));
+                strcpy(BTCUSERPASS, (config.Value("rpcuser") + ":" + config.Value("rpcpassword")).c_str());
+            }
+            catch(const ios_base::failure& ex)
+            {
+                LogPrintf("Could not open (%s). Will not validate dest notarizations. Reason: %s\n", 
+                        ntz_dest_path.c_str(), ex.what());
+            }
         }
     }
     int32_t dpowconfs = KOMODO_DPOWCONFS;
     if ( ASSETCHAINS_SYMBOL[0] != 0 )
     {
         BITCOIND_RPCPORT = GetArg("-rpcport", ASSETCHAINS_RPCPORT);
-        //fprintf(stderr,"(%s) port.%u chain params initialized\n",ASSETCHAINS_SYMBOL,BITCOIND_RPCPORT);
         if ( strcmp("PIRATE",ASSETCHAINS_SYMBOL) == 0 && ASSETCHAINS_HALVING[0] == 77777 )
         {
             ASSETCHAINS_HALVING[0] *= 5;

@@ -184,7 +184,7 @@ bool AppInit(int argc, char* argv[])
                    "depending on how you installed Komodo:\n") +
                  _("- Source code:  %s\n"
                    "- .deb package: %s\n")).c_str(),
-                GetConfigFile().string().c_str(),
+                GetConfigFile(ASSETCHAINS_SYMBOL).c_str(),
                 "contrib/debian/examples/komodo.conf",
                 "/usr/share/doc/komodo/examples/komodo.conf");
             return false;

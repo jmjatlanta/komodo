@@ -1,9 +1,16 @@
 #include <fstream>
+#include <stdexcept>
 #include "komodo_config.h"
+
+ConfigFile::ConfigFile()
+{
+}
 
 ConfigFile::ConfigFile(const boost::filesystem::path& path)
 {
-    std::ifstream in(path.string());
+    std::ifstream in;
+    in.exceptions( std::ifstream::failbit | std::ifstream::badbit);
+    in.open(path.string());
     std::string line;
     while ( std::getline(in, line) )
     {

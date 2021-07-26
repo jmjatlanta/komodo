@@ -24,6 +24,10 @@ class ConfigFile
 {
 public:
     /****
+     * default ctor
+     */
+    ConfigFile();
+    /****
      * Read a configuation file
      * @param path the full path to the file
      * @throws std::ioexception if path is invalid or the file cannot be read
