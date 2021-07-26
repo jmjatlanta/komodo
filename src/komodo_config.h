@@ -66,4 +66,28 @@ private:
     std::multimap<std::string, std::string> entries;
 };
 
+/*****
+ * Get the full path to the config file
+ * @note if symbol is empty, looks for komodo.conf
+ * @note the `-conf` command line parameter overrides most logic
+ * @param symbol the symbol to use
+ * @returns the full path to the config file
+ */
+boost::filesystem::path GetConfigFile(const std::string& symbol);
+
+/***
+ * Read or create a [symbol].conf file. Also sets the globals
+ *    BITCOIND_RPCPORT (based on passed in value)
+ *    KMD_PORT (based on komodo.conf)
+ *    KMDUSERPASS (based on komodo.conf)
+ * and the mapArgs (randomly generated)
+ *    -rpcusername
+ *    -rpcpassword
+ * if symbol or rpcport are not passed, only komodo.conf is read
+ * @note only seems to be called if ASSETCHAINS_SYMBOL is set, so only on KMD subchains
+ * @param[in] symbol the symbol for the asset chain
+ * @param[in] rpcport the rpc port for the asset chain
+ */
+void komodo_configfile(char *symbol,uint16_t rpcport);
+
 #endif

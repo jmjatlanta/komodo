@@ -482,7 +482,6 @@ libbitcoin_common_a_SOURCES = \
   key.cpp \
   key_io.cpp \
   keystore.cpp \
-  komodo_config.cpp \
   netbase.cpp \
   metrics.cpp \
   primitives/block.cpp \
@@ -522,6 +521,8 @@ libbitcoin_util_a_SOURCES = \
   sync.cpp \
   uint256.cpp \
   util.cpp \
+  komodo_config.cpp \
+  crc.cpp \
   utilmoneystr.cpp \
   utilstrencodings.cpp \
   utiltime.cpp \

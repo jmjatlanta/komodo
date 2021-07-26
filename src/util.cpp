@@ -31,6 +31,7 @@
 #include "utilstrencodings.h"
 #include "utiltime.h"
 #include "komodo_defs.h"
+#include "komodo_config.h"
 
 #include <stdarg.h>
 #include <sstream>
@@ -644,7 +645,6 @@ const boost::filesystem::path GetExportDir()
     return path;
 }
 
-
 const boost::filesystem::path &GetDataDir(bool fNetSpecific)
 {
     namespace fs = boost::filesystem;
@@ -681,40 +681,6 @@ void ClearDatadirCache()
 {
     pathCached = boost::filesystem::path();
     pathCachedNetSpecific = boost::filesystem::path();
-}
-
-/*****
- * Get the full path to the config file
- * @note if symbol is empty, looks for komodo.conf
- * @note the `-conf` command line parameter overrides most logic
- * @param symbol the symbol to use
- * @returns the full path to the config file
- */
-boost::filesystem::path GetConfigFile(const std::string& symbol)
-{
-    boost::filesystem::path retval;
-    if (mapArgs.count("-conf"))
-        retval = mapArgs["-conf"];
-    else
-    {
-        if (symbol.empty())
-        {
-#ifdef __linux__
-            std::string komodo_conf("komodo.conf");
-#else
-            std::string komodo_conf("Komodo.conf");
-#endif
-            retval /= komodo_conf;
-        }
-        else
-            retval /= (symbol + ".conf");
-    }
-    if (!retval.is_complete())
-    {
-        // try prefixing with GetDataDir
-        retval = GetDataDir(false) / retval;
-    }
-    return retval;
 }
 
 void ReadConfigFile(map<string, string>& mapSettingsRet,
