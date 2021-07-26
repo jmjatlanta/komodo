@@ -17,19 +17,20 @@ namespace TestConfig
 
 TEST(TestConfig, userpass)
 {
-    ASSETCHAINS_SYMBOL[0] = 0;
     char userpass[512];
     std::string token = "J_M_J";
+    strcpy(ASSETCHAINS_SYMBOL, token.c_str());
 
     boost::filesystem::path jmj_path = boost::filesystem::temp_directory_path();
     jmj_path /= token;
     boost::filesystem::create_directories(jmj_path);
     mapArgs["-datadir"] = jmj_path.string();
-    //mapArgs["-conf"] = token + ".conf";
     ClearDatadirCache();
     boost::filesystem::path config_file = jmj_path / (token + ".conf");
     {
-        std::ofstream out(config_file.string());
+        std::ofstream out;
+        out.exceptions(std::ios_base::badbit | std::ios::failbit);
+        out.open(config_file.string());
         out << "rpcuser=abc\nrpcpassword=123\nrpcport=456\n";
     }
     uint16_t port = komodo_userpass(userpass, token);
@@ -206,14 +207,27 @@ TEST(TestConfig, configFile)
         boost::filesystem::remove( good_path );
     
     // try to read a file we probably can't get to
-    ConfigFile bad(badpath);
-    ASSERT_FALSE( bad.Has("rpcport") );
-    // try to read a file that does not exist
-    ConfigFile not_exist(noexist_path);
-    ASSERT_FALSE( not_exist.Has("rpcport") );
-    // try to create a good config file
+    try
     {
-        ConfigFile good( good_path );
+        ConfigFile test(badpath);
+        ASSERT_TRUE(false);
+    }
+    catch(const std::ios_base::failure&)
+    {
+    }
+    // try to read a file that does not exist
+    try
+    {
+        ConfigFile not_exist(noexist_path);
+        ASSERT_TRUE(false);
+    }
+    catch(const std::ios_base::failure&)
+    {
+    }
+    // try to create a good config file
+    try
+    {
+        ConfigFile good;
         ASSERT_FALSE( good.Has("rpcport") );
         std::multimap<std::string, std::string> entries;
         entries.emplace("rpcport", "123");
@@ -223,6 +237,11 @@ TEST(TestConfig, configFile)
         entries.emplace("Hello", "Again!");
         good.SetEntries(entries);
         ASSERT_TRUE( good.Save(good_path, false) );
+    }
+    catch(const std::ios_base::failure& ex)
+    {
+        ASSERT_EQ(std::string(), std::string(ex.what()));
+        ASSERT_TRUE(false);
     }
     // now try to read the file we just created
     ConfigFile good( good_path );

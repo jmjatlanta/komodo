@@ -16,9 +16,10 @@ ConfigFile::ConfigFile()
 ConfigFile::ConfigFile(const boost::filesystem::path& path)
 {
     std::ifstream in;
-    std::cerr << "Attempting to open " << path.string() << "\n";
-    in.exceptions( std::ifstream::failbit | std::ifstream::badbit);
+    in.exceptions(std::ifstream::badbit);
     in.open(path.string());
+    if (in.fail())
+        throw std::ios_base::failure("Unable to open " + path.string());
     std::string line;
     while ( std::getline(in, line) )
     {
@@ -27,9 +28,6 @@ ConfigFile::ConfigFile(const boost::filesystem::path& path)
         size_t pos = line.find('=');
         if (pos != std::string::npos && pos <= line.size() - 1)
         {
-            std::string key = line.substr(0, pos);
-            std::string value = line.substr(pos+1);
-            std::cerr << "Found key [" << key <<  "] with value [" << value << "]\n";
             entries.emplace( line.substr(0,pos), line.substr(pos+1));
         }
     }
@@ -37,9 +35,6 @@ ConfigFile::ConfigFile(const boost::filesystem::path& path)
 
 bool ConfigFile::Has(const std::string& key) const
 {
-    bool retval = entries.find(key) != entries.end();
-    if (!retval)
-        std::cerr << "Key [" << key << "] was not found. Returning false. Entries count: " << std::to_string(entries.size()) << "\n";
     return entries.find(key) != entries.end();
 }
 
@@ -48,10 +43,8 @@ std::string ConfigFile::Value(const std::string& key) const
     auto itr = entries.find(key);
     if (itr != entries.end())
     {
-        std::cerr << "Found " << key << ":" << (*itr).second << "\n";
         return (*itr).second;
     }
-    std::cerr << "Unable to find [" << key << "]. Entries size: " << std::to_string(entries.size()) << "\n";
     return "";
 }
 
@@ -195,8 +188,6 @@ void generate_random_user_pw(const std::string& salt, std::string& user, std::st
     password[i*2] = 0;
     pw = std::string("pass") + password;
     user = "user" + std::to_string(crc);
-    // JMJ
-    std::cerr << "Created user/pw combo: " << user << ":" << pw << "\n";
     return;
 }
 
@@ -227,8 +218,6 @@ void komodo_configfile(char *symbol,uint16_t rpcport)
         catch (const std::ios_base::failure& ex)
         {
             // attempt to create a config file
-            // JMJ
-            std::cerr << "Unable to read " << GetConfigFile(symbol).string() << ":" << ex.what() << std::endl;
             LogPrintf("Unable to read %s, attempting to create.\n", GetConfigFile(symbol).c_str());
             ConfigFile config_f;
             std::multimap<std::string, std::string> entries;
