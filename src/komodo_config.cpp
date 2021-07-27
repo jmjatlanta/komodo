@@ -7,7 +7,6 @@
 #include "komodo_config.h"
 
 extern std::map<std::string, std::string> mapArgs;
-extern uint16_t BITCOIND_RPCPORT;
 
 ConfigFile::ConfigFile()
 {
@@ -192,14 +191,9 @@ void generate_random_user_pw(const std::string& salt, std::string& user, std::st
 }
 
 /***
- * Read or create a [symbol].conf file. Also sets the globals
- *    BITCOIND_RPCPORT (based on passed in value)
- *    KMD_PORT (based on komodo.conf)
- *    KMDUSERPASS (based on komodo.conf)
- * and the mapArgs (randomly generated)
+ * Create a [symbol].conf file. Also sets the mapArgs (randomly generated)
  *    -rpcusername
  *    -rpcpassword
- * if symbol or rpcport are not passed, only komodo.conf is read
  * @note only seems to be called if ASSETCHAINS_SYMBOL is set, so only on KMD subchains
  * @param[in] symbol the symbol for the asset chain
  * @param[in] rpcport the rpc port for the asset chain
@@ -208,7 +202,6 @@ void komodo_configfile(char *symbol,uint16_t rpcport)
 {
     if ( symbol != 0 && rpcport != 0 )
     {
-        BITCOIND_RPCPORT = rpcport;
         try
         {
             ConfigFile config_f(GetConfigFile(symbol));

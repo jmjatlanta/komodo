@@ -2116,6 +2116,7 @@ fprintf(stderr,"extralen.%d before disable bits\n",extralen);
             { 
                 // config file was not found, generate default
                 komodo_configfile(ASSETCHAINS_SYMBOL,ASSETCHAINS_P2PPORT + 1);
+                BITCOIND_RPCPORT = ASSETCHAINS_P2PPORT + 1;
                 // now try to load the komodo.conf
                 try
                 {
