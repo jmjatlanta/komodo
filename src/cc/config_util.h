@@ -17,9 +17,13 @@
 
 /************
  * A few CC .c routines use this (rogue and dapp), so now they're in one place
+ * Uses the C++ utilities for reading the config file into a c-compatible struct
  */
 #include <stdint.h>
-#include <stdio.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 struct rpc_info
 {
@@ -36,7 +40,9 @@ struct rpc_info
  * @param[in] symbol the symbol of the chain (file [symbol].conf should exist)
  * @returns 1 on success, 0 on failure
  */
-
 uint8_t komodo_rpc_info(struct rpc_info* results, const char* symbol);
 
+#ifdef __cplusplus
+}
+#endif
 #endif

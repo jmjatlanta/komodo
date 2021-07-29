@@ -129,6 +129,9 @@ MISC     = Makefile.std LICENSE.TXT rogue54.sln rogue54.vcproj rogue.spec \
 .c.o:
 	$(CC) $(CFLAGS) $(CPPFLAGS) -c $*.c
 
+.cpp.o:
+    $(CXX) $(CXXFLAGS) $(CPPFLAGS) -c $*.cpp
+
 #$(RM) rogue.so ; $(CC) -shared -o rogue.so cursesd.c $(OBJS1) $(OBJS2); $(CC) $(CFLAGS) $(LDFLAGS) $(OBJS) $(LIBS) -o $@
 
 $(PROGRAM): $(HDRS) $(OBJS)
