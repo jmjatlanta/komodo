@@ -41,7 +41,7 @@ void komodo_eventadd_notarized(struct komodo_state *sp,char *symbol,int32_t heig
 {
     static uint32_t counter; int32_t verified=0; char *coin; struct komodo_event_notarized N;
     coin = (ASSETCHAINS_SYMBOL[0] == 0) ? (char *)"KMD" : ASSETCHAINS_SYMBOL;
-    if ( IS_KOMODO_NOTARY != 0 && (verified= komodo_verifynotarization(symbol,dest,height,notarizedheight,notarized_hash,notarized_desttxid)) < 0 )
+    if ( IS_KOMODO_NOTARY != 0 && (verified= komodo_verifynotarization(symbol,dest,height,notarized_hash,notarized_desttxid)) < 0 )
     {
         if ( counter++ < 100 )
             printf("[%s] error validating notarization ht.%d notarized_height.%d, if on a pruned %s node this can be ignored\n",ASSETCHAINS_SYMBOL,height,notarizedheight,dest);

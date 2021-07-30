@@ -120,7 +120,7 @@ size_t accumulatebytes(void *ptr,size_t size,size_t nmemb,struct return_string *
  *
  ************************************************************************/
 
-char *post_process_bitcoind_RPC(char *debugstr,char *command,char *rpcstr,char *params)
+char *post_process_bitcoind_RPC(char *debugstr,const char *command,char *rpcstr,const char *params)
 {
     long i,j,len; char *retstr = 0; cJSON *json,*result,*error;
     //printf("<<<<<<<<<<< bitcoind_RPC: %s post_process_bitcoind_RPC.%s.[%s]\n",debugstr,command,rpcstr);
@@ -171,7 +171,7 @@ char *post_process_bitcoind_RPC(char *debugstr,char *command,char *rpcstr,char *
  *
  ************************************************************************/
 
-char *bitcoind_RPC(char **retstrp,char *debugstr,char *url,char *userpass,char *command,char *params)
+char *bitcoind_RPC(char **retstrp,char *debugstr,char *url,const char *userpass,const char *command,const char *params)
 {
     static int didinit,count,count2; static double elapsedsum,elapsedsum2;
     struct curl_slist *headers = NULL; struct return_string s; CURLcode res; CURL *curl_handle;
@@ -367,7 +367,7 @@ char *curl_post(CURL **cHandlep,char *url,char *userpass,char *postfields,char *
     return(chunk.memory);
 }
 
-char *komodo_issuemethod(char *userpass,char *method,char *params,uint16_t port)
+char *komodo_issuemethod(const char *userpass,const char *method,const char *params,uint16_t port)
 {
     //static void *cHandle;
     char url[512],*retstr=0,*retstr2=0,postdata[8192];
@@ -457,20 +457,32 @@ int32_t notarizedtxid_height(char *dest,char *txidstr,int32_t *kmdnotarized_heig
     return(txid_height);
 }
 
-int32_t komodo_verifynotarizedscript(int32_t height,uint8_t *script,int32_t len,uint256 NOTARIZED_HASH)
+/*****
+ * Verify that the notarization matches
+ * @param height the height (to be shown in error message)
+ * @param script where to get the hash to compare
+ * @param len the length of the script
+ * @param notarized_hash the hash to compare to
+ * @returns 1 on match, -1 on mismatch
+ */
+int32_t komodo_verifynotarizedscript(int32_t height,uint8_t *script,int32_t len,uint256 notarized_hash)
 {
-    int32_t i; uint256 hash; char params[256];
-    for (i=0; i<32; i++)
+    // get the script into the correct format
+    uint256 hash; 
+    for (int16_t i=0; i<32; i++)
         ((uint8_t *)&hash)[i] = script[2+i];
-    if ( hash == NOTARIZED_HASH )
-        return(1);
-    for (i=0; i<32; i++)
-        printf("%02x",((uint8_t *)&NOTARIZED_HASH)[i]);
+
+    if ( hash == notarized_hash )
+        return 1;
+    
+    // notarization failed, print details to console
+    for (int16_t i=0; i<32; i++)
+        printf("%02x",((uint8_t *)&notarized_hash)[i]);
     printf(" notarized, ");
-    for (i=0; i<32; i++)
+    for (int16_t i=0; i<32; i++)
         printf("%02x",((uint8_t *)&hash)[i]);
     printf(" opreturn from [%s] ht.%d MISMATCHED\n",ASSETCHAINS_SYMBOL,height);
-    return(-1);
+    return -1;
 }
 
 void komodo_reconsiderblock(uint256 blockhash)
@@ -485,61 +497,75 @@ void komodo_reconsiderblock(uint256 blockhash)
     //fprintf(stderr,"komodo_reconsiderblock.(%s) (%s %u) -> NULL\n",params,ASSETCHAINS_USERPASS,ASSETCHAINS_RPCPORT);
 }
 
-int32_t komodo_verifynotarization(char *symbol,char *dest,int32_t height,int32_t NOTARIZED_HEIGHT,uint256 NOTARIZED_HASH,uint256 NOTARIZED_DESTTXID)
+/*****
+ * verify a notarization
+ * @param symbol the symbol
+ * @param dest the destination chain (KMD or BTC)
+ * @param height (for use in error message)
+ * @param notarized_hash the expected hash on the foreign chain
+ * @param notarized_desttxid the txid of the hash on the foreign chain
+ * @returns 0 or -1 on error, 1 if hash matches 
+ */
+int32_t komodo_verifynotarization(const char *symbol, const char *dest, int32_t height,
+        uint256 notarized_hash,uint256 notarized_desttxid)
 {
-    char params[256],*jsonstr,*hexstr; uint8_t *script,_script[8192]; int32_t n,len,retval = -1; cJSON *json,*txjson,*vouts,*vout,*skey;
-    script = _script;
-    /*params[0] = '[';
-     params[1] = '"';
-     for (i=0; i<32; i++)
-     sprintf(&params[i*2 + 2],"%02x",((uint8_t *)&NOTARIZED_DESTTXID)[31-i]);
-     strcat(params,"\", 1]");*/
-    sprintf(params,"[\"%s\", 1]",NOTARIZED_DESTTXID.ToString().c_str());
-    if ( strcmp(symbol,ASSETCHAINS_SYMBOL[0]==0?(char *)"KMD":ASSETCHAINS_SYMBOL) != 0 )
-        return(0);
-    if ( 0 && ASSETCHAINS_SYMBOL[0] != 0 )
-        printf("[%s] src.%s dest.%s params.[%s] ht.%d notarized.%d\n",ASSETCHAINS_SYMBOL,symbol,dest,params,height,NOTARIZED_HEIGHT);
+    // symbol must be ASSETCHAINS_SYMBOL or "KMD"
+    if ( strcmp(symbol, ASSETCHAINS_SYMBOL[0]==0?(char *)"KMD":ASSETCHAINS_SYMBOL ) != 0 )
+        return 0;
+
+    std::string params = std::string("[\"") + notarized_desttxid.ToString() + "\", 1]";
+    char *jsonstr = nullptr; // the resultant json returned from issuemethod call
+    int32_t retval = -1; 
+
+    /// Get the raw transaction of notarized_desttxid
     if ( strcmp(dest,"KMD") == 0 )
     {
         if ( KMDUSERPASS[0] != 0 )
         {
             if ( ASSETCHAINS_SYMBOL[0] != 0 )
             {
-                jsonstr = komodo_issuemethod(KMDUSERPASS,(char *)"getrawtransaction",params,KMD_PORT);
-                //printf("userpass.(%s) got (%s)\n",KMDUSERPASS,jsonstr);
+                jsonstr = komodo_issuemethod(KMDUSERPASS,(char *)"getrawtransaction",params.c_str(),KMD_PORT);
             }
-        }//else jsonstr = _dex_getrawtransaction();
-        else return(0); // need universal way to issue DEX* API, since notaries mine most blocks, this ok
+        }
+        else 
+            return 0; // need universal way to issue DEX* API, since notaries mine most blocks, this ok
     }
     else if ( strcmp(dest,"BTC") == 0 )
     {
         if ( BTCUSERPASS[0] != 0 )
         {
-            jsonstr = komodo_issuemethod(BTCUSERPASS,(char *)"getrawtransaction",params,DEST_PORT);
+            jsonstr = komodo_issuemethod(BTCUSERPASS,(char *)"getrawtransaction",params.c_str(),DEST_PORT);
         }
-        //else jsonstr = _dex_getrawtransaction();
-        else return(0);
+        else 
+            return 0;
     }
     else
     {
         printf("[%s] verifynotarization error unexpected dest.(%s)\n",ASSETCHAINS_SYMBOL,dest);
-        return(-1);
+        return -1;
     }
-    if ( jsonstr != 0 )
+
+    if ( jsonstr != nullptr ) // we got something back from issuemethod
     {
+        cJSON *json;
         if ( (json= cJSON_Parse(jsonstr)) != 0 )
         {
+            int32_t n;
+            cJSON *txjson;
+            cJSON *vouts;
             if ( (txjson= jobj(json,(char *)"result")) != 0 && (vouts= jarray(&n,txjson,(char *)"vout")) != 0 )
             {
+                cJSON *vout;
                 vout = jitem(vouts,n-1);
-                if ( 0 && ASSETCHAINS_SYMBOL[0] != 0 )
-                    printf("vout.(%s)\n",jprint(vout,0));
+                cJSON *skey;
                 if ( (skey= jobj(vout,(char *)"scriptPubKey")) != 0 )
                 {
+                    char *hexstr; 
                     if ( (hexstr= jstr(skey,(char *)"hex")) != 0 )
                     {
-                        //printf("HEX.(%s) vs hash.%s\n",hexstr,NOTARIZED_HASH.ToString().c_str());
-                        len = strlen(hexstr) >> 1;
+                        uint8_t _script[8192];
+                        uint8_t *script = _script;
+                        int32_t len = strlen(hexstr) >> 1;
                         decode_hex(script,len,hexstr);
                         if ( script[1] == 0x4c )
                         {
@@ -551,7 +577,7 @@ int32_t komodo_verifynotarization(char *symbol,char *dest,int32_t height,int32_t
                             script += 2;
                             len -= 2;
                         }
-                        retval = komodo_verifynotarizedscript(height,script,len,NOTARIZED_HASH);
+                        retval = komodo_verifynotarizedscript(height,script,len,notarized_hash);
                     }
                 }
             }
@@ -559,7 +585,7 @@ int32_t komodo_verifynotarization(char *symbol,char *dest,int32_t height,int32_t
         }
         free(jsonstr);
     }
-    return(retval);
+    return retval;
 }
 
 CScript komodo_makeopret(CBlock *pblock, bool fNew)
