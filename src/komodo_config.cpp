@@ -1,7 +1,9 @@
 #include <fstream>
 #include <stdexcept>
 #include <iostream>
+#include <set>
 #include <sys/time.h> // gettimeofday
+#include <boost/program_options/detail/config_file.hpp>
 #include "util.h" // GetDataDir()
 #include "crc.h"
 #include "komodo_config.h"
@@ -121,6 +123,52 @@ boost::filesystem::path GetConfigFile(const std::string& symbol)
         retval = GetDataDir(false) / retval;
     }
     return retval;
+}
+
+/*****
+ * @brief Handle negative settings on command line or config file
+ * @note -nofoo == -foo and -nofoo=0 == -foo=1
+ * @param name the name of the parameter
+ * @param mapSettings where to store the results
+ */
+void InterpretNegativeSetting(const std::string& name, std::map<std::string, std::string>& mapSettings)
+{
+    // interpret -nofoo as -foo=0 (and -nofoo=0 as -foo=1) as long as -foo not set
+    if (name.find("-no") == 0)
+    {
+        std::string positive("-");
+        positive.append(name.begin()+3, name.end());
+        if (mapSettings.count(positive) == 0)
+        {
+            bool value = !GetBoolArg(name, false);
+            mapSettings[positive] = (value ? "1" : "0");
+        }
+    }
+}
+
+void ReadConfigFile(std::map<std::string, std::string>& mapSettings, 
+        std::map<std::string, std::vector<std::string>>& mapMultiSettings, 
+        const std::string& symbol)
+{
+    boost::filesystem::ifstream streamConfig(GetConfigFile(symbol));
+    if (!streamConfig.good())
+        throw missing_zcash_conf();
+    std::set<std::string> setOptions;
+    setOptions.insert("*");
+
+    for (boost::program_options::detail::config_file_iterator it(streamConfig, setOptions), end; it != end; ++it)
+    {
+        // Don't overwrite existing settings so command line settings override komodo.conf
+        std::string strKey = std::string("-") + it->string_key;
+        if (mapSettings.count(strKey) == 0)
+        {
+            mapSettings[strKey] = it->value[0];
+            // interpret nofoo=1 as foo=0 (and nofoo=0 as foo=1) as long as foo not set)
+            InterpretNegativeSetting(strKey, mapSettings);
+        }
+        mapMultiSettings[strKey].push_back(it->value[0]);
+    }
+    ClearDatadirCache(); // In case datadir is changed in .conf file
 }
 
 double current_milliseconds()
