@@ -27,7 +27,7 @@
 #include "util.h"
 #include "httpserver.h"
 #include "httprpc.h"
-
+#include "komodo_config.h"
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/thread.hpp>
@@ -169,7 +169,9 @@ bool AppInit(int argc, char* argv[])
         }
         try
         {
-            ReadConfigFile(mapArgs, mapMultiArgs);
+            ReadConfigFile(mapArgs, mapMultiArgs, ASSETCHAINS_SYMBOL);
+            extern uint16_t BITCOIND_RPCPORT;
+            BITCOIND_RPCPORT = GetArg("-rpcport",BaseParams().RPCPort());            
         } catch (const missing_zcash_conf& e) {
             fprintf(stderr,
                 (_("Before starting komodod, you need to create a configuration file:\n"
