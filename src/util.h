@@ -132,6 +132,13 @@ static inline bool error(const char* format)
 const boost::filesystem::path &ZC_GetParamsDir();
 
 void PrintExceptionContinue(const std::exception *pex, const char* pszThread);
+/*****
+ * @brief Read command line parameters and place them in collections
+ * @note this fills the globals mapArgs and mapMultiArgs
+ * @note this turns -nofoo into -foo=0 and -nofoo=0 into -foo=1
+ * @param argc number of arguments
+ * @param argv the arguments
+ */
 void ParseParameters(int argc, const char*const argv[]);
 void FileCommit(FILE *fileout);
 bool TruncateFile(FILE *file, unsigned int length);
@@ -158,6 +165,13 @@ class missing_zcash_conf : public std::runtime_error {
 public:
     missing_zcash_conf() : std::runtime_error("Missing komodo.conf") { }
 };
+/*****
+ * Read the config file, merge with the passed-in maps
+ * @note reads ASSETCHAINS_SYMBOL.conf or Komodo.conf
+ * @note sets BITCOIND_RPCPORT based on command line or config file
+ * @param mapSettingsRet the map of parameters
+ * @param mapMultiSettingsRet the map of duplicated parameters
+ */
 void ReadConfigFile(std::map<std::string, std::string>& mapSettingsRet, std::map<std::string, std::vector<std::string> >& mapMultiSettingsRet);
 #ifdef _WIN32
 boost::filesystem::path GetSpecialFolderPath(int nFolder, bool fCreate = true);

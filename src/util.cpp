@@ -354,6 +354,13 @@ static void InterpretNegativeSetting(string name, map<string, string>& mapSettin
     }
 }
 
+/*****
+ * Read command line parameters and place them in collections
+ * @note this fills the globals mapArgs and mapMultiArgs
+ * @note this turns -nofoo into -foo=0 and -nofoo=0 into -foo=1
+ * @param argc number of arguments
+ * @param argv the arguments
+ */
 void ParseParameters(int argc, const char* const argv[])
 {
     mapArgs.clear();
@@ -361,34 +368,33 @@ void ParseParameters(int argc, const char* const argv[])
 
     for (int i = 1; i < argc; i++)
     {
-        std::string str(argv[i]);
-        std::string strValue;
-        size_t is_index = str.find('=');
+        std::string key(argv[i]);
+        std::string value;
+        size_t is_index = key.find('=');
         if (is_index != std::string::npos)
         {
-            strValue = str.substr(is_index+1);
-            str = str.substr(0, is_index);
+            value = key.substr(is_index+1);
+            key = key.substr(0, is_index);
         }
 #ifdef _WIN32
-        boost::to_lower(str);
-        if (boost::algorithm::starts_with(str, "/"))
-            str = "-" + str.substr(1);
+        boost::to_lower(key);
+        if (boost::algorithm::starts_with(key, "/"))
+            key = "-" + key.substr(1);
 #endif
 
-        if (str[0] != '-')
+        if (key[0] != '-')
             break;
 
         // Interpret --foo as -foo.
         // If both --foo and -foo are set, the last takes effect.
-        if (str.length() > 1 && str[1] == '-')
-            str = str.substr(1);
+        if (key.length() > 1 && key[1] == '-')
+            key = key.substr(1);
 
-        mapArgs[str] = strValue;
-        mapMultiArgs[str].push_back(strValue);
+        mapArgs[key] = value;
+        mapMultiArgs[key].push_back(value);
     }
 
-    // New 0.6 features:
-    BOOST_FOREACH(const PAIRTYPE(string,string)& entry, mapArgs)
+    for( auto entry : mapArgs )
     {
         // interpret -nofoo as -foo=0 (and -nofoo=0 as -foo=1) as long as -foo not set
         InterpretNegativeSetting(entry.first, mapArgs);
