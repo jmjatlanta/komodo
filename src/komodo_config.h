@@ -85,4 +85,23 @@ boost::filesystem::path GetConfigFile(const std::string& symbol);
  */
 void komodo_configfile(char *symbol,uint16_t rpcport);
 
+/*****
+ * @brief Handle negative settings on command line or config file
+ * @note -nofoo == -foo and -nofoo=0 == -foo=1
+ * @param name the name of the parameter
+ * @param mapSettings where to store the results
+ */
+void InterpretNegativeSetting(const std::string& name, std::map<std::string, std::string>& mapSettings);
+
+/*************
+ * @brief read the default config file and modify existing collections of parameters
+ * @note does not override what was already in the collections
+ * @param mapSettings a map of settings
+ * @param mapMultiSettings a map of settings that handles multiple values for a key
+ * @param symbol the asset chain symbol (can be empty for the Komodo chain)
+ */
+void ReadConfigFile(std::map<std::string, std::string>& mapSettings, 
+        std::map<std::string, std::vector<std::string> >& mapMultiSettings,
+        const std::string& symbol);
+
 #endif

@@ -24,6 +24,7 @@
 #include "rpc/protocol.h"
 #include "util.h"
 #include "utilstrencodings.h"
+#include "komodo_config.h"
 
 #include <boost/filesystem/operations.hpp>
 #include <stdio.h>
@@ -124,9 +125,13 @@ static int AppInitRPC(int argc, char* argv[])
         fprintf(stderr, "Error: Specified data directory \"%s\" does not exist.\n", mapArgs["-datadir"].c_str());
         return EXIT_FAILURE;
     }
-    try {
-        ReadConfigFile(mapArgs, mapMultiArgs);
-    } catch (const std::exception& e) {
+    try 
+    {
+        ReadConfigFile(mapArgs, mapMultiArgs, ASSETCHAINS_SYMBOL);
+        BITCOIND_RPCPORT = GetArg("-rpcport",BaseParams().RPCPort());        
+    } 
+    catch (const std::exception& e) 
+    {
         fprintf(stderr,"Error reading configuration file: %s\n", e.what());
         return EXIT_FAILURE;
     }

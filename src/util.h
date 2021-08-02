@@ -165,14 +165,6 @@ class missing_zcash_conf : public std::runtime_error {
 public:
     missing_zcash_conf() : std::runtime_error("Missing komodo.conf") { }
 };
-/*****
- * Read the config file, merge with the passed-in maps
- * @note reads ASSETCHAINS_SYMBOL.conf or Komodo.conf
- * @note sets BITCOIND_RPCPORT based on command line or config file
- * @param mapSettingsRet the map of parameters
- * @param mapMultiSettingsRet the map of duplicated parameters
- */
-void ReadConfigFile(std::map<std::string, std::string>& mapSettingsRet, std::map<std::string, std::vector<std::string> >& mapMultiSettingsRet);
 #ifdef _WIN32
 boost::filesystem::path GetSpecialFolderPath(int nFolder, bool fCreate = true);
 #endif
