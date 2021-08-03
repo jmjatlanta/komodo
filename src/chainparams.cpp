@@ -89,7 +89,7 @@ static CBlock CreateGenesisBlock(uint32_t nTime, const uint256& nNonce, const st
  *    timestamp before)
  * + Contains no strange transactions
  */
-void *chainparams_commandline();
+void chainparams_commandline();
 #include "komodo_defs.h"
 int32_t ASSETCHAINS_BLOCKTIME = 60;
 uint64_t ASSETCHAINS_NK[2];
@@ -552,11 +552,12 @@ void komodo_setactivation(int32_t height)
     fprintf(stderr,"SET SAPLING ACTIVATION height.%d\n",height);
 }
 
-void *chainparams_commandline()
+/*******
+ * Process command line and config file to set up the chain parameters
+ */
+void chainparams_commandline()
 {
-    fprintf(stderr,"chainparams_commandline called\n");
     CChainParams::CCheckpointData checkpointData;
-    //fprintf(stderr,">>>>>>>> port.%u\n",ASSETCHAINS_P2PPORT);
     if ( ASSETCHAINS_SYMBOL[0] != 0 )
     {
         if ( ASSETCHAINS_BLOCKTIME != 60 )
@@ -567,11 +568,10 @@ void *chainparams_commandline()
         pCurrentParams->SetDefaultPort(ASSETCHAINS_P2PPORT);
         if ( ASSETCHAINS_NK[0] != 0 && ASSETCHAINS_NK[1] != 0 )
         {
-            //BOOST_STATIC_ASSERT(equihash_parameters_acceptable(ASSETCHAINS_NK[0], ASSETCHAINS_NK[1]));
             pCurrentParams->SetNValue(ASSETCHAINS_NK[0]);
             pCurrentParams->SetKValue(ASSETCHAINS_NK[1]);
         }
-        if ( KOMODO_TESTNODE != 0 )
+        if ( IS_KOMODO_TESTNODE )
             pCurrentParams->SetMiningRequiresPeers(false);
         if ( ASSETCHAINS_RPCPORT == 0 )
             ASSETCHAINS_RPCPORT = ASSETCHAINS_P2PPORT + 1;
@@ -718,5 +718,5 @@ void *chainparams_commandline()
     pCurrentParams->SetCheckpointData(checkpointData);
 
     ASSETCHAIN_INIT = 1;
-    return(0);
+    return;
 }

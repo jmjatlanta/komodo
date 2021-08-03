@@ -31,6 +31,7 @@
 #include "utilstrencodings.h"
 #include "utiltime.h"
 #include "komodo_defs.h"
+#include "komodo_config.h"
 
 #include <stdarg.h>
 #include <sstream>
@@ -338,21 +339,13 @@ int LogPrintStr(const std::string &str)
     return ret;
 }
 
-static void InterpretNegativeSetting(string name, map<string, string>& mapSettingsRet)
-{
-    // interpret -nofoo as -foo=0 (and -nofoo=0 as -foo=1) as long as -foo not set
-    if (name.find("-no") == 0)
-    {
-        std::string positive("-");
-        positive.append(name.begin()+3, name.end());
-        if (mapSettingsRet.count(positive) == 0)
-        {
-            bool value = !GetBoolArg(name, false);
-            mapSettingsRet[positive] = (value ? "1" : "0");
-        }
-    }
-}
-
+/*****
+ * Read command line parameters and place them in collections
+ * @note this fills the globals mapArgs and mapMultiArgs
+ * @note this turns -nofoo into -foo=0 and -nofoo=0 into -foo=1
+ * @param argc number of arguments
+ * @param argv the arguments
+ */
 void ParseParameters(int argc, const char* const argv[])
 {
     mapArgs.clear();
@@ -360,34 +353,33 @@ void ParseParameters(int argc, const char* const argv[])
 
     for (int i = 1; i < argc; i++)
     {
-        std::string str(argv[i]);
-        std::string strValue;
-        size_t is_index = str.find('=');
+        std::string key(argv[i]);
+        std::string value;
+        size_t is_index = key.find('=');
         if (is_index != std::string::npos)
         {
-            strValue = str.substr(is_index+1);
-            str = str.substr(0, is_index);
+            value = key.substr(is_index+1);
+            key = key.substr(0, is_index);
         }
 #ifdef _WIN32
-        boost::to_lower(str);
-        if (boost::algorithm::starts_with(str, "/"))
-            str = "-" + str.substr(1);
+        boost::to_lower(key);
+        if (boost::algorithm::starts_with(key, "/"))
+            key = "-" + key.substr(1);
 #endif
 
-        if (str[0] != '-')
+        if (key[0] != '-')
             break;
 
         // Interpret --foo as -foo.
         // If both --foo and -foo are set, the last takes effect.
-        if (str.length() > 1 && str[1] == '-')
-            str = str.substr(1);
+        if (key.length() > 1 && key[1] == '-')
+            key = key.substr(1);
 
-        mapArgs[str] = strValue;
-        mapMultiArgs[str].push_back(strValue);
+        mapArgs[key] = value;
+        mapMultiArgs[key].push_back(value);
     }
 
-    // New 0.6 features:
-    BOOST_FOREACH(const PAIRTYPE(string,string)& entry, mapArgs)
+    for( auto entry : mapArgs )
     {
         // interpret -nofoo as -foo=0 (and -nofoo=0 as -foo=1) as long as -foo not set
         InterpretNegativeSetting(entry.first, mapArgs);
@@ -529,52 +521,47 @@ void PrintExceptionContinue(const std::exception* pex, const char* pszThread)
 }
 
 extern char ASSETCHAINS_SYMBOL[KOMODO_ASSETCHAIN_MAXLEN];
-//int64_t MAX_MONEY = 200000000 * 100000000LL;
 
 boost::filesystem::path GetDefaultDataDir()
 {
-    namespace fs = boost::filesystem;
-    char symbol[KOMODO_ASSETCHAIN_MAXLEN];
-    if ( ASSETCHAINS_SYMBOL[0] != 0 ){
-        strcpy(symbol,ASSETCHAINS_SYMBOL);
-    }
-    
-    else symbol[0] = 0;
-    // Windows < Vista: C:\Documents and Settings\Username\Application Data\Zcash
-    // Windows >= Vista: C:\Users\Username\AppData\Roaming\Zcash
-    // Mac: ~/Library/Application Support/Zcash
-    // Unix: ~/.zcash
+    // Windows < Vista: C:\Documents and Settings\Username\Application Data\Komodo
+    // Windows >= Vista: C:\Users\Username\AppData\Roaming\Komodo
+    // Mac: ~/Library/Application Support/Komodo
+    // Unix: ~/.komodo
+
+    std::string komodo = "Komodo";
+    boost::filesystem::path pathRet;
+
 #ifdef _WIN32
-    // Windows
-    if ( symbol[0] == 0 )
-        return GetSpecialFolderPath(CSIDL_APPDATA) / "Komodo";
-    else return GetSpecialFolderPath(CSIDL_APPDATA) / "Komodo" / symbol;
+    // windows
+    pathRet = GetSpecialFolderPath(CSIDL_APPDATA);
 #else
-    fs::path pathRet;
-    char* pszHome = getenv("HOME");
-    if (pszHome == NULL || strlen(pszHome) == 0)
-        pathRet = fs::path("/");
+    // max & Unix
+    std::string home = getenv("HOME");
+    if (home.empty())
+        pathRet = boost::filesystem::path("/");
     else
-        pathRet = fs::path(pszHome);
+        pathRet = boost::filesystem::path(home);
+
 #ifdef MAC_OSX
     // Mac
     pathRet /= "Library/Application Support";
-    TryCreateDirectory(pathRet);
-    if ( symbol[0] == 0 )
-        return pathRet / "Komodo";
-    else
-    {
-        pathRet /= "Komodo";
-        TryCreateDirectory(pathRet);
-        return pathRet / symbol;
-    }
 #else
-    // Unix
-    if ( symbol[0] == 0 )
-        return pathRet / ".komodo";
-    else return pathRet / ".komodo" / symbol;
+    komodo = ".komodo";
 #endif
 #endif
+
+    pathRet /= komodo;
+
+    std::string symbol(ASSETCHAINS_SYMBOL);
+    if (!symbol.empty())
+        pathRet /= symbol;
+
+#ifdef MAC_OSX
+    TryCreateDirectory(pathRet);
+#endif
+
+    return pathRet;
 }
 
 static boost::filesystem::path pathCached;
@@ -649,7 +636,6 @@ const boost::filesystem::path GetExportDir()
     return path;
 }
 
-
 const boost::filesystem::path &GetDataDir(bool fNetSpecific)
 {
     namespace fs = boost::filesystem;
@@ -686,57 +672,6 @@ void ClearDatadirCache()
 {
     pathCached = boost::filesystem::path();
     pathCachedNetSpecific = boost::filesystem::path();
-}
-
-boost::filesystem::path GetConfigFile()
-{
-    char confname[512];
-    if ( !mapArgs.count("-conf") && ASSETCHAINS_SYMBOL[0] != 0 ){
-        sprintf(confname,"%s.conf",ASSETCHAINS_SYMBOL);
-    }
-    else
-    {
-#ifdef __APPLE__
-        strcpy(confname,"Komodo.conf");
-#else
-        strcpy(confname,"komodo.conf");
-#endif
-    }
-    boost::filesystem::path pathConfigFile(GetArg("-conf",confname));
-    if (!pathConfigFile.is_complete()){
-        pathConfigFile = GetDataDir(false) / pathConfigFile;
-    }
-
-    //printf("DEBUG - util.cpp:710 correct pathConfigFile: %s\n",GetConfigFile().string().c_str());
-    return pathConfigFile;
-}
-
-void ReadConfigFile(map<string, string>& mapSettingsRet,
-                    map<string, vector<string> >& mapMultiSettingsRet)
-{
-
-    boost::filesystem::ifstream streamConfig(GetConfigFile());
-    if (!streamConfig.good())
-        throw missing_zcash_conf();
-    set<string> setOptions;
-    setOptions.insert("*");
-
-    for (boost::program_options::detail::config_file_iterator it(streamConfig, setOptions), end; it != end; ++it)
-    {
-        // Don't overwrite existing settings so command line settings override komodo.conf
-        string strKey = string("-") + it->string_key;
-        if (mapSettingsRet.count(strKey) == 0)
-        {
-            mapSettingsRet[strKey] = it->value[0];
-            // interpret nofoo=1 as foo=0 (and nofoo=0 as foo=1) as long as foo not set)
-            InterpretNegativeSetting(strKey, mapSettingsRet);
-        }
-        mapMultiSettingsRet[strKey].push_back(it->value[0]);
-    }
-    // If datadir is changed in .conf file:
-    ClearDatadirCache();
-    extern uint16_t BITCOIND_RPCPORT;
-    BITCOIND_RPCPORT = GetArg("-rpcport",BaseParams().RPCPort());
 }
 
 #ifndef _WIN32
@@ -778,7 +713,7 @@ bool TryCreateDirectory(const boost::filesystem::path& p)
 {
     try
     {
-        return boost::filesystem::create_directory(p);
+        return boost::filesystem::create_directories(p);
     } catch (const boost::filesystem::filesystem_error&) {
         if (!boost::filesystem::exists(p) || !boost::filesystem::is_directory(p))
             throw;

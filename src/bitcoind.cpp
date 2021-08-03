@@ -27,7 +27,7 @@
 #include "util.h"
 #include "httpserver.h"
 #include "httprpc.h"
-
+#include "komodo_config.h"
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/thread.hpp>
@@ -108,11 +108,14 @@ void WaitForShutdown(boost::thread_group* threadGroup)
 //
 // Start
 //
-extern int32_t IS_KOMODO_NOTARY,USE_EXTERNAL_PUBKEY;
+extern bool IS_KOMODO_NOTARY;
+extern int32_t USE_EXTERNAL_PUBKEY;
 extern uint32_t ASSETCHAIN_INIT;
 extern std::string NOTARY_PUBKEY;
 int32_t komodo_is_issuer();
 void komodo_passport_iteration();
+void komodo_args(char *argv0);
+void chainparams_commandline();
 
 bool AppInit(int argc, char* argv[])
 {
@@ -155,9 +158,7 @@ bool AppInit(int argc, char* argv[])
             fprintf(stderr, "Error: Invalid combination of -regtest and -testnet.\n");
             return false;
         }
-        void komodo_args(char *argv0);
         komodo_args(argv[0]);
-        void chainparams_commandline();
         chainparams_commandline();
 
         fprintf(stderr,"call komodo_args.(%s) NOTARY_PUBKEY.(%s)\n",argv[0],NOTARY_PUBKEY.c_str());
@@ -169,7 +170,9 @@ bool AppInit(int argc, char* argv[])
         }
         try
         {
-            ReadConfigFile(mapArgs, mapMultiArgs);
+            ReadConfigFile(mapArgs, mapMultiArgs, ASSETCHAINS_SYMBOL);
+            extern uint16_t BITCOIND_RPCPORT;
+            BITCOIND_RPCPORT = GetArg("-rpcport",BaseParams().RPCPort());            
         } catch (const missing_zcash_conf& e) {
             fprintf(stderr,
                 (_("Before starting komodod, you need to create a configuration file:\n"
@@ -184,7 +187,7 @@ bool AppInit(int argc, char* argv[])
                    "depending on how you installed Komodo:\n") +
                  _("- Source code:  %s\n"
                    "- .deb package: %s\n")).c_str(),
-                GetConfigFile().string().c_str(),
+                GetConfigFile(ASSETCHAINS_SYMBOL).c_str(),
                 "contrib/debian/examples/komodo.conf",
                 "/usr/share/doc/komodo/examples/komodo.conf");
             return false;

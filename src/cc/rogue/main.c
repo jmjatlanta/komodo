@@ -22,6 +22,9 @@
 #include <unistd.h>
 #include <curl/curl.h>
 #include <curl/easy.h>
+#include <cc/config_util.h>
+
+#include "bits256.h"
 
 char USERPASS[8192]; uint16_t ROGUE_PORT;
 extern char Gametxidstr[67];
@@ -31,12 +34,6 @@ extern char Gametxidstr[67];
 #define dstr(x) ((double)(x) / SATOSHIDEN)
 #define KOMODO_ASSETCHAIN_MAXLEN 65
 char ASSETCHAINS_SYMBOL[KOMODO_ASSETCHAIN_MAXLEN],IPADDRESS[100];
-
-#ifndef _BITS256
-#define _BITS256
-union _bits256 { uint8_t bytes[32]; uint16_t ushorts[16]; uint32_t uints[8]; uint64_t ulongs[4]; uint64_t txid; };
-typedef union _bits256 bits256;
-#endif
 
 #ifdef _WIN32
 #ifdef _MSC_VER
@@ -74,112 +71,6 @@ double OS_milliseconds()
     millis = ((double)tv.tv_sec * 1000. + (double)tv.tv_usec / 1000.);
     //printf("tv_sec.%ld usec.%d %f\n",tv.tv_sec,tv.tv_usec,millis);
     return(millis);
-}
-
-int32_t _unhex(char c)
-{
-    if ( c >= '0' && c <= '9' )
-        return(c - '0');
-    else if ( c >= 'a' && c <= 'f' )
-        return(c - 'a' + 10);
-    else if ( c >= 'A' && c <= 'F' )
-        return(c - 'A' + 10);
-    return(-1);
-}
-
-int32_t is_hexstr(char *str,int32_t n)
-{
-    int32_t i;
-    if ( str == 0 || str[0] == 0 )
-        return(0);
-    for (i=0; str[i]!=0; i++)
-    {
-        if ( n > 0 && i >= n )
-            break;
-        if ( _unhex(str[i]) < 0 )
-            break;
-    }
-    if ( n == 0 )
-        return(i);
-    return(i == n);
-}
-
-int32_t unhex(char c)
-{
-    int32_t hex;
-    if ( (hex= _unhex(c)) < 0 )
-    {
-        //printf("unhex: illegal hexchar.(%c)\n",c);
-    }
-    return(hex);
-}
-
-unsigned char _decode_hex(char *hex) { return((unhex(hex[0])<<4) | unhex(hex[1])); }
-
-int32_t decode_hex(uint8_t *bytes,int32_t n,char *hex)
-{
-    int32_t adjust,i = 0;
-    //printf("decode.(%s)\n",hex);
-    if ( is_hexstr(hex,n) <= 0 )
-    {
-        memset(bytes,0,n);
-        return(n);
-    }
-    if ( hex[n-1] == '\n' || hex[n-1] == '\r' )
-        hex[--n] = 0;
-    if ( n == 0 || (hex[n*2+1] == 0 && hex[n*2] != 0) )
-    {
-        if ( n > 0 )
-        {
-            bytes[0] = unhex(hex[0]);
-            printf("decode_hex n.%d hex[0] (%c) -> %d hex.(%s) [n*2+1: %d] [n*2: %d %c] len.%ld\n",n,hex[0],bytes[0],hex,hex[n*2+1],hex[n*2],hex[n*2],(long)strlen(hex));
-        }
-        bytes++;
-        hex++;
-        adjust = 1;
-    } else adjust = 0;
-    if ( n > 0 )
-    {
-        for (i=0; i<n; i++)
-            bytes[i] = _decode_hex(&hex[i*2]);
-    }
-    //bytes[i] = 0;
-    return(n + adjust);
-}
-
-char hexbyte(int32_t c)
-{
-    c &= 0xf;
-    if ( c < 10 )
-        return('0'+c);
-    else if ( c < 16 )
-        return('a'+c-10);
-    else return(0);
-}
-
-int32_t init_hexbytes_noT(char *hexbytes,unsigned char *message,long len)
-{
-    int32_t i;
-    if ( len <= 0 )
-    {
-        hexbytes[0] = 0;
-        return(1);
-    }
-    for (i=0; i<len; i++)
-    {
-        hexbytes[i*2] = hexbyte((message[i]>>4) & 0xf);
-        hexbytes[i*2 + 1] = hexbyte(message[i] & 0xf);
-        //printf("i.%d (%02x) [%c%c]\n",i,message[i],hexbytes[i*2],hexbytes[i*2+1]);
-    }
-    hexbytes[len*2] = 0;
-    //printf("len.%ld\n",len*2+1);
-    return((int32_t)len*2+1);
-}
-
-char *bits256_str(char hexstr[65],bits256 x)
-{
-    init_hexbytes_noT(hexstr,x.bytes,sizeof(x));
-    return(hexstr);
 }
 
 long _stripwhite(char *buf,int accept)
@@ -229,7 +120,7 @@ char *parse_conf_line(char *line,char *field)
     return(clonestr(line));
 }
 
-int32_t safecopy(char *dest,char *src,long len)
+int32_t safecopy(char *dest, const char *src,long len)
 {
     int32_t i = -1;
     if ( src != 0 && dest != 0 && src != dest )
@@ -263,7 +154,7 @@ int32_t rogue_replay(uint64_t seed,int32_t sleeptime);
 char *rogue_keystrokesload(int32_t *numkeysp,uint64_t seed,int32_t counter);
 int rogue(int argc, char **argv, char **envp);
 
-void *OS_loadfile(char *fname,uint8_t **bufp,long *lenp,long *allocsizep)
+void *OS_loadfile(const char *fname,uint8_t **bufp,long *lenp,long *allocsizep)
 {
     FILE *fp;
     long  filesize,buflen = *allocsizep;
@@ -301,7 +192,7 @@ void *OS_loadfile(char *fname,uint8_t **bufp,long *lenp,long *allocsizep)
     return(buf);
 }
 
-uint8_t *OS_fileptr(long *allocsizep,char *fname)
+uint8_t *OS_fileptr(long *allocsizep, const char *fname)
 {
     long filesize = 0; uint8_t *buf = 0; void *retptr;
     *allocsizep = 0;
@@ -619,106 +510,6 @@ char *curl_post(CURL **cHandlep,char *url,char *userpass,char *postfields,char *
     return(chunk.memory);
 }
 
-uint16_t _komodo_userpass(char *username, char *password, FILE *fp)
-{
-    char *rpcuser,*rpcpassword,*str,*ipaddress,line[8192]; uint16_t port = 0;
-    rpcuser = rpcpassword = 0;
-    username[0] = password[0] = 0;
-    while ( fgets(line,sizeof(line),fp) != 0 )
-    {
-        if ( line[0] == '#' )
-            continue;
-        //printf("line.(%s) %p %p\n",line,strstr(line,(char *)"rpcuser"),strstr(line,(char *)"rpcpassword"));
-        if ( (str= strstr(line,(char *)"rpcuser")) != 0 )
-            rpcuser = parse_conf_line(str,(char *)"rpcuser");
-        else if ( (str= strstr(line,(char *)"rpcpassword")) != 0 )
-            rpcpassword = parse_conf_line(str,(char *)"rpcpassword");
-        else if ( (str= strstr(line,(char *)"rpcport")) != 0 )
-        {
-            port = atoi(parse_conf_line(str,(char *)"rpcport"));
-            //fprintf(stderr,"rpcport.%u in file\n",port);
-        }
-        else if ( (str= strstr(line,(char *)"ipaddress")) != 0 )
-        {
-            ipaddress = parse_conf_line(str,(char *)"ipaddress");
-            strcpy(IPADDRESS,ipaddress);
-        }
-    }
-    if ( rpcuser != 0 && rpcpassword != 0 )
-    {
-        strcpy(username,rpcuser);
-        strcpy(password,rpcpassword);
-    }
-    //printf("rpcuser.(%s) rpcpassword.(%s) %u ipaddress.%s\n",rpcuser,rpcpassword,port,ipaddress);
-    if ( rpcuser != 0 )
-        free(rpcuser);
-    if ( rpcpassword != 0 )
-        free(rpcpassword);
-    return(port);
-}
-
-/*void komodo_statefname(char *fname,char *symbol,char *str)
-{
-    int32_t n,len;
-    sprintf(fname,"%s",getDataDir());
-    if ( (n= (int32_t)strlen(ASSETCHAINS_SYMBOL)) != 0 )
-    {
-        len = (int32_t)strlen(fname);
-        if ( strcmp(ASSETCHAINS_SYMBOL,&fname[len - n]) == 0 )
-            fname[len - n] = 0;
-        else
-        {
-            printf("unexpected fname.(%s) vs %s [%s] n.%d len.%d (%s)\n",fname,symbol,ASSETCHAINS_SYMBOL,n,len,&fname[len - n]);
-            return;
-        }
-    }
-    else
-    {
-#ifdef _WIN32
-        strcat(fname,"\\");
-#else
-        strcat(fname,"/");
-#endif
-    }
-    if ( symbol != 0 && symbol[0] != 0 && strcmp("KMD",symbol) != 0 )
-    {
-        strcat(fname,symbol);
-        //printf("statefname.(%s) -> (%s)\n",symbol,fname);
-#ifdef _WIN32
-        strcat(fname,"\\");
-#else
-        strcat(fname,"/");
-#endif
-    }
-    strcat(fname,str);
-    //printf("test.(%s) -> [%s] statename.(%s) %s\n",test,ASSETCHAINS_SYMBOL,symbol,fname);
-}*/
-
-uint16_t komodo_userpass(char *userpass,char *symbol)
-{
-    FILE *fp; uint16_t port = 0; char fname[512],username[512],password[512],confname[KOMODO_ASSETCHAIN_MAXLEN];
-    userpass[0] = 0;
-    if ( strcmp("KMD",symbol) == 0 )
-    {
-#ifdef __APPLE__
-        sprintf(confname,"Komodo.conf");
-#else
-        sprintf(confname,"komodo.conf");
-#endif
-    }
-    else sprintf(confname,"%s.conf",symbol);
-    //komodo_statefname(fname,symbol,confname);
-    if ( (fp= fopen(confname,"rb")) != 0 )
-    {
-        port = _komodo_userpass(username,password,fp);
-        sprintf(userpass,"%s:%s",username,password);
-        if ( strcmp(symbol,ASSETCHAINS_SYMBOL) == 0 )
-            strcpy(USERPASS,userpass);
-        fclose(fp);
-    }
-    return(port);
-}
-
 #define is_cJSON_True(json) ((json) != 0 && ((json)->type & 0xff) == cJSON_True)
 
 char *komodo_issuemethod(const char *userpass,const char *method,const char *params,uint16_t port)
@@ -974,6 +765,30 @@ static inline bool is_x64(void) {
 #endif // _WIN32
 #endif // _MSC_VER
 
+/******
+ * Fills in ROGUE_PORT, IPADDRESS, and USERPASS
+ * @param[in] symbol the symbol of the chain
+ * @returns 1 on success, 0 on failure
+ */
+uint8_t read_config(const char* symbol)
+{
+    // set defaults
+    ROGUE_PORT = 0;
+    strcpy(IPADDRESS, "127.0.0.1");
+    USERPASS[0] = 0;
+    struct rpc_info rpc;
+    memset(&rpc, 0, sizeof(struct rpc_info) );
+
+    if ( komodo_rpc_info(&rpc, ASSETCHAINS_SYMBOL) )
+    {
+        ROGUE_PORT = rpc.port;
+        strcpy(IPADDRESS, rpc.ipaddress);
+        sprintf(USERPASS, "%s:%s", rpc.username, rpc.password);
+        return 1;
+    }
+    return 0;
+}
+
 int main(int argc, char **argv, char **envp)
 {
     uint64_t seed; FILE *fp = 0; int32_t i,j,c; char userpass[8192];
@@ -1006,9 +821,7 @@ int main(int argc, char **argv, char **envp)
 	#endif
 	#endif
 
-    ROGUE_PORT = komodo_userpass(userpass,ASSETCHAINS_SYMBOL);
-    if ( IPADDRESS[0] == 0 )
-        strcpy(IPADDRESS,"127.0.0.1");
+    read_config(ASSETCHAINS_SYMBOL);
     printf("ASSETCHAINS_SYMBOL.(%s) port.%u (%s) IPADDRESS.%s \n",ASSETCHAINS_SYMBOL,ROGUE_PORT,USERPASS,IPADDRESS); sleep(1);
     if ( argc == 2 && (fp=fopen(argv[1],"rb")) == 0 )
     {

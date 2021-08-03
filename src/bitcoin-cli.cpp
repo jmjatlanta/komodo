@@ -24,6 +24,7 @@
 #include "rpc/protocol.h"
 #include "util.h"
 #include "utilstrencodings.h"
+#include "komodo_config.h"
 
 #include <boost/filesystem/operations.hpp>
 #include <stdio.h>
@@ -124,9 +125,13 @@ static int AppInitRPC(int argc, char* argv[])
         fprintf(stderr, "Error: Specified data directory \"%s\" does not exist.\n", mapArgs["-datadir"].c_str());
         return EXIT_FAILURE;
     }
-    try {
-        ReadConfigFile(mapArgs, mapMultiArgs);
-    } catch (const std::exception& e) {
+    try 
+    {
+        ReadConfigFile(mapArgs, mapMultiArgs, ASSETCHAINS_SYMBOL);
+        BITCOIND_RPCPORT = GetArg("-rpcport",BaseParams().RPCPort());        
+    } 
+    catch (const std::exception& e) 
+    {
         fprintf(stderr,"Error reading configuration file: %s\n", e.what());
         return EXIT_FAILURE;
     }
@@ -237,7 +242,7 @@ UniValue CallRPC(const std::string& strMethod, const UniValue& params)
             throw std::runtime_error(strprintf(
                 _("Could not locate RPC credentials. No authentication cookie could be found,\n"
                   "and no rpcpassword is set in the configuration file (%s)."),
-                    GetConfigFile().string().c_str()));
+                    GetConfigFile(ASSETCHAINS_SYMBOL).c_str()));
 
         }
     } else {
