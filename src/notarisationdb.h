@@ -25,6 +25,5 @@ void WriteBackNotarisations(const NotarisationsInBlock notarisations, CDBBatch &
 void EraseBackNotarisations(const NotarisationsInBlock notarisations, CDBBatch &batch);
 int ScanNotarisationsDB(int height, std::string symbol, int scanLimitBlocks, Notarisation& out);
 int ScanNotarisationsDB2(int height, std::string symbol, int scanLimitBlocks, Notarisation& out);
-bool IsTXSCL(const char* symbol);
 
 #endif  /* NOTARISATIONDB_H */

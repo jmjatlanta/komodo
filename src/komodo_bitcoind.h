@@ -2010,23 +2010,34 @@ uint64_t komodo_notarypayamount(int32_t nHeight, int64_t notarycount)
     return(ret);
 }
 
+/******
+ * Check that the notaraization is valid, return the notarized height
+ * @param timestamp
+ * @param height
+ * @param script the script
+ * @param len the length of the script
+ * @returns notarized height or 0 if invalid
+ */
 int32_t komodo_getnotarizedheight(uint32_t timestamp,int32_t height, uint8_t *script, int32_t len)
 {
-    // Check the notarisation is valid, and extract notarised height. 
-    uint64_t voutmask;
     uint8_t scriptbuf[10001]; 
-    int32_t isratification,specialtx,notarizedheight;
+    int32_t notarizedheight = 0;
 
     if ( len >= sizeof(uint32_t) && len <= sizeof(scriptbuf) )
     {
         memcpy(scriptbuf,script,len);
-        if ( komodo_voutupdate(true,&isratification,0,scriptbuf,len,height,uint256(),1,1,&voutmask,&specialtx,&notarizedheight,0,1,0,timestamp) != -2 )
+        uint64_t voutmask;
+        int32_t isratification;
+        int32_t specialtx;
+        if ( komodo_voutupdate(true,&isratification,0,scriptbuf,len,height,
+                uint256(),1,1,&voutmask,&specialtx,
+                &notarizedheight,0,1,0,timestamp) != -2 )
         {
             fprintf(stderr, "<<<<<<INVALID NOTARIZATION ht.%i\n",notarizedheight);
-            return(0);
+            return 0;
         }
-    } else return(0);
-    return(notarizedheight);
+    } 
+    return notarizedheight;
 }
 
 uint64_t komodo_notarypay(CMutableTransaction &txNew, std::vector<int8_t> &NotarisationNotaries, uint32_t timestamp, int32_t height, uint8_t *script, int32_t len)

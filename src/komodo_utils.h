@@ -2218,14 +2218,15 @@ struct komodo_state *komodo_stateptrget(char *base)
         return(&KOMODO_STATES[33]);
     else if ( (baseid= komodo_baseid(base)) >= 0 )
         return(&KOMODO_STATES[baseid+1]);
-    else return(&KOMODO_STATES[0]);
+    else 
+        return(&KOMODO_STATES[0]);
 }
 
 struct komodo_state *komodo_stateptr(char *symbol,char *dest)
 {
     int32_t baseid;
     komodo_nameset(symbol,dest,ASSETCHAINS_SYMBOL);
-    return(komodo_stateptrget(symbol));
+    return komodo_stateptrget(symbol);
 }
 
 void komodo_prefetch(FILE *fp)
