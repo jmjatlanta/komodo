@@ -8,7 +8,7 @@
 
 enum BlockSolverResult
 {
-    BSR_LOOP_BREAK, BSR_LOOP_CONTINUE, BSR_NORMAL
+    BSR_LOOP_BREAK, BSR_NORMAL
 };
 
 class BlockSolver

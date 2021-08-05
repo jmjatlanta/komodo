@@ -6,6 +6,7 @@
 #include "key.h"
 #include "main.h"
 #include "miner.h"
+#include "wallet/wallet.h"
 #include "notarisationdb.h"
 #include "random.h"
 #include "rpc/server.h"
@@ -352,8 +353,28 @@ CValidationState TestWallet::Transfer(std::shared_ptr<TestWallet> to, CAmount am
     return chain->acceptTx(fundTo);
 }
 
+/****
+ * @brief "mine" a block
+ */
 CValidationState TestWallet::Notarize()
 {
+    CChainParams chainParams = Params();
+    int32_t gpuCount = 1;
+    int32_t notaryId = 0;
+    unsigned int extraNonce = 0;
+    unsigned int n = 200;
+    unsigned int k = 9;
+    std::mutex my_mutex;
+    bool cancelSolver = false;
+    CReserveKey reserveKey(&internalWallet);
+    std::shared_ptr<TrompSolver> solver = std::make_shared<TrompSolver>();
+
+    auto result = MineOneBlock( chainParams, gpuCount, notaryId, extraNonce, 
+            solver, n, k, my_mutex, cancelSolver, &internalWallet, reserveKey);
+
+
+    /*
+    this->chain->Notarize();
     CMutableTransaction tx;
     auto available = GetAvailable(1);
     CTxIn incoming;
@@ -373,4 +394,7 @@ CValidationState TestWallet::Notarize()
     tx.vout.push_back(outReturn);
     CTransaction notarizeTx(tx);
     return chain->acceptTx(notarizeTx);
+    */
+   CValidationState retVal;
+   return retVal;
 }

@@ -22,7 +22,8 @@
 #define BITCOIN_MINER_H
 
 #include "primitives/block.h"
-
+#include "solver.h"
+#include "chainparams.h"
 #include <boost/optional.hpp>
 #include <stdint.h>
 
@@ -53,15 +54,70 @@ CBlockTemplate* CreateNewBlockWithKey();
 #endif
 
 #ifdef ENABLE_MINING
+
+/***
+ * Possible return values from mining
+ */
+enum BlockCreateResult
+{
+    BCR_CONTINUE, // loop should be restarted
+    BCR_BREAK, // loop should be exited
+    BCR_RETURN, // mining should be stopped
+    BCR_BLOCK_CREATED // mining successful
+};
+
 /** Modify the extranonce in a block */
 void IncrementExtraNonce(CBlock* pblock, CBlockIndex* pindexPrev, unsigned int& nExtraNonce);
+
+#ifdef ENABLE_WALLET
 /** Run the miner threads */
- #ifdef ENABLE_WALLET
 void GenerateBitcoins(bool fGenerate, CWallet* pwallet, int nThreads);
- #else
+
+/******
+ * @brief attempt to mine one block
+ * @param chainparams the chain parameters
+ * @param reservekey the reserve key
+ * @param gpucount gpu count
+ * @param notaryid the notary id
+ * @param nExtraNonce nonce
+ * @param solver the solver in use
+ * @param n
+ * @param k
+ * @param m_cs protects cancelSolver
+ * @param cancelSolver whether the solver process should be cancelled
+ * @param pwallet the wallet used for mining
+ */
+BlockCreateResult MineOneBlock(const CChainParams &chainparams, 
+        int32_t &gpucount, int32_t &notaryid,
+        unsigned int &nExtraNonce, std::shared_ptr<BlockSolver> solver,
+        unsigned int n, unsigned int k, std::mutex &m_cs, bool &cancelSolver
+        ,CWallet *pwallet, CReserveKey &reservekey);
+
+#else // (!ENABLE_WALLET)
+
+/** Run the miner threads */
 void GenerateBitcoins(bool fGenerate, int nThreads);
- #endif
-#endif
+
+/******
+ * @brief attempt to mine one block
+ * @param chainparams the chain parameters
+ * @param reservekey the reserve key
+ * @param gpucount gpu count
+ * @param notaryid the notary id
+ * @param nExtraNonce nonce
+ * @param solver the solver in use
+ * @param n
+ * @param k
+ * @param m_cs protects cancelSolver
+ * @param cancelSolver whether the solver process should be cancelled
+ * @param pwallet the wallet used for mining
+ */
+BlockCreateResult MineOneBlock(const CChainParams &chainparams, 
+        int32_t &gpucount, int32_t &notaryid,
+        unsigned int &nExtraNonce, std::shared_ptr<BlockSolver> solver,
+        unsigned int n, unsigned int k, std::mutex &m_cs, bool &cancelSolver);
+#endif // ENABLE_WALLET
+#endif // ENABLE_MINING
 
 void UpdateTime(CBlockHeader* pblock, const Consensus::Params& consensusParams, const CBlockIndex* pindexPrev);
 

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "main.h"
+#include "wallet/wallet.h"
 
 #define VCH(a,b) std::vector<unsigned char>(a, a + b)
 
@@ -159,4 +160,5 @@ private:
     CKey key;
     std::vector<std::pair<CTransaction, uint8_t>> availableTransactions;
     CScript destScript;
+    CWallet internalWallet;
 };
