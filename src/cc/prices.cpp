@@ -1879,8 +1879,6 @@ UniValue PricesRekt(int64_t txfee, uint256 bettxid, int32_t rektheight)
         for (int i = 0; i<1000000; i++, nonce++)
         {
             CMutableTransaction tmpmtx = mtx;
-            //int32_t len;
-            //uint8_t txbuf[32768];
 
             rawtx = FinalizeCCTx(0, &C, tmpmtx, mypk, txfee, prices_finalopret(true, bettxid, mypk, betinfo.lastheight, betinfo.averageCostbasis, betinfo.lastprice, betinfo.liquidationprice, betinfo.equity, myfee, nonce));
             //if ((len = (int32_t)rawtx.size()) > 0 && len < sizeof(txbuf) / sizeof(txbuf[0]) * 2)
