@@ -43,6 +43,11 @@ public:
      * ctor to create a chain
      */
     TestChain();
+    /*****
+     * Make a chain with a certain token symbol
+     */
+    TestChain(const std::string& symbol);
+    TestChain(const std::string& symbol, TestChain* notarizingChain);
     /**
      * Generate a block
      * @returns the block generated
@@ -69,8 +74,15 @@ public:
      * @returns the wallet
      */
     std::shared_ptr<TestWallet> AddWallet();
+    /***
+     * accept a notarization from a child chain
+     * @param tx the notarization
+     */
+    CValidationState Notarize(const CTransaction& tx);
 private:
     std::vector<std::shared_ptr<TestWallet>> toBeNotified;
+    std::string chainSymbol;
+    TestChain* notarizingChain;
 };
 
 /***
@@ -81,7 +93,16 @@ private:
 class TestWallet
 {
 public:
+    /****
+     * ctor, generate key
+     * @param chain the chain to watch
+     */
     TestWallet(TestChain* chain);
+    /*****
+     * ctor, use existing key
+     * @param chain the chain to watch
+     * @param in the key to use
+     */
     TestWallet(TestChain* chain, const CKey& in);
     /***
      * @returns the public key
@@ -129,6 +150,10 @@ public:
      * @returns the results
      */
     CValidationState Transfer(std::shared_ptr<TestWallet> to, CAmount amount, CAmount fee = 0);
+    /****
+     * Send notarization to parent chain
+     */
+    CValidationState Notarize();
 private:
     TestChain *chain;
     CKey key;

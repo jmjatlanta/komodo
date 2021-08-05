@@ -13,13 +13,15 @@
 #include "script/serverchecker.h"
 
 #include "testutils.h"
-
+#ifndef MAX_CURRENCIES
+#define MAX_CURRENCIES 32
+#endif
+extern char CURRENCIES[MAX_CURRENCIES+1][8];
+extern int32_t KOMODO_CONNECTING;
 
 extern int32_t komodo_notaries(uint8_t pubkeys[64][33],int32_t height,uint32_t timestamp);
 
-
 namespace TestEvalNotarisation {
-
 
     class EvalMock : public Eval
     {
@@ -203,6 +205,42 @@ TEST(TestEvalNotarisation, testInvalidNotarisationInputNotCheckSig)
     ASSERT_FALSE(eval.GetNotarisationData(notary.GetHash(), data));
 }
 
+TEST(TestEvalNotarisation, stateptrtest)
+{
+    // set up the "parent" chain that will hold notarizations
+    std::string notarizingSymbol("TEST235");
+    // put this in CURRENCIES as a hack to make notarization work
+    strcpy(CURRENCIES[10], notarizingSymbol.c_str());
+    TestChain parentChain(notarizingSymbol);
+    parentChain.generateBlock();
+    auto parentNotary = parentChain.AddWallet(parentChain.getNotaryKey());
+
+    // now set up the child chain
+    std::string childSymbol("TEST234");
+    TestChain childChain(childSymbol, &parentChain);
+
+    // force validation although not synced
+    //KOMODO_CONNECTING=0;
+
+    // make genesis block
+    childChain.generateBlock();
+
+    // create wallets for the child chain
+    auto childNotary = childChain.AddWallet(childChain.getNotaryKey());
+    auto childUser1 = childChain.AddWallet();
+    childChain.generateBlock();
+    // give the new wallet some tokens
+    auto firstTransferState = childNotary->Transfer(childUser1, 100000);
+    EXPECT_TRUE( firstTransferState.IsValid() );
+    childChain.generateBlock();
+    // Now the child tries to move some back
+    auto secondTransferState = childUser1->Transfer(childNotary, 50000);
+    EXPECT_TRUE( secondTransferState.IsValid() );
+    // child notary pushes notarization to notarizing chain
+    childNotary->Notarize();
+    // wait for notarization to appear on notarizing chain
+    // verify notarization exists and is valid
+}
 
 
 } /* namespace TestEvalNotarisation */

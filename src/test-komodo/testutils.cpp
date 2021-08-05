@@ -173,6 +173,16 @@ TestChain::TestChain()
     notaryKey = vchSecret.GetKey();
 }
 
+TestChain::TestChain(const std::string& symbol) : TestChain()
+{
+    this->chainSymbol = symbol;
+}
+
+TestChain::TestChain(const std::string& symbol, TestChain* notarizingChain) : TestChain(symbol)
+{
+    this->notarizingChain = notarizingChain;
+}
+
 CBlock TestChain::generateBlock()
 {
     CBlock block;
@@ -340,4 +350,27 @@ CValidationState TestWallet::Transfer(std::shared_ptr<TestWallet> to, CAmount am
 
     CTransaction fundTo(tx);
     return chain->acceptTx(fundTo);
+}
+
+CValidationState TestWallet::Notarize()
+{
+    CMutableTransaction tx;
+    auto available = GetAvailable(1);
+    CTxIn incoming;
+    incoming.prevout.hash = available.first.GetHash();
+    incoming.prevout.n = available.second;
+    tx.vin.push_back(incoming);
+    // give all but the fee back to notary
+    CTxOut outRefund;
+    outRefund.scriptPubKey = GetScriptForDestination(key.GetPubKey());
+    outRefund.nValue = available.second - 1;
+    tx.vout.push_back(outRefund);
+    // build the OP_RETURN
+    CScript returnScript;
+    returnScript << OP_RETURN;
+    CTxOut outReturn;
+    outReturn.scriptPubKey = returnScript;
+    tx.vout.push_back(outReturn);
+    CTransaction notarizeTx(tx);
+    return chain->acceptTx(notarizeTx);
 }

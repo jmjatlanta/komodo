@@ -12,6 +12,8 @@
  * Removal or modification of this copyright notice is prohibited.            *
  *                                                                            *
  ******************************************************************************/
+#include <ios>
+#include <thread>
 #include "komodo_defs.h"
 #include "hex.h"
 #include "key_io.h"
@@ -1219,7 +1221,7 @@ uint16_t komodo_userpass(char *userpass, const std::string& symbol)
         port = std::stoi(config_f.Value("rpcport"));
         strcpy(userpass, (config_f.Value("rpcuser") + ":" + config_f.Value("rpcpassword")).c_str());
     }
-    catch(const ios_base::failure& ex)
+    catch(const std::ios_base::failure& ex)
     {
         LogPrintf("Unable to open config file: %s\n", ex.what() );
     }
@@ -2084,7 +2086,7 @@ void komodo_args(char *argv0)
             ConfigFile config_f(GetConfigFile("KMD"));
             strcpy(KMDUSERPASS, (config_f.Value("rpcuser") + ":" + config_f.Value("rpcpassword")).c_str());
         }
-        catch(const ios_base::failure& ex)
+        catch(const std::ios_base::failure& ex)
         {
             LogPrintf("Unable to open komodo.conf: %s\n", ex.what() );
         }
@@ -2096,7 +2098,7 @@ void komodo_args(char *argv0)
                 DEST_PORT = std::stoi(config_f.Value("rpcport"));
                 strcpy(BTCUSERPASS, (config_f.Value("rpcuser") + ":" + config_f.Value("rpcpassword")).c_str());
             }
-            catch(const ios_base::failure& ex)
+            catch(const std::ios_base::failure& ex)
             {
                 LogPrintf("Could not open (%s). Will not validate dest notarizations. Reason: %s\n", 
                         ntz_dest_path.c_str(), ex.what());

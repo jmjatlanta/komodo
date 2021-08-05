@@ -8,14 +8,32 @@
 
 extern pthread_mutex_t staked_mutex;
 
+/****
+ * @brief Check if chain is staked
+ * On first run, compares chain_name to some values to return 0, 1, 2, 3, 4, or 255
+ * - 0 is the default
+ * - 1 if chain allows coin emissions
+ * - 2 if chain has no coin emission, block subsidy is always 0, and notary pay is allowed
+ * - 3 if chain has no special rules
+ * - 4 if chain is for testing
+ * - 255 for a banned chain
+ * On subsequent runs, if chain_name and ASSETCHAINS_SYMBOL is filled in, it returns the last run's 
+ * value with little checking
+ * @param chain_name the chain to check, function always returns 0 if chain_name is a null string
+ * @returns a value that makes little sense and may be inaccurate
+ */
 int8_t is_STAKED(const char *chain_name) 
 {
-    static int8_t STAKED,doneinit;
+    static int8_t STAKED;
+    static int8_t doneinit;
+
     if ( chain_name[0] == 0 )
-        return(0);
+        return 0;
+    // JMJ The following feels very presumptuous to me
     if (doneinit == 1 && ASSETCHAINS_SYMBOL[0] != 0)
         return(STAKED);
-    else STAKED = 0;
+    else 
+        STAKED = 0;
     if ( (strcmp(chain_name, "LABS") == 0) ) 
         STAKED = 1; // These chains are allowed coin emissions.
     else if ( (strncmp(chain_name, "LABS", 4) == 0) ) 
