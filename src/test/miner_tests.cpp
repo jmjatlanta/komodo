@@ -10,7 +10,6 @@
 #include "uint256.h"
 #include "util.h"
 #include "crypto/equihash.h"
-//#include "pow/tromp/equi_miner.h"
 
 #include "test/test_bitcoin.h"
 

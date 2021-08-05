@@ -348,6 +348,8 @@ libbitcoin_server_a_SOURCES = \
   rpc/server.cpp \
   script/serverchecker.cpp \
   script/sigcache.cpp \
+  solver_default.cpp \
+  solver_tromp.cpp \
   timedata.cpp \
   torcontrol.cpp \
   txdb.cpp \
