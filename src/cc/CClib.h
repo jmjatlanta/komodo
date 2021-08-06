@@ -1,5 +1,6 @@
 #pragma once
 #include "CCinclude.h"
+#include "hex.h"
 
 struct CClibContract_info : public CCcontract_info
 {
