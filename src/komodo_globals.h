@@ -16,6 +16,7 @@
 #include <mutex>
 #include "komodo_defs.h"
 #include "komodo_structs.h"
+#include "komodo_hardfork.h"
 
 void komodo_prefetch(FILE *fp);
 uint32_t komodo_heightstamp(int32_t height);

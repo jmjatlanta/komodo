@@ -124,6 +124,7 @@ std::ostream& operator<<(std::ostream& os, const event_rewind& in);
 struct event_notarized : public event
 {
     event_notarized() : event(komodo_event_type::EVENT_NOTARIZED, 0), notarizedheight(0), MoMdepth(0) {}
+    event_notarized(int32_t ht) : event(komodo_event_type::EVENT_NOTARIZED, ht), notarizedheight(0), MoMdepth(0) {}
     event_notarized(uint8_t* data, long &pos, long data_len, int32_t height, bool includeMoM = false);
     uint256 blockhash;
     uint256 desttxid;
@@ -140,6 +141,7 @@ struct event_pubkeys : public event
      * Default ctor
      */
     event_pubkeys() : event(EVENT_PUBKEYS, 0), num(0) {}
+    event_pubkeys(int32_t ht) : event(EVENT_PUBKEYS, ht), num(0) {}
     /***
      * ctor from data stream
      * @param data the data stream
@@ -166,6 +168,7 @@ std::ostream& operator<<(std::ostream& os, const event_u& in);
 struct event_kmdheight : public event
 {
     event_kmdheight() : event(EVENT_KMDHEIGHT, 0) {}
+    event_kmdheight(int32_t ht) : event(EVENT_KMDHEIGHT, ht) {}
     event_kmdheight(uint8_t *data, long &pos, long data_len, int32_t height, bool includeTimestamp = false);
     int32_t kheight = 0;
     uint32_t timestamp = 0;
@@ -175,19 +178,20 @@ std::ostream& operator<<(std::ostream& os, const event_kmdheight& in);
 struct event_opreturn : public event 
 { 
     event_opreturn() : event(EVENT_OPRETURN, 0) {}
+    event_opreturn(int32_t ht) : event(EVENT_OPRETURN, ht) {}
     event_opreturn(uint8_t *data, long &pos, long data_len, int32_t height);
     ~event_opreturn();
     uint256 txid; 
-    uint64_t value; 
-    uint16_t vout;
-    uint16_t oplen; 
-    uint8_t *opret = nullptr; 
+    uint16_t vout; 
+    uint64_t value;
+    std::vector<uint8_t> opret; 
 };
 std::ostream& operator<<(std::ostream& os, const event_opreturn& in);
 
 struct event_pricefeed : public event
 {
     event_pricefeed() : event(EVENT_PRICEFEED, 0) {}
+    event_pricefeed(int32_t ht) : event(EVENT_PRICEFEED, ht) {}
     event_pricefeed(uint8_t *data, long &pos, long data_len, int32_t height); 
     uint8_t num; 
     uint32_t prices[35]; 
