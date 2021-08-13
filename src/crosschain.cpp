@@ -12,8 +12,6 @@
  * Removal or modification of this copyright notice is prohibited.            *
  *                                                                            *
  ******************************************************************************/
-
-#include "cc/eval.h"
 #include "crosschain.h"
 #include "importcoin.h"
 #include "main.h"
@@ -48,6 +46,16 @@ CBlockIndex *komodo_getblockindex(uint256 hash);
 
 
 /* On KMD */
+
+/*********************
+ * @brief calculate the proof root of a given asset chain
+ * @param[in] symbol the asset chain
+ * @param[in] targetCCid the target ccid
+ * @param[in] kmdHeight the upper limit of blocks to scan
+ * @param[out] moms the MoMs found
+ * @param[out] destNotarisationTxid the notarization from the asset chain
+ * @returns the merkle root
+ */
 uint256 CalculateProofRoot(const char* symbol, uint32_t targetCCid, int kmdHeight,
         std::vector<uint256> &moms, uint256 &destNotarisationTxid)
 {
@@ -68,20 +76,21 @@ uint256 CalculateProofRoot(const char* symbol, uint32_t targetCCid, int kmdHeigh
     if (kmdHeight < 0 || kmdHeight > chainActive.Height())
         return uint256();
 
-    int seenOwnNotarisations = 0, i = 0;
-
-    int authority = GetSymbolAuthority(symbol);
+    int seenOwnNotarisations = 0;
+    auto authority = GetSymbolAuthority(symbol);
     std::set<uint256> tmp_moms;
 
-    for (i=0; i<NOTARISATION_SCAN_LIMIT_BLOCKS; i++) {
-        if (i > kmdHeight) break;
+    for (int i=0; i<NOTARISATION_SCAN_LIMIT_BLOCKS; i++) {
+        if (i > kmdHeight) 
+            break;
         NotarisationsInBlock notarisations;
         uint256 blockHash = *chainActive[kmdHeight-i]->phashBlock;
         if (!GetBlockNotarisations(blockHash, notarisations))
             continue;
 
         // See if we have an own notarisation in this block
-        BOOST_FOREACH(Notarisation& nota, notarisations) {
+        for(Notarisation& nota : notarisations) 
+        {
             if (strcmp(nota.second.symbol, symbol) == 0)
             {
                 seenOwnNotarisations++;
@@ -89,16 +98,17 @@ uint256 CalculateProofRoot(const char* symbol, uint32_t targetCCid, int kmdHeigh
                     destNotarisationTxid = nota.first;
                 else if (seenOwnNotarisations == 7)
                     goto end;
-                //break;
             }
         }
 
-        if (seenOwnNotarisations >= 1) {
-            BOOST_FOREACH(Notarisation& nota, notarisations) {
+        if (seenOwnNotarisations >= 1) 
+        {
+            for(Notarisation& nota : notarisations) 
+            {
                 if (GetSymbolAuthority(nota.second.symbol) == authority)
-                    if (nota.second.ccId == targetCCid) {
+                    if (nota.second.ccId == targetCCid) 
+                    {
                       tmp_moms.insert(nota.second.MoM);
-                      //fprintf(stderr, "added mom: %s\n",nota.second.MoM.GetHex().data());
                     }
             }
         }
@@ -113,7 +123,6 @@ end:
     // add set to vector. Set makes sure there are no dupes included. 
     moms.clear();
     std::copy(tmp_moms.begin(), tmp_moms.end(), std::back_inserter(moms));
-    //fprintf(stderr, "SeenOwnNotarisations.%i moms.size.%li blocks scanned.%i\n",seenOwnNotarisations, moms.size(), i);
     return GetMerkleRoot(moms);
 }
 
@@ -146,6 +155,16 @@ int ScanNotarisationsFromHeight(int nHeight, const IsTarget f, Notarisation &fou
 
 
 /* On KMD */
+
+/****************
+ * @brief given a proof from an assetchain A, find the proof root on B that includes A
+ * @param txid
+ * @param targetSymbol asset chain symbol
+ * @param targetCCid
+ * @param assetChainProof
+ * @param offset
+ * @returns the proof root
+ */
 TxProof GetCrossChainProof(const uint256 txid, const char* targetSymbol, uint32_t targetCCid,
         const TxProof assetChainProof, int32_t offset)
 {
@@ -176,9 +195,7 @@ TxProof GetCrossChainProof(const uint256 txid, const char* targetSymbol, uint32_
     // at all. So, the thing we need to do is scan forwards to find the notarisation for B,
     // that is inclusive of A.
     Notarisation nota;
-    auto isTarget = [&](Notarisation &nota) {
-        return strcmp(nota.second.symbol, targetSymbol) == 0;
-    };
+    auto isTarget = [&](Notarisation &nota) { return strcmp(nota.second.symbol, targetSymbol) == 0; };
     kmdHeight = ScanNotarisationsFromHeight(kmdHeight, isTarget, nota);
     if (!kmdHeight)
         throw std::runtime_error("Cannot find notarisation for target inclusive of source");
@@ -195,18 +212,22 @@ TxProof GetCrossChainProof(const uint256 txid, const char* targetSymbol, uint32_
 
     // Find index of source MoM in MoMoM
     int nIndex;
-    for (nIndex=0; nIndex<moms.size(); nIndex++) {
+    for (nIndex=0; nIndex<moms.size(); nIndex++) 
+    {
         if (moms[nIndex] == MoM)
             goto cont;
     }
+
     throw std::runtime_error("Couldn't find MoM within MoMoM set");
+
 cont:
 
     // Create a branch
     std::vector<uint256> vBranch;
     {
         CBlock fakeBlock;
-        for (int i=0; i<moms.size(); i++) {
+        for (int i=0; i<moms.size(); i++) 
+        {
             CTransaction fakeTx;
             // first value in CTransaction memory is it's hash
             memcpy((void*)&fakeTx, moms[i].begin(), 32);
@@ -227,25 +248,33 @@ cont:
 }
 
 
-/*
- * Takes an importTx that has proof leading to assetchain root
+/***************************
+ * @brief Takes an importTx that has proof leading to assetchain root
  * and extends proof to cross chain root
+ * @param importTx
+ * @param offset
  */
 void CompleteImportTransaction(CTransaction &importTx, int32_t offset)
 {
-    ImportProof proof; CTransaction burnTx; std::vector<CTxOut> payouts; std::vector<uint8_t> rawproof;
+    ImportProof proof; 
+    CTransaction burnTx; 
+    std::vector<CTxOut> payouts; 
+
     if (!UnmarshalImportTx(importTx, proof, burnTx, payouts))
         throw std::runtime_error("Couldn't unmarshal importTx");
 
     std::string targetSymbol;
     uint32_t targetCCid;
     uint256 payoutsHash;
+    std::vector<uint8_t> rawproof;
+
     if (!UnmarshalBurnTx(burnTx, targetSymbol, &targetCCid, payoutsHash, rawproof))
         throw std::runtime_error("Couldn't unmarshal burnTx");
 
     TxProof merkleBranch;
     if( !proof.IsMerkleBranch(merkleBranch) )
         throw std::runtime_error("Incorrect import tx proof");
+
     TxProof newMerkleBranch = GetCrossChainProof(burnTx.GetHash(), targetSymbol.data(), targetCCid, merkleBranch, offset);
     ImportProof newProof(newMerkleBranch);
 
@@ -281,7 +310,12 @@ bool GetNextBacknotarisation(uint256 kmdNotarisationTxid, Notarisation &out)
     return (bool) ScanNotarisationsFromHeight(block.GetHeight()+1, &IsSameAssetChain, out);
 }
 
-
+/***************
+ * @brief check a notarization
+ * @param kmdNotarisationHash the hash
+ * @param momom The Merkle Root of Merkle Root of Merkle Root
+ * @returns true on success
+ */
 bool CheckMoMoM(uint256 kmdNotarisationHash, uint256 momom)
 {
     /*
@@ -310,15 +344,14 @@ bool CheckMoMoM(uint256 kmdNotarisationHash, uint256 momom)
     };
 
     return (bool) ScanNotarisationsFromHeight(block.GetHeight()-100, checkMoMoM, nota);
-
 }
 
-/*
-* Check notaries approvals for the txoutproofs of burn tx
+/**************************
+* @brief Check notaries approvals for the txoutproofs of burn tx
 * (alternate check if MoMoM check has failed)
-* Params:
-* burntxid - txid of burn tx on the source chain
-* rawproof - array of txids of notaries' proofs
+* @param burntxid txid of burn tx on the source chain
+* @param notaryTxidsarray collection of txids of notaries' proofs
+* @returns true on success
 */
 bool CheckNotariesApproval(uint256 burntxid, const std::vector<uint256> & notaryTxids) 
 {
@@ -418,13 +451,12 @@ bool CheckNotariesApproval(uint256 burntxid, const std::vector<uint256> & notary
     return retcode;
 }
 
-
-/*
- * On assetchain
- * in: txid
- * out: pair<notarisationTxHash,merkleBranch>
+/***************
+ * @brief given a transaction, find its proof
+ * @param hash the tx hash
+ * @param burnTx not used
+ * @returns the proof (a pair<notarizationTxHash, merkleBranch>)
  */
-
 TxProof GetAssetchainProof(uint256 hash,CTransaction burnTx)
 {
     int nIndex;

@@ -3,39 +3,51 @@
 #include "notarisationdb.h"
 #include "notaries_staked.h"
 
-int GetSymbolAuthority(const char* symbol)
+/***
+ * @brief determine the chain type
+ * @param symbol the symbol for the chain
+ * @returns the chain type
+ */
+CrosschainType GetSymbolAuthority(const char* symbol)
 {
     if (strncmp(symbol, "TXSCL", 5) == 0)
         return CROSSCHAIN_TXSCL;
-    if (is_STAKED(symbol) != 0) {
-        //printf("RETURNED CROSSCHAIN STAKED AS TRUE\n");
+    if (is_STAKED(symbol) != 0)
         return CROSSCHAIN_STAKED;
-    }
-    //printf("RETURNED CROSSCHAIN KOMODO AS TRUE\n");
     return CROSSCHAIN_KOMODO;
 }
 
-
+/*****
+ * @brief Verify the tx notarization is valid
+ * @param tx the transaction
+ * @param auth the authorities for the chain
+ * @returns true on success
+ */
 bool CheckTxAuthority(const CTransaction &tx, CrosschainAuthority auth)
 {
-    EvalRef eval;
-
-    if (tx.vin.size() < auth.requiredSigs) return false;
+    if (tx.vin.size() < auth.requiredSigs) 
+        return false;
 
     uint8_t seen[64] = {0};
+    EvalRef eval;
 
-    BOOST_FOREACH(const CTxIn &txIn, tx.vin)
+    for(const CTxIn &txIn : tx.vin)
     {
         // Get notary pubkey
         CTransaction tx;
         uint256 hashBlock;
-        if (!eval->GetTxUnconfirmed(txIn.prevout.hash, tx, hashBlock)) return false;
-        if (tx.vout.size() < txIn.prevout.n) return false;
+        if (!eval->GetTxUnconfirmed(txIn.prevout.hash, tx, hashBlock)) 
+            return false;
+        if (tx.vout.size() < txIn.prevout.n) 
+            return false;
         CScript spk = tx.vout[txIn.prevout.n].scriptPubKey;
-        if (spk.size() != 35) return false;
+        if (spk.size() != 35) 
+            return false;
         const unsigned char *pk = &spk[0];
-        if (pk++[0] != 33) return false;
-        if (pk[33] != OP_CHECKSIG) return false;
+        if (pk++[0] != 33) 
+            return false;
+        if (pk[33] != OP_CHECKSIG) 
+            return false;
 
         // Check it's a notary
         for (int i=0; i<auth.size; i++) {
@@ -43,13 +55,13 @@ bool CheckTxAuthority(const CTransaction &tx, CrosschainAuthority auth)
                 if (memcmp(pk, auth.notaries[i], 33) == 0) {
                     seen[i] = 1;
                     goto found;
-                } else {
-                    //printf("notary.%i is not valid!\n",i);
                 }
             }
         }
-
+        // no authorized notary found
         return false;
+
+        // authorized notary found
         found:;
     }
 

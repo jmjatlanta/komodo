@@ -32,7 +32,7 @@ NotarisationsInBlock ScanBlockNotarisations(const CBlock &block, int nHeight)
           continue;
 
         //printf("Checked notarisation data for %s \n",data.symbol);
-        int authority = GetSymbolAuthority(data.symbol);
+        auto authority = GetSymbolAuthority(data.symbol);
 
         if (authority == CROSSCHAIN_KOMODO) {
             if (!eval->CheckNotaryInputs(tx, nHeight, block.nTime))
