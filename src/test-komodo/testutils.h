@@ -76,10 +76,10 @@ public:
      */
     std::shared_ptr<TestWallet> AddWallet();
     /***
-     * accept a notarization from a child chain
-     * @param tx the notarization
+     * Create a notarization
      */
-    CValidationState Notarize(const CTransaction& tx);
+    CValidationState Notarize(CWallet& wallet);
+    CBlockIndex *LastBlock();
 private:
     std::vector<std::shared_ptr<TestWallet>> toBeNotified;
     std::string chainSymbol;

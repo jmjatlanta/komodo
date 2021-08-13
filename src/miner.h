@@ -24,6 +24,7 @@
 #include "primitives/block.h"
 #include "solver.h"
 #include "chainparams.h"
+#include "consensus/validation.h"
 #include <boost/optional.hpp>
 #include <stdint.h>
 
@@ -85,13 +86,15 @@ void GenerateBitcoins(bool fGenerate, CWallet* pwallet, int nThreads);
  * @param k
  * @param m_cs protects cancelSolver
  * @param cancelSolver whether the solver process should be cancelled
+ * @param validationResult the result of the validation
  * @param pwallet the wallet used for mining
+ * @param reserveKey the key to use
  */
 BlockCreateResult MineOneBlock(const CChainParams &chainparams, 
         int32_t &gpucount, int32_t &notaryid,
         unsigned int &nExtraNonce, std::shared_ptr<BlockSolver> solver,
-        unsigned int n, unsigned int k, std::mutex &m_cs, bool &cancelSolver
-        ,CWallet *pwallet, CReserveKey &reservekey);
+        unsigned int n, unsigned int k, std::mutex &m_cs, bool &cancelSolver,
+        CValidationState &validationResult ,CWallet *pwallet, CReserveKey &reservekey);
 
 #else // (!ENABLE_WALLET)
 
@@ -115,7 +118,8 @@ void GenerateBitcoins(bool fGenerate, int nThreads);
 BlockCreateResult MineOneBlock(const CChainParams &chainparams, 
         int32_t &gpucount, int32_t &notaryid,
         unsigned int &nExtraNonce, std::shared_ptr<BlockSolver> solver,
-        unsigned int n, unsigned int k, std::mutex &m_cs, bool &cancelSolver);
+        unsigned int n, unsigned int k, std::mutex &m_cs, bool &cancelSolver,
+        CValidationState &validationResult);
 #endif // ENABLE_WALLET
 #endif // ENABLE_MINING
 

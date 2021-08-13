@@ -1838,12 +1838,15 @@ BlockCreateResult Search(CBlock *pblock, CBlockIndex *pindexPrev, int32_t notary
  * @param k
  * @param m_cs protects cancelSolver
  * @param cancelSolver whether the solver process should be cancelled
+ * @param[out] validationResult the block validation data
  * @param pwallet the wallet used for mining
+ * @param reservekey
  */
 BlockCreateResult MineOneBlock(const CChainParams &chainparams, 
         int32_t &gpucount, int32_t &notaryid,
         unsigned int &nExtraNonce, std::shared_ptr<BlockSolver> solver,
-        unsigned int n, unsigned int k, std::mutex &m_cs, bool &cancelSolver
+        unsigned int n, unsigned int k, std::mutex &m_cs, bool &cancelSolver,
+        CValidationState &validationResult
 #ifdef ENABLE_WALLET
         ,CWallet *pwallet, CReserveKey &reservekey)
 #else
@@ -1934,7 +1937,7 @@ BlockCreateResult MineOneBlock(const CChainParams &chainparams,
         // define the validBlock lambda
         std::function<bool(std::vector<unsigned char>)> validBlock =
 #ifdef ENABLE_WALLET
-        [&block, &hashTarget, &pwallet, &reservekey, &m_cs, &cancelSolver, &chainparams, &hashTarget_POW]
+        [&block, &hashTarget, &pwallet, &reservekey, &m_cs, &cancelSolver, &chainparams, &hashTarget_POW, &validationResult]
 #else
         [&block, &hashTarget, &m_cs, &cancelSolver, &chainparams, &hashTarget_POW]
 #endif
@@ -1989,8 +1992,7 @@ BlockCreateResult MineOneBlock(const CChainParams &chainparams,
                     fprintf(stderr,"%02x",((uint8_t *)&tmp)[z]);
                 fprintf(stderr, "\n");
             }
-            CValidationState state;
-            if ( !TestBlockValidity(state,B, chainActive.LastTip(), true, false))
+            if ( !TestBlockValidity(validationResult,B, chainActive.LastTip(), true, false))
             {
                 h = UintToArith256(B.GetHash());
                 gotinvalid = 1;
@@ -2131,8 +2133,9 @@ void static BitcoinMiner()
         // main mining loop
         while (true)
         {
+            CValidationState validationResult;
             auto miningResult = MineOneBlock(chainparams, gpucount, notaryid, nExtraNonce, solver,
-                    n, k, m_cs, cancelSolver
+                    n, k, m_cs, cancelSolver, validationResult
 #ifdef ENABLE_WALLET
                     , pwallet, reservekey);
 #else

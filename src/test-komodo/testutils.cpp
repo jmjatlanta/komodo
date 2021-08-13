@@ -220,6 +220,31 @@ std::shared_ptr<TestWallet> TestChain::AddWallet()
     return retVal;
 }
 
+CValidationState TestChain::Notarize(CWallet& wallet)
+{
+    CChainParams chainParams = Params();
+    int32_t gpuCount = 1;
+    int32_t notaryId = 0;
+    unsigned int extraNonce = 0;
+    unsigned int n = 200;
+    unsigned int k = 9;
+    std::mutex my_mutex;
+    bool cancelSolver = false;
+    CReserveKey reserveKey(&wallet);
+    std::shared_ptr<TrompSolver> solver = std::make_shared<TrompSolver>();
+    CValidationState validationResult;
+
+    auto result = MineOneBlock( chainParams, gpuCount, notaryId, extraNonce, 
+            solver, n, k, my_mutex, cancelSolver, validationResult, &wallet, reserveKey);
+
+  return validationResult;
+}
+
+CBlockIndex *TestChain::LastBlock()
+{
+    return chainActive.LastTip();
+}
+
 
 /***
  * A simplistic (dumb) wallet for helping with testing
@@ -358,43 +383,5 @@ CValidationState TestWallet::Transfer(std::shared_ptr<TestWallet> to, CAmount am
  */
 CValidationState TestWallet::Notarize()
 {
-    CChainParams chainParams = Params();
-    int32_t gpuCount = 1;
-    int32_t notaryId = 0;
-    unsigned int extraNonce = 0;
-    unsigned int n = 200;
-    unsigned int k = 9;
-    std::mutex my_mutex;
-    bool cancelSolver = false;
-    CReserveKey reserveKey(&internalWallet);
-    std::shared_ptr<TrompSolver> solver = std::make_shared<TrompSolver>();
-
-    auto result = MineOneBlock( chainParams, gpuCount, notaryId, extraNonce, 
-            solver, n, k, my_mutex, cancelSolver, &internalWallet, reserveKey);
-
-
-    /*
-    this->chain->Notarize();
-    CMutableTransaction tx;
-    auto available = GetAvailable(1);
-    CTxIn incoming;
-    incoming.prevout.hash = available.first.GetHash();
-    incoming.prevout.n = available.second;
-    tx.vin.push_back(incoming);
-    // give all but the fee back to notary
-    CTxOut outRefund;
-    outRefund.scriptPubKey = GetScriptForDestination(key.GetPubKey());
-    outRefund.nValue = available.second - 1;
-    tx.vout.push_back(outRefund);
-    // build the OP_RETURN
-    CScript returnScript;
-    returnScript << OP_RETURN;
-    CTxOut outReturn;
-    outReturn.scriptPubKey = returnScript;
-    tx.vout.push_back(outReturn);
-    CTransaction notarizeTx(tx);
-    return chain->acceptTx(notarizeTx);
-    */
-   CValidationState retVal;
-   return retVal;
+    return chain->Notarize(internalWallet);
 }

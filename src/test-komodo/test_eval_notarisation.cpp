@@ -236,8 +236,15 @@ TEST(TestEvalNotarisation, stateptrtest)
     // Now the child tries to move some back
     auto secondTransferState = childUser1->Transfer(childNotary, 50000);
     EXPECT_TRUE( secondTransferState.IsValid() );
+    CBlockIndex *before = childChain.LastBlock();
     // child notary pushes notarization to notarizing chain
-    childNotary->Notarize();
+    CValidationState notarizationResult = childNotary->Notarize();
+    EXPECT_TRUE( notarizationResult.IsValid() );
+    CBlockIndex *after = childChain.LastBlock();
+    EXPECT_NE( before, after );
+    std::cout << "Before: " << std::to_string(before->GetHeight())
+            << " After: " << std::to_string(after->GetHeight())
+            << "\n";
     // wait for notarization to appear on notarizing chain
     // verify notarization exists and is valid
 }
