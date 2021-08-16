@@ -207,6 +207,10 @@ TEST(TestEvalNotarisation, testInvalidNotarisationInputNotCheckSig)
 
 TEST(TestEvalNotarisation, stateptrtest)
 {
+    // turn on logging messages
+    fDebug = true;
+    fPrintToConsole = true;
+
     // set up the "parent" chain that will hold notarizations
     std::string notarizingSymbol("TEST235");
     // put this in CURRENCIES as a hack to make notarization work
@@ -218,9 +222,6 @@ TEST(TestEvalNotarisation, stateptrtest)
     // now set up the child chain
     std::string childSymbol("TEST234");
     TestChain childChain(childSymbol, &parentChain);
-
-    // force validation although not synced
-    //KOMODO_CONNECTING=0;
 
     // make genesis block
     childChain.generateBlock();
@@ -242,9 +243,6 @@ TEST(TestEvalNotarisation, stateptrtest)
     EXPECT_TRUE( notarizationResult.IsValid() );
     CBlockIndex *after = childChain.LastBlock();
     EXPECT_NE( before, after );
-    std::cout << "Before: " << std::to_string(before->GetHeight())
-            << " After: " << std::to_string(after->GetHeight())
-            << "\n";
     // wait for notarization to appear on notarizing chain
     // verify notarization exists and is valid
 }
