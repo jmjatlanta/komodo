@@ -49,6 +49,7 @@
 using namespace std;
 
 extern int32_t KOMODO_INSYNC;
+const char *komodo_currency(uint8_t index);
 extern void TxToJSON(const CTransaction& tx, const uint256 hashBlock, UniValue& entry);
 void ScriptPubKeyToJSON(const CScript& scriptPubKey, UniValue& out, bool fIncludeHex);
 int32_t komodo_notarized_height(int32_t *prevMoMheightp,uint256 *hashp,uint256 *txidp);
@@ -1101,8 +1102,8 @@ UniValue notaries(const UniValue& params, bool fHelp, const CPubKey& mypk)
 }
 
 int32_t komodo_pending_withdraws(char *opretstr);
-int32_t pax_fiatstatus(uint64_t *available,uint64_t *deposited,uint64_t *issued,uint64_t *withdrawn,uint64_t *approved,uint64_t *redeemed,char *base);
-extern char CURRENCIES[][8];
+int32_t pax_fiatstatus(uint64_t *available,uint64_t *deposited,uint64_t *issued,uint64_t *withdrawn,
+        uint64_t *approved,uint64_t *redeemed, const char *base);
 
 UniValue paxpending(const UniValue& params, bool fHelp, const CPubKey& mypk)
 {
@@ -1116,7 +1117,7 @@ UniValue paxpending(const UniValue& params, bool fHelp, const CPubKey& mypk)
     for (baseid=0; baseid<32; baseid++)
     {
         UniValue item(UniValue::VOBJ); UniValue obj(UniValue::VOBJ);
-        if ( pax_fiatstatus(&available,&deposited,&issued,&withdrawn,&approved,&redeemed,CURRENCIES[baseid]) == 0 )
+        if ( pax_fiatstatus(&available,&deposited,&issued,&withdrawn,&approved,&redeemed,komodo_currency(baseid)) == 0 )
         {
             if ( deposited != 0 || issued != 0 || withdrawn != 0 || approved != 0 || redeemed != 0 )
             {
@@ -1126,7 +1127,7 @@ UniValue paxpending(const UniValue& params, bool fHelp, const CPubKey& mypk)
                 item.push_back(Pair("withdrawn", ValueFromAmount(withdrawn)));
                 item.push_back(Pair("approved", ValueFromAmount(approved)));
                 item.push_back(Pair("redeemed", ValueFromAmount(redeemed)));
-                obj.push_back(Pair(CURRENCIES[baseid],item));
+                obj.push_back(Pair(komodo_currency(baseid),item));
                 a.push_back(obj);
             }
         }

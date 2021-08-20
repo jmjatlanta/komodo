@@ -1248,7 +1248,7 @@ int32_t komodo_nextheight()
 int32_t komodo_isrealtime(int32_t *kmdheightp)
 {
     struct komodo_state *sp; CBlockIndex *pindex;
-    if ( (sp= komodo_stateptrget((char *)"KMD")) != 0 )
+    if ( (sp= komodo_stateptrget("KMD")) != 0 )
         *kmdheightp = sp->CURRENT_HEIGHT;
     else *kmdheightp = 0;
     if ( (pindex= chainActive.LastTip()) != 0 && pindex->GetHeight() >= (int32_t)komodo_longestchain() )

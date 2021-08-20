@@ -52,7 +52,6 @@
 #define HRK 31
 
 #define MAX_CURRENCIES 32
-extern char CURRENCIES[][8];
 
 uint64_t M1SUPPLY[] = { 3317900000000, 6991604000000, 667780000000000, 1616854000000, 331000000000, 861909000000, 584629000000, 46530000000, // major currencies
     45434000000000, 16827000000000, 3473357229000, 306435000000, 27139000000000, 2150641000000, 347724099000, 1469583000000, 749543000000, 1826110000000, 2400434000000, 1123925000000, 3125276000000, 13975000000000, 317657000000, 759706000000000, 354902000000, 2797061000000, 162189000000, 163745000000, 1712000000000, 39093000000, 1135490000000000, 80317000000,
@@ -475,7 +474,6 @@ uint64_t komodo_paxcalc(int32_t height,uint32_t *pvals,int32_t baseid,int32_t re
             if ( baseid != MAX_CURRENCIES )
             {
                 pax_rank(ranked,pvals);
-                //printf("%s M1 percentage %.8f\n",CURRENCIES[baseid],dstr(10 * ranked[baseid]));
                 return(10 * ranked[baseid]); // scaled percentage of M1 total
             } else return(basevolume);
         }
@@ -489,12 +487,13 @@ uint64_t komodo_paxcalc(int32_t height,uint32_t *pvals,int32_t baseid,int32_t re
                 basevolume *= (MINDENOMS[relid] / MINDENOMS[baseid]);
             return(komodo_paxvol(basevolume,baserel));
         }
-        else printf("null pval for %s\n",CURRENCIES[relid]);
-    } else printf("null pval for %s\n",CURRENCIES[baseid]);
+        else printf("null pval for %s\n", komodo_currency(relid));
+    } else printf("null pval for %s\n", komodo_currency(baseid));
     return(0);
 }
 
-uint64_t _komodo_paxprice(uint64_t *kmdbtcp,uint64_t *btcusdp,int32_t height,char *base,char *rel,uint64_t basevolume,uint64_t kmdbtc,uint64_t btcusd)
+uint64_t _komodo_paxprice(uint64_t *kmdbtcp,uint64_t *btcusdp,int32_t height,const char *base,
+        const char *rel,uint64_t basevolume,uint64_t kmdbtc,uint64_t btcusd)
 {
     int32_t baseid=-1,relid=-1,i; uint32_t *ptr,*pvals;
     if ( height > 10 )
@@ -553,7 +552,7 @@ int32_t komodo_kmdbtcusd(int32_t rwflag,uint64_t *kmdbtcp,uint64_t *btcusdp,int3
     else return(-1);
 }
 
-uint64_t _komodo_paxpriceB(uint64_t seed,int32_t height,char *base,char *rel,uint64_t basevolume)
+uint64_t _komodo_paxpriceB(uint64_t seed,int32_t height,const char *base,const char *rel,uint64_t basevolume)
 {
     int32_t i,j,k,ind,zeroes,numvotes,wt,nonz; int64_t delta; uint64_t lastprice,tolerance,den,densum,sum=0,votes[sizeof(Peggy_inds)/sizeof(*Peggy_inds)],btcusds[sizeof(Peggy_inds)/sizeof(*Peggy_inds)],kmdbtcs[sizeof(Peggy_inds)/sizeof(*Peggy_inds)],kmdbtc,btcusd;
     if ( basevolume > KOMODO_PAXMAX )
@@ -602,7 +601,7 @@ uint64_t _komodo_paxpriceB(uint64_t seed,int32_t height,char *base,char *rel,uin
     return(komodo_paxcorrelation(votes,numvotes,seed) * basevolume / 100000);
 }
 
-uint64_t komodo_paxpriceB(uint64_t seed,int32_t height,char *base,char *rel,uint64_t basevolume)
+uint64_t komodo_paxpriceB(uint64_t seed,int32_t height,const char *base,const char *rel,uint64_t basevolume)
 {
     uint64_t baseusd,basekmd,usdkmd; int32_t baseid = komodo_baseid(base);
     if ( height >= 236000 && strcmp(rel,"kmd") == 0 )
@@ -634,7 +633,7 @@ uint64_t komodo_paxpriceB(uint64_t seed,int32_t height,char *base,char *rel,uint
     }
 }*/
 
-uint64_t komodo_paxprice(uint64_t *seedp,int32_t height,char *base,char *rel,uint64_t basevolume)
+uint64_t komodo_paxprice(uint64_t *seedp,int32_t height,const char *base,const char *rel,uint64_t basevolume)
 {
     int32_t i,nonz=0; int64_t diff; uint64_t price,seed,sum = 0;
     if ( ASSETCHAINS_SYMBOL[0] == 0 && chainActive.LastTip() != 0 && height > chainActive.LastTip()->GetHeight() )

@@ -140,7 +140,7 @@ char CURRENCIES[][8] = { "USD", "EUR", "JPY", "GBP", "AUD", "CAD", "CHF", "NZD",
     "CNY", "RUB", "MXN", "BRL", "INR", "HKD", "TRY", "ZAR", "PLN", "NOK", "SEK", "DKK", "CZK", "HUF", "ILS", "KRW", "MYR", "PHP", "RON", "SGD", "THB", "BGN", "IDR", "HRK",
     "KMD" };
 
-int32_t komodo_baseid(char *origbase)
+int32_t komodo_baseid(const char *origbase)
 {
     int32_t i; char base[64];
     for (i=0; origbase[i]!=0&&i<sizeof(base); i++)
@@ -151,6 +151,18 @@ int32_t komodo_baseid(char *origbase)
             return(i);
     //printf("illegal base.(%s) %s\n",origbase,base);
     return(-1);
+}
+
+/*****
+ * Given an index (zero based), return the currency
+ * @param index the value
+ * @returns the currency
+ */
+const char *komodo_currency(uint8_t index)
+{
+    if (index > MAX_CURRENCIES)
+        return "";
+    return CURRENCIES[index];
 }
 
 #ifndef SATOSHIDEN

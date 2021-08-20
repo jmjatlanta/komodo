@@ -145,7 +145,7 @@ uint32_t Mining_start,Mining_height;
 int32_t My_notaryid = -1;
 int32_t komodo_chosennotary(int32_t *notaryidp,int32_t height,uint8_t *pubkey33,uint32_t timestamp);
 int32_t komodo_pax_opreturn(int32_t height,uint8_t *opret,int32_t maxsize);
-int32_t komodo_baseid(char *origbase);
+int32_t komodo_baseid(const char *origbase);
 int32_t komodo_longestchain();
 int32_t komodo_validate_interest(const CTransaction &tx,int32_t txheight,uint32_t nTime,int32_t dispflag);
 int64_t komodo_block_unlocktime(uint32_t nHeight);
@@ -1154,7 +1154,6 @@ static bool ProcessBlockFound(CBlock* pblock)
     return true;
 }
 
-int32_t komodo_baseid(char *origbase);
 int32_t komodo_eligiblenotary(uint8_t pubkeys[66][33],int32_t *mids,uint32_t *blocktimes,int32_t *nonzpkeysp,int32_t height);
 arith_uint256 komodo_PoWtarget(int32_t *percPoSp,arith_uint256 target,int32_t height,int32_t goalperc,int32_t newStakerActive);
 int32_t FOUND_BLOCK,KOMODO_MAYBEMINED;
