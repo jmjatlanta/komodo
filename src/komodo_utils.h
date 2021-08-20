@@ -2352,6 +2352,12 @@ void komodo_args(char *argv0)
         KOMODO_EXTRASATOSHI = 1;
 }
 
+/****
+ * @brief Given a source, compute the correct chain symbol and destination
+ * @param[out] symbol the chain symbol based on source (nullptr for KMD)
+ * @param[out] dest the destination chain (BTC for KMD, KMD for everything else)
+ * @param[in] source what to base the results on
+ */
 void komodo_nameset(char *symbol,char *dest,const char *source)
 {
     if ( source[0] == 0 )
@@ -2366,21 +2372,37 @@ void komodo_nameset(char *symbol,char *dest,const char *source)
     }
 }
 
-struct komodo_state *komodo_stateptrget(const char *base)
+/****
+ * @brief Get the symbol of the default chain
+ * @returns ASSETCHAIN_SYMBOL or "KMD"
+ */
+const char *komodo_chainsymbol()
 {
-    int32_t baseid;
-    if ( base == 0 || base[0] == 0 || strcmp(base,(char *)"KMD") == 0 )
-        return(&KOMODO_STATES[33]);
-    else if ( (baseid= komodo_baseid(base)) >= 0 )
-        return(&KOMODO_STATES[baseid+1]);
-    else return(&KOMODO_STATES[0]);
+    if ( ASSETCHAINS_SYMBOL[0] == 0 )
+        return "KMD";
+    return ASSETCHAINS_SYMBOL;
 }
 
-struct komodo_state *komodo_stateptr(char *symbol,char *dest)
+/*****
+ * @brief retrieve the state object for the given chain
+ * @param base the given chain
+ * @returns the state object
+ */
+komodo_state *komodo_stateptr(const char *base)
 {
-    int32_t baseid;
-    komodo_nameset(symbol,dest,ASSETCHAINS_SYMBOL);
-    return(komodo_stateptrget(symbol));
+    if ( base == nullptr || base[0] == 0 || strcmp(base,"KMD") == 0 )
+        return KOMODO_STATES.by_symbol("KMD").get();
+    return KOMODO_STATES.by_symbol(base).get();
+}
+
+/****
+ * @brief retrieve a pointer to the current chain's state
+ * @note relies on ASSETCHAINS_SYMBOL to determine the current chain
+ * @returns the struct that contains the current chain state
+ */
+komodo_state *komodo_stateptr()
+{
+    return komodo_stateptr(komodo_chainsymbol());
 }
 
 void komodo_prefetch(FILE *fp)

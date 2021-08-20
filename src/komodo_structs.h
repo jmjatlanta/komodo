@@ -111,6 +111,7 @@ struct komodo_ccdata
 
 struct komodo_state
 {
+    komodo_state(const std::string& symbol) : symbol(symbol){}
     uint256 NOTARIZED_HASH,NOTARIZED_DESTTXID,MoM;
     int32_t SAVEDHEIGHT,CURRENT_HEIGHT,NOTARIZED_HEIGHT,MoMdepth;
     uint32_t SAVEDTIMESTAMP;
@@ -118,6 +119,24 @@ struct komodo_state
     struct notarized_checkpoint *NPOINTS; int32_t NUM_NPOINTS,last_NPOINTSi;
     struct komodo_event **Komodo_events; int32_t Komodo_numevents;
     uint32_t RTbufs[64][3]; uint64_t RTmask;
+    const std::string symbol;
+};
+
+class komodo_states
+{
+public:
+    std::shared_ptr<komodo_state> by_symbol(const std::string& symbol)
+    {
+        if (symbol.empty())
+            return nullptr;
+        std::lock_guard<std::mutex>  lock(states_mutex);
+        if (states.find(symbol) == states.end())
+            states[symbol] = std::make_shared<komodo_state>(symbol);
+        return states[symbol];
+    }
+private:
+    std::mutex states_mutex;
+    std::map<std::string, std::shared_ptr<komodo_state>> states;
 };
 
 #endif /* KOMODO_STRUCTS_H */

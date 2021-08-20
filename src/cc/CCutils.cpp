@@ -27,7 +27,7 @@
     #define MIN_NON_NOTARIZED_CONFIRMS 101
 #endif // TESTMODE
 int32_t komodo_dpowconfs(int32_t height,int32_t numconfs);
-struct komodo_state *komodo_stateptr(char *symbol,char *dest);
+komodo_state *komodo_stateptr();
 extern uint32_t KOMODO_DPOWCONFS;
 
 void endiancpy(uint8_t *dest,uint8_t *src,int32_t len)
@@ -682,7 +682,6 @@ bool komodo_txnotarizedconfirmed(uint256 txid)
     CTransaction tx;
     uint256 hashBlock;
     CBlockIndex *pindex;    
-    char symbol[KOMODO_ASSETCHAIN_MAXLEN],dest[KOMODO_ASSETCHAIN_MAXLEN]; struct komodo_state *sp;
 
     if ( KOMODO_NSPV_SUPERLITE )
     {
@@ -728,7 +727,9 @@ bool komodo_txnotarizedconfirmed(uint256 txid)
         confirms=1 + pindex->GetHeight() - txheight;
     }
 
-    if ((sp= komodo_stateptr(symbol,dest)) != 0 && (notarized=sp->NOTARIZED_HEIGHT) > 0 && txheight > sp->NOTARIZED_HEIGHT)  notarized=0;            
+    komodo_state *sp = komodo_stateptr();
+    if (sp != nullptr && (notarized=sp->NOTARIZED_HEIGHT) > 0 && txheight > sp->NOTARIZED_HEIGHT)  
+        notarized=0;            
 #ifdef TESTMODE           
     notarized=0;
 #endif //TESTMODE

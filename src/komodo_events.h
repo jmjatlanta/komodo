@@ -127,10 +127,9 @@ void komodo_event_undo(struct komodo_state *sp,struct komodo_event *ep)
     }
 }
 
-void komodo_event_rewind(struct komodo_state *sp,char *symbol,int32_t height)
+void komodo_event_rewind(komodo_state *sp, const char *symbol, int32_t height)
 {
-    struct komodo_event *ep;
-    if ( sp != 0 )
+    if ( sp != nullptr )
     {
         if ( ASSETCHAINS_SYMBOL[0] == 0 && height <= KOMODO_LASTMINED && prevKOMODO_LASTMINED != 0 )
         {
@@ -140,7 +139,8 @@ void komodo_event_rewind(struct komodo_state *sp,char *symbol,int32_t height)
         }
         while ( sp->Komodo_events != 0 && sp->Komodo_numevents > 0 )
         {
-            if ( (ep= sp->Komodo_events[sp->Komodo_numevents-1]) != 0 )
+            komodo_event *ep = sp->Komodo_events[sp->Komodo_numevents-1];
+            if ( ep != nullptr )
             {
                 if ( ep->height < height )
                     break;

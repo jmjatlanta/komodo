@@ -286,23 +286,22 @@ int32_t komodo_chosennotary(int32_t *notaryidp,int32_t height,uint8_t *pubkey33,
     return(modval);
 }
 
-//struct komodo_state *komodo_stateptr(char *symbol,char *dest);
-
 struct notarized_checkpoint *komodo_npptr_for_height(int32_t height, int *idx)
 {
-    char symbol[KOMODO_ASSETCHAIN_MAXLEN],dest[KOMODO_ASSETCHAIN_MAXLEN]; int32_t i; struct komodo_state *sp; struct notarized_checkpoint *np = 0;
-    if ( (sp= komodo_stateptr(symbol,dest)) != 0 )
+    komodo_state *sp = komodo_stateptr();
+
+    if ( sp != nullptr )
     {
-        for (i=sp->NUM_NPOINTS-1; i>=0; i--)
+        for (int32_t i=sp->NUM_NPOINTS-1; i>=0; i--)
         {
             *idx = i;
-            np = &sp->NPOINTS[i];
+            struct notarized_checkpoint *np = &sp->NPOINTS[i];
             if ( np->MoMdepth != 0 && height > np->notarized_height-(np->MoMdepth&0xffff) && height <= np->notarized_height )
-                return(np);
+                return np;
         }
     }
     *idx = -1;
-    return(0);
+    return 0;
 }
 
 struct notarized_checkpoint *komodo_npptr(int32_t height)
@@ -313,36 +312,38 @@ struct notarized_checkpoint *komodo_npptr(int32_t height)
 
 struct notarized_checkpoint *komodo_npptr_at(int idx)
 {
-    char symbol[KOMODO_ASSETCHAIN_MAXLEN],dest[KOMODO_ASSETCHAIN_MAXLEN]; struct komodo_state *sp;
-    if ( (sp= komodo_stateptr(symbol,dest)) != 0 )
+    komodo_state *sp = komodo_stateptr();
+    if ( sp != nullptr )
         if (idx < sp->NUM_NPOINTS)
             return &sp->NPOINTS[idx];
-    return(0);
+    return 0;
 }
 
 int32_t komodo_prevMoMheight()
 {
     static uint256 zero;
-    char symbol[KOMODO_ASSETCHAIN_MAXLEN],dest[KOMODO_ASSETCHAIN_MAXLEN]; int32_t i; struct komodo_state *sp; struct notarized_checkpoint *np = 0;
-    if ( (sp= komodo_stateptr(symbol,dest)) != 0 )
+    komodo_state *sp = komodo_stateptr();
+
+    if ( sp != nullptr )
     {
-        for (i=sp->NUM_NPOINTS-1; i>=0; i--)
+        for (int32_t i=sp->NUM_NPOINTS-1; i>=0; i--)
         {
-            np = &sp->NPOINTS[i];
+            struct notarized_checkpoint *np = &sp->NPOINTS[i];
             if ( np->MoM != zero )
                 return(np->notarized_height);
         }
     }
-    return(0);
+    return 0;
 }
 
 int32_t komodo_notarized_height(int32_t *prevMoMheightp,uint256 *hashp,uint256 *txidp)
 {
-    char symbol[KOMODO_ASSETCHAIN_MAXLEN],dest[KOMODO_ASSETCHAIN_MAXLEN]; struct komodo_state *sp;
     *prevMoMheightp = 0;
     memset(hashp,0,sizeof(*hashp));
     memset(txidp,0,sizeof(*txidp));
-    if ( (sp= komodo_stateptr(symbol,dest)) != 0 )
+
+    komodo_state *sp = komodo_stateptr();
+    if ( sp != nullptr )
     {
         CBlockIndex *pindex;
         if ( (pindex= komodo_blockindex(sp->NOTARIZED_HASH)) == 0 || pindex->GetHeight() < 0 )
@@ -365,8 +366,8 @@ int32_t komodo_notarized_height(int32_t *prevMoMheightp,uint256 *hashp,uint256 *
 int32_t komodo_dpowconfs(int32_t txheight,int32_t numconfs)
 {
     static int32_t hadnotarization;
-    char symbol[KOMODO_ASSETCHAIN_MAXLEN],dest[KOMODO_ASSETCHAIN_MAXLEN]; struct komodo_state *sp;
-    if ( KOMODO_DPOWCONFS != 0 && txheight > 0 && numconfs > 0 && (sp= komodo_stateptr(symbol,dest)) != 0 )
+    komodo_state *sp;
+    if ( KOMODO_DPOWCONFS != 0 && txheight > 0 && numconfs > 0 && (sp= komodo_stateptr()) != nullptr )
     {
         if ( sp->NOTARIZED_HEIGHT > 0 )
         {
@@ -405,9 +406,11 @@ int32_t komodo_MoMdata(int32_t *notarized_htp,uint256 *MoMp,uint256 *kmdtxidp,in
 
 int32_t komodo_notarizeddata(int32_t nHeight,uint256 *notarized_hashp,uint256 *notarized_desttxidp)
 {
-    struct notarized_checkpoint *np = 0; int32_t i=0,flag = 0; char symbol[KOMODO_ASSETCHAIN_MAXLEN],dest[KOMODO_ASSETCHAIN_MAXLEN]; struct komodo_state *sp;
-    if ( (sp= komodo_stateptr(symbol,dest)) != 0 )
+    int32_t i=0,flag = 0; 
+    komodo_state *sp = komodo_stateptr();
+    if ( sp != nullptr )
     {
+        notarized_checkpoint *np = 0; 
         if ( sp->NUM_NPOINTS > 0 )
         {
             flag = 0;
@@ -420,7 +423,6 @@ int32_t komodo_notarizeddata(int32_t nHeight,uint256 *notarized_hashp,uint256 *n
                     {
                         if ( sp->NPOINTS[i].nHeight >= nHeight )
                         {
-                            //printf("flag.1 i.%d np->ht %d [%d].ht %d >= nHeight.%d, last.%d num.%d\n",i,np->nHeight,i,sp->NPOINTS[i].nHeight,nHeight,sp->last_NPOINTSi,sp->NUM_NPOINTS);
                             flag = 1;
                             break;
                         }
@@ -436,7 +438,6 @@ int32_t komodo_notarizeddata(int32_t nHeight,uint256 *notarized_hashp,uint256 *n
                 {
                     if ( sp->NPOINTS[i].nHeight >= nHeight )
                     {
-                        //printf("i.%d np->ht %d [%d].ht %d >= nHeight.%d\n",i,np->nHeight,i,sp->NPOINTS[i].nHeight,nHeight);
                         break;
                     }
                     np = &sp->NPOINTS[i];

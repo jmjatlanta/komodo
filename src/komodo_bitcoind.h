@@ -780,14 +780,10 @@ int32_t komodo_isPoS(CBlock *pblock, int32_t height,CTxDestination *addressout)
 
 void komodo_disconnect(CBlockIndex *pindex,CBlock& block)
 {
-    char symbol[KOMODO_ASSETCHAIN_MAXLEN],dest[KOMODO_ASSETCHAIN_MAXLEN]; struct komodo_state *sp;
-    //fprintf(stderr,"disconnect ht.%d\n",pindex->GetHeight());
     komodo_init(pindex->GetHeight());
-    if ( (sp= komodo_stateptr(symbol,dest)) != 0 )
-    {
-        //sp->rewinding = pindex->GetHeight();
-        //fprintf(stderr,"-%d ",pindex->GetHeight());
-    } else printf("komodo_disconnect: ht.%d cant get komodo_state.(%s)\n",pindex->GetHeight(),ASSETCHAINS_SYMBOL);
+
+    if ( komodo_stateptr() == nullptr )
+        printf("komodo_disconnect: ht.%d cant get komodo_state.(%s)\n",pindex->GetHeight(),ASSETCHAINS_SYMBOL);
 }
 
 int32_t komodo_is_notarytx(const CTransaction& tx)
@@ -1247,13 +1243,15 @@ int32_t komodo_nextheight()
 
 int32_t komodo_isrealtime(int32_t *kmdheightp)
 {
-    struct komodo_state *sp; CBlockIndex *pindex;
-    if ( (sp= komodo_stateptrget("KMD")) != 0 )
+    CBlockIndex *pindex;
+    komodo_state *sp = komodo_stateptr("KMD");
+    if ( sp != nullptr )
         *kmdheightp = sp->CURRENT_HEIGHT;
-    else *kmdheightp = 0;
+    else 
+        *kmdheightp = 0;
     if ( (pindex= chainActive.LastTip()) != 0 && pindex->GetHeight() >= (int32_t)komodo_longestchain() )
-        return(1);
-    else return(0);
+        return 1;
+    return(0);
 }
 
 int32_t komodo_validate_interest(const CTransaction &tx,int32_t txheight,uint32_t cmptime,int32_t dispflag)
