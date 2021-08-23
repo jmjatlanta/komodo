@@ -374,9 +374,6 @@ void komodo_stateupdate(int32_t height,uint8_t notarypubs[][33],uint8_t numnotar
         didinit = 1;
     }
 
-    char symbol[KOMODO_ASSETCHAIN_MAXLEN];
-    char dest[KOMODO_ASSETCHAIN_MAXLEN];
-    komodo_nameset(symbol, dest, ASSETCHAINS_SYMBOL);
     komodo_state *sp = komodo_stateptr();
     if ( sp == nullptr )
     {
@@ -384,6 +381,9 @@ void komodo_stateupdate(int32_t height,uint8_t notarypubs[][33],uint8_t numnotar
         printf("[%s] no komodo_stateptr\n",ASSETCHAINS_SYMBOL);
         return;
     }
+    char symbol[KOMODO_ASSETCHAIN_MAXLEN];
+    char dest[KOMODO_ASSETCHAIN_MAXLEN];
+    komodo_nameset(symbol, dest, ASSETCHAINS_SYMBOL);
     if ( fp == 0 )
     {
         komodo_statefname(fname,ASSETCHAINS_SYMBOL,(char *)"komodostate");

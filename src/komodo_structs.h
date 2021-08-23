@@ -18,6 +18,10 @@
 #include "uthash.h"
 #include "utlist.h"
 
+#include <string>
+#include <mutex>
+#include <map>
+
 /*#ifdef _WIN32
 #define PACKED
 #else
@@ -111,14 +115,28 @@ struct komodo_ccdata
 
 struct komodo_state
 {
-    komodo_state(const std::string& symbol) : symbol(symbol){}
+    komodo_state(const std::string& symbol) : 
+            NOTARIZED_HASH(uint256()), NOTARIZED_DESTTXID(uint256()),
+            MoM(uint256()), symbol(symbol) { }
     uint256 NOTARIZED_HASH,NOTARIZED_DESTTXID,MoM;
-    int32_t SAVEDHEIGHT,CURRENT_HEIGHT,NOTARIZED_HEIGHT,MoMdepth;
-    uint32_t SAVEDTIMESTAMP;
-    uint64_t deposited,issued,withdrawn,approved,redeemed,shorted;
-    struct notarized_checkpoint *NPOINTS; int32_t NUM_NPOINTS,last_NPOINTSi;
-    struct komodo_event **Komodo_events; int32_t Komodo_numevents;
-    uint32_t RTbufs[64][3]; uint64_t RTmask;
+    int32_t SAVEDHEIGHT = 0;
+    int32_t CURRENT_HEIGHT = 0; 
+    int32_t NOTARIZED_HEIGHT = 0;
+    int32_t MoMdepth = 0;
+    uint32_t SAVEDTIMESTAMP = 0;
+    uint64_t deposited = 0;
+    uint64_t issued = 0;
+    uint64_t withdrawn = 0;
+    uint64_t approved = 0;
+    uint64_t redeemed = 0;
+    uint64_t shorted = 0;
+    notarized_checkpoint *NPOINTS = nullptr; 
+    int32_t NUM_NPOINTS = 0;
+    int32_t last_NPOINTSi = 0;
+    komodo_event **Komodo_events = nullptr; 
+    int32_t Komodo_numevents = 0;
+    uint32_t RTbufs[64][3]; 
+    uint64_t RTmask = 0;
     const std::string symbol;
 };
 

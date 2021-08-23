@@ -1251,7 +1251,7 @@ int32_t komodo_isrealtime(int32_t *kmdheightp)
         *kmdheightp = 0;
     if ( (pindex= chainActive.LastTip()) != 0 && pindex->GetHeight() >= (int32_t)komodo_longestchain() )
         return 1;
-    return(0);
+    return 0;
 }
 
 int32_t komodo_validate_interest(const CTransaction &tx,int32_t txheight,uint32_t cmptime,int32_t dispflag)
