@@ -242,7 +242,7 @@ UniValue CallRPC(const std::string& strMethod, const UniValue& params)
             throw std::runtime_error(strprintf(
                 _("Could not locate RPC credentials. No authentication cookie could be found,\n"
                   "and no rpcpassword is set in the configuration file (%s)."),
-                    GetConfigFile(ASSETCHAINS_SYMBOL).c_str()));
+                    GetConfigFile(ASSETCHAINS_SYMBOL).string().c_str()));
 
         }
     } else {

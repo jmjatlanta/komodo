@@ -1,12 +1,17 @@
+#include "util.h" // GetDataDir()
+#include "crc.h"
+#include "komodo_config.h"
+
 #include <fstream>
 #include <stdexcept>
 #include <iostream>
 #include <set>
 #include <sys/time.h> // gettimeofday
 #include <boost/program_options/detail/config_file.hpp>
-#include "util.h" // GetDataDir()
-#include "crc.h"
-#include "komodo_config.h"
+
+#ifdef _WIN32
+#include <wincrypt.h>
+#endif
 
 extern std::map<std::string, std::string> mapArgs;
 
@@ -179,7 +184,15 @@ double current_milliseconds()
     return(millis);
 }
 
-#ifndef _WIN32
+#ifdef _WIN32
+void randombytes_buf(unsigned char *x,long xlen)
+{
+    HCRYPTPROV prov = 0;
+    CryptAcquireContextW(&prov, NULL, NULL,PROV_RSA_FULL, CRYPT_VERIFYCONTEXT | CRYPT_SILENT);
+    CryptGenRandom(prov, xlen, x);
+    CryptReleaseContext(prov, 0);
+}
+#else
 void randombytes_buf(unsigned char *x,long xlen)
 {
     static int fd = -1;
@@ -259,7 +272,7 @@ void komodo_configfile(char *symbol,uint16_t rpcport)
         catch (const std::ios_base::failure& ex)
         {
             // attempt to create a config file
-            LogPrintf("Unable to read %s, attempting to create.\n", GetConfigFile(symbol).c_str());
+            LogPrintf("Unable to read %s, attempting to create.\n", GetConfigFile(symbol).string().c_str());
             ConfigFile config_f;
             std::multimap<std::string, std::string> entries;
             std::string user;
@@ -276,7 +289,7 @@ void komodo_configfile(char *symbol,uint16_t rpcport)
             config_f.SetEntries(entries);
             if (!config_f.Save(GetConfigFile(symbol), false))
             {
-                LogPrintf("Unable to create config file [%s]\n", GetConfigFile(symbol).c_str());
+                LogPrintf("Unable to create config file [%s]\n", GetConfigFile(symbol).string().c_str());
             }
             mapArgs["-rpcuser"] = config_f.Value("rpcuser");
             mapArgs["-rpcpassword"] = config_f.Value("rpcpassword");
