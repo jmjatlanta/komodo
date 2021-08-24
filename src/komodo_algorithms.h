@@ -8,10 +8,10 @@ class CChainParams;
 
 enum hash_algo
 {
-    HASH_ALGO_UNKNOWN,
-    HASH_ALGO_EQUIHASH,
-    HASH_ALGO_VERUSHASH,
-    HASH_ALGO_VERUSHASHV1_1
+    HASH_ALGO_EQUIHASH = 0,
+    HASH_ALGO_VERUSHASH = 1,
+    HASH_ALGO_VERUSHASHV1_1 = 2,
+    HASH_ALGO_UNKNOWN = 3
 };
 
 class hash_algorithm
