@@ -599,50 +599,77 @@ public:
     }
 };
 
-/** An in-memory indexed chain of blocks. */
+/** 
+ * An in-memory indexed chain of blocks. 
+ */
 class CChain {
 protected:
+
     std::vector<CBlockIndex*> vChain;
     CBlockIndex *lastTip;
+
     CBlockIndex *at(int nHeight) const REQUIRES(cs_main)
     {
         if (nHeight < 0 || nHeight >= (int)vChain.size())
-            return NULL;
+            return nullptr;
         return vChain[nHeight];
     }
+
 public:
-    /** Returns the index entry for the genesis block of this chain, or NULL if none. */
+
+    /*****
+     * @returns the index entry for the geneis block (nullptr if none)
+     */
     virtual CBlockIndex *Genesis() const REQUIRES(cs_main) {
-        return vChain.size() > 0 ? vChain[0] : NULL;
+        return vChain.size() > 0 ? vChain[0] : nullptr;
     }
 
-    /** Returns the index entry for the tip of this chain, or NULL if none. */
+    /** 
+     * @returns the index entry for the tip of this chain, or nullptr if none. 
+     */
     virtual CBlockIndex *Tip() const REQUIRES(cs_main) {
-        return vChain.size() > 0 ? vChain[vChain.size() - 1] : NULL;
+        return vChain.size() > 0 ? vChain[vChain.size() - 1] : nullptr;
     }
     
-    /** Returns the last tip of the chain, or NULL if none. */
+    /** 
+     * @returns the last tip of the chain, or nullptr if none. 
+     */
     virtual CBlockIndex *LastTip() const REQUIRES(cs_main) {
-        return vChain.size() > 0 ? lastTip : NULL;
+        return vChain.size() > 0 ? lastTip : nullptr;
     }
 
-    /** Returns the index entry at a particular height in this chain, or NULL if no such height exists. */
+    /** 
+     * @returns the index entry at a particular height in this chain, or nullptr if no such height exists. 
+     */
     virtual CBlockIndex *operator[](int nHeight) const REQUIRES(cs_main) {
         return at(nHeight);
     }
 
-    /** Compare two chains efficiently. */
+    /** 
+     * @brief Compare two chains efficiently (check only Height and LastTip)
+     * @param a 
+     * @param b
+     * @returns true if a == b
+     */
     friend bool operator==(const CChain &a, const CChain &b) REQUIRES(cs_main) {
         return a.Height() == b.Height() &&
                a.LastTip() == b.LastTip();
     }
 
-    /** Efficiently check whether a block is present in this chain. */
+    /** 
+     * @brief Check whether a block is present in this chain. 
+     * @param pindex the CBlockIndex to check
+     * @returns true if the block is present in this chain
+     */
     virtual bool Contains(const CBlockIndex *pindex) const REQUIRES(cs_main) {
         return (*this)[pindex->GetHeight()] == pindex;
     }
 
-    /** Find the successor of a block in this chain, or NULL if the given index is not found or is the tip. */
+    /** 
+     * @brief Find the successor of a block in this chain.
+     * @param pindex what to search for
+     * @returns the next index after pindex, or nullptr if pindex not found or is the current tip
+     */
     virtual CBlockIndex *Next(const CBlockIndex *pindex) const REQUIRES(cs_main) {
         if (Contains(pindex))
             return (*this)[pindex->GetHeight() + 1];
@@ -650,18 +677,29 @@ public:
             return NULL;
     }
 
-    /** Return the maximal height in the chain. Is equal to chain.Tip() ? chain.Tip()->GetHeight() : -1. */
+    /** 
+     * @return the current height
+     */
     virtual int Height() const REQUIRES(cs_main) {
         return vChain.size() - 1;
     }
 
-    /** Set/initialize a chain with a given tip. */
+    /** 
+     * @brief Set/initialize a chain with a given tip. 
+     * @param pindex the new tip
+     */
     virtual void SetTip(CBlockIndex *pindex) REQUIRES(cs_main);
 
-    /** Return a CBlockLocator that refers to a block in this chain (by default the tip). */
-    virtual CBlockLocator GetLocator(const CBlockIndex *pindex = NULL) const REQUIRES(cs_main);
+    /** 
+     * @brief Return a CBlockLocator that refers to a block in this chain
+     * @param pindex the block index (nullptr will return the tip)
+     */
+    virtual CBlockLocator GetLocator(const CBlockIndex *pindex = nullptr) const REQUIRES(cs_main);
 
-    /** Find the last common block between this chain and a block index entry. */
+    /** 
+     * @param pindex
+     * @returns the last common block between this chain and pindex
+     */
     virtual const CBlockIndex *FindFork(const CBlockIndex *pindex) const REQUIRES(cs_main);
 };
 
