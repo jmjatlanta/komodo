@@ -933,7 +933,7 @@ bool ReconsiderBlock(CValidationState& state, CBlockIndex *pindex);
 #ifdef DEBUG_LOCKORDER
 extern MultithreadedCChain<CCriticalSection> chainActive;
 #else
-extern CChain chainActive;
+extern LockableCChain chainActive;
 #endif
 
 /** Global variable that points to the active CCoinsView (protected by cs_main) */

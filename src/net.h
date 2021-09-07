@@ -273,6 +273,7 @@ public:
     uint64_t nSendBytes;
     std::deque<CSerializeData> vSendMsg;
     CCriticalSection cs_vSend;
+    CCriticalSection *getCsvsend() RETURN_CAPABILITY(cs_vSend); // declaration only, for static analysis
 
     std::deque<CInv> vRecvGetData;
     std::deque<CNetMessage> vRecvMsg;
@@ -345,6 +346,7 @@ public:
     mruset<CInv> setInventoryKnown;
     std::vector<CInv> vInventoryToSend;
     CCriticalSection cs_inventory;
+    CCriticalSection *getCsinventory() RETURN_CAPABILITY(cs_inventory); // declaration only, for static analysis
     std::set<uint256> setAskFor;
     std::multimap<int64_t, CInv> mapAskFor;
 
@@ -438,21 +440,17 @@ public:
     }
 
 
-    void AddInventoryKnown(const CInv& inv)
+    void AddInventoryKnown(const CInv& inv) REQUIRES(!cs_inventory) REQUIRES(!getCsinventory())
     {
-        {
-            LOCK(cs_inventory);
-            setInventoryKnown.insert(inv);
-        }
+        LOCK(cs_inventory);
+        setInventoryKnown.insert(inv);
     }
 
-    void PushInventory(const CInv& inv)
+    void PushInventory(const CInv& inv) REQUIRES(!getCsinventory())
     {
-        {
-            LOCK(cs_inventory);
-            if (!setInventoryKnown.count(inv))
-                vInventoryToSend.push_back(inv);
-        }
+        LOCK(cs_inventory);
+        if (!setInventoryKnown.count(inv))
+            vInventoryToSend.push_back(inv);
     }
 
     void AskFor(const CInv& inv);
@@ -469,7 +467,7 @@ public:
     void PushVersion();
 
 
-    void PushMessage(const char* pszCommand)
+    void PushMessage(const char* pszCommand) REQUIRES(!getCsvsend())
     {
         //fprintf(stderr,"push.(%s)\n",pszCommand);
         try
@@ -485,7 +483,7 @@ public:
     }
 
     template<typename T1>
-    void PushMessage(const char* pszCommand, const T1& a1)
+    void PushMessage(const char* pszCommand, const T1& a1) REQUIRES(!getCsvsend())
     {
         //fprintf(stderr,"push.(%s)\n",pszCommand);
         try
@@ -502,7 +500,7 @@ public:
     }
 
     template<typename T1, typename T2>
-    void PushMessage(const char* pszCommand, const T1& a1, const T2& a2)
+    void PushMessage(const char* pszCommand, const T1& a1, const T2& a2) REQUIRES(!getCsvsend())
     {
         try
         {
@@ -518,7 +516,7 @@ public:
     }
 
     template<typename T1, typename T2, typename T3>
-    void PushMessage(const char* pszCommand, const T1& a1, const T2& a2, const T3& a3)
+    void PushMessage(const char* pszCommand, const T1& a1, const T2& a2, const T3& a3) REQUIRES(!getCsvsend())
     {
         try
         {
@@ -534,7 +532,7 @@ public:
     }
 
     template<typename T1, typename T2, typename T3, typename T4>
-    void PushMessage(const char* pszCommand, const T1& a1, const T2& a2, const T3& a3, const T4& a4)
+    void PushMessage(const char* pszCommand, const T1& a1, const T2& a2, const T3& a3, const T4& a4) REQUIRES(!getCsvsend())
     {
         try
         {
@@ -550,7 +548,7 @@ public:
     }
 
     template<typename T1, typename T2, typename T3, typename T4, typename T5>
-    void PushMessage(const char* pszCommand, const T1& a1, const T2& a2, const T3& a3, const T4& a4, const T5& a5)
+    void PushMessage(const char* pszCommand, const T1& a1, const T2& a2, const T3& a3, const T4& a4, const T5& a5) REQUIRES(!getCsvsend())
     {
         try
         {
@@ -566,7 +564,7 @@ public:
     }
 
     template<typename T1, typename T2, typename T3, typename T4, typename T5, typename T6>
-    void PushMessage(const char* pszCommand, const T1& a1, const T2& a2, const T3& a3, const T4& a4, const T5& a5, const T6& a6)
+    void PushMessage(const char* pszCommand, const T1& a1, const T2& a2, const T3& a3, const T4& a4, const T5& a5, const T6& a6) REQUIRES(!getCsvsend())
     {
         try
         {
@@ -582,7 +580,7 @@ public:
     }
 
     template<typename T1, typename T2, typename T3, typename T4, typename T5, typename T6, typename T7>
-    void PushMessage(const char* pszCommand, const T1& a1, const T2& a2, const T3& a3, const T4& a4, const T5& a5, const T6& a6, const T7& a7)
+    void PushMessage(const char* pszCommand, const T1& a1, const T2& a2, const T3& a3, const T4& a4, const T5& a5, const T6& a6, const T7& a7) REQUIRES(!getCsvsend())
     {
         try
         {
@@ -598,7 +596,7 @@ public:
     }
 
     template<typename T1, typename T2, typename T3, typename T4, typename T5, typename T6, typename T7, typename T8>
-    void PushMessage(const char* pszCommand, const T1& a1, const T2& a2, const T3& a3, const T4& a4, const T5& a5, const T6& a6, const T7& a7, const T8& a8)
+    void PushMessage(const char* pszCommand, const T1& a1, const T2& a2, const T3& a3, const T4& a4, const T5& a5, const T6& a6, const T7& a7, const T8& a8) REQUIRES(!getCsvsend())
     {
         try
         {
@@ -614,7 +612,7 @@ public:
     }
 
     template<typename T1, typename T2, typename T3, typename T4, typename T5, typename T6, typename T7, typename T8, typename T9>
-    void PushMessage(const char* pszCommand, const T1& a1, const T2& a2, const T3& a3, const T4& a4, const T5& a5, const T6& a6, const T7& a7, const T8& a8, const T9& a9)
+    void PushMessage(const char* pszCommand, const T1& a1, const T2& a2, const T3& a3, const T4& a4, const T5& a5, const T6& a6, const T7& a7, const T8& a8, const T9& a9) REQUIRES(!getCsvsend())
     {
         try
         {

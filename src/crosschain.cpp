@@ -49,7 +49,7 @@ CBlockIndex *komodo_getblockindex(uint256 hash);
 
 /* On KMD */
 uint256 CalculateProofRoot(const char* symbol, uint32_t targetCCid, int kmdHeight,
-        std::vector<uint256> &moms, uint256 &destNotarisationTxid)
+        std::vector<uint256> &moms, uint256 &destNotarisationTxid) REQUIRES(!cs_main)
 {
     /*
      * Notaries don't wait for confirmation on KMD before performing a backnotarisation,
@@ -65,7 +65,7 @@ uint256 CalculateProofRoot(const char* symbol, uint32_t targetCCid, int kmdHeigh
     if (targetCCid < 2)
         return uint256();
 
-    if (kmdHeight < 0 || kmdHeight > chainActive.Height())
+    if (kmdHeight < 0 || kmdHeight > chainActive.GetHeight())
         return uint256();
 
     int seenOwnNotarisations = 0, i = 0;
@@ -76,7 +76,7 @@ uint256 CalculateProofRoot(const char* symbol, uint32_t targetCCid, int kmdHeigh
     for (i=0; i<NOTARISATION_SCAN_LIMIT_BLOCKS; i++) {
         if (i > kmdHeight) break;
         NotarisationsInBlock notarisations;
-        uint256 blockHash = *chainActive[kmdHeight-i]->phashBlock;
+        uint256 blockHash = *chainActive.at(kmdHeight-i)->phashBlock;
         if (!GetBlockNotarisations(blockHash, notarisations))
             continue;
 
@@ -124,15 +124,15 @@ end:
  * Will scan notarisations leveldb up to a limit
  */
 template <typename IsTarget>
-int ScanNotarisationsFromHeight(int nHeight, const IsTarget f, Notarisation &found)
+int ScanNotarisationsFromHeight(int nHeight, const IsTarget f, Notarisation &found) REQUIRES(!cs_main)
 {
-    int limit = std::min(nHeight + NOTARISATION_SCAN_LIMIT_BLOCKS, chainActive.Height());
+    int limit = std::min(nHeight + NOTARISATION_SCAN_LIMIT_BLOCKS, chainActive.GetHeight());
     int start = std::max(nHeight, 1);
 
     for (int h=start; h<limit; h++) {
         NotarisationsInBlock notarisations;
 
-        if (!GetBlockNotarisations(*chainActive[h]->phashBlock, notarisations))
+        if (!GetBlockNotarisations(*chainActive.at(h)->phashBlock, notarisations))
             continue;
 
         BOOST_FOREACH(found, notarisations) {
@@ -425,7 +425,7 @@ bool CheckNotariesApproval(uint256 burntxid, const std::vector<uint256> & notary
  * out: pair<notarisationTxHash,merkleBranch>
  */
 
-TxProof GetAssetchainProof(uint256 hash,CTransaction burnTx)
+TxProof GetAssetchainProof(uint256 hash,CTransaction burnTx) REQUIRES(!cs_main)
 {
     int nIndex;
     CBlockIndex* blockIndex;
@@ -460,7 +460,7 @@ TxProof GetAssetchainProof(uint256 hash,CTransaction burnTx)
     {
         std::vector<uint256> leaves, tree;
         for (int i=0; i<nota.second.MoMDepth; i++) {
-            uint256 mRoot = chainActive[nota.second.height - i]->hashMerkleRoot;
+            uint256 mRoot = chainActive.at(nota.second.height - i)->hashMerkleRoot;
             leaves.push_back(mRoot);
         }
         bool fMutated;

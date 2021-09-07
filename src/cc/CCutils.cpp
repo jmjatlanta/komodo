@@ -515,7 +515,7 @@ void CCclearvars(struct CCcontract_info *cp)
     cp->unspendableaddr2[0] = cp->unspendableaddr3[0] = 0;
 }
 
-int64_t CCduration(int32_t &numblocks,uint256 txid)
+int64_t CCduration(int32_t &numblocks,uint256 txid) REQUIRES(!cs_main)
 {
     CTransaction tx; uint256 hashBlock; uint32_t txheight,txtime=0; char str[65]; CBlockIndex *pindex; int64_t duration = 0;
     numblocks = 0;
@@ -534,7 +534,7 @@ int64_t CCduration(int32_t &numblocks,uint256 txid)
         fprintf(stderr,"CCduration no txtime %u or txheight.%d %p for txid %s\n",txtime,txheight,pindex,uint256_str(str,txid));
         return(0);
     }
-    else if ( (pindex= chainActive.LastTip()) == 0 || pindex->nTime < txtime || pindex->GetHeight() <= txheight )
+    else if ( (pindex= chainActive.GetLastTip()) == 0 || pindex->nTime < txtime || pindex->GetHeight() <= txheight )
     {
         if ( pindex->nTime < txtime )
             fprintf(stderr,"CCduration backwards timestamps %u %u for txid %s hts.(%d %d)\n",(uint32_t)pindex->nTime,txtime,uint256_str(str,txid),txheight,(int32_t)pindex->GetHeight());
@@ -666,16 +666,16 @@ uint256 BitcoinGetProofMerkleRoot(const std::vector<uint8_t> &proofData, std::ve
 }
 
 extern struct NSPV_inforesp NSPV_inforesult;
-int32_t komodo_get_current_height()
+int32_t komodo_get_current_height() REQUIRES(!cs_main)
 {
     if ( KOMODO_NSPV_SUPERLITE )
     {
         return (NSPV_inforesult.height);
     }
-    else return chainActive.LastTip()->GetHeight();
+    else return chainActive.GetLastTip()->GetHeight();
 }
 
-bool komodo_txnotarizedconfirmed(uint256 txid)
+bool komodo_txnotarizedconfirmed(uint256 txid) REQUIRES(!cs_main)
 {
     char str[65];
     int32_t confirms,notarized=0,txheight=0,currentheight=0;;
@@ -720,7 +720,7 @@ bool komodo_txnotarizedconfirmed(uint256 txid)
             fprintf(stderr,"komodo_txnotarizedconfirmed no txheight.%d %p for txid %s\n",txheight,pindex,txid.ToString().c_str());
             return(0);
         }
-        else if ( (pindex= chainActive.LastTip()) == 0 || pindex->GetHeight() < txheight )
+        else if ( (pindex= chainActive.GetLastTip()) == 0 || pindex->GetHeight() < txheight )
         {
             fprintf(stderr,"komodo_txnotarizedconfirmed backwards heights for txid %s hts.(%d %d)\n",txid.ToString().c_str(),txheight,(int32_t)pindex->GetHeight());
             return(0);

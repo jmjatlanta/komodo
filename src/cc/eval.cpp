@@ -144,9 +144,9 @@ bool Eval::GetTxConfirmed(const uint256 &hash, CTransaction &txOut, CBlockIndex 
     return true;
 }
 
-unsigned int Eval::GetCurrentHeight() const
+unsigned int Eval::GetCurrentHeight() const REQUIRES(!cs_main)
 {
-    return chainActive.Height();
+    return chainActive.GetHeight();
 }
 
 bool Eval::GetBlock(uint256 hash, CBlockIndex& blockIdx) const

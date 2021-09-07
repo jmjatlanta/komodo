@@ -93,7 +93,7 @@ BlockMap mapBlockIndex;
 #ifdef DEBUG_LOCKORDER
 MultithreadedCChain<CCriticalSection> chainActive(cs_main);
 #else
-CChain chainActive;
+LockableCChain chainActive;
 #endif
 CBlockIndex *pindexBestHeader = NULL;
 static int64_t nTimeBestReceived = 0;

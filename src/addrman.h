@@ -195,6 +195,8 @@ friend class CAddrManTest;
 private:
     //! critical section to protect the inner data structures
     mutable CCriticalSection cs;
+    // for thread safety analysis only, does not need to be defined
+    CCriticalSection *getCs() const RETURN_CAPABILITY(cs);
 
     //! last used nId
     int nIdCount;
@@ -320,7 +322,7 @@ public:
      * very little in common.
      */
         template<typename Stream>
-        void Serialize(Stream &s) const
+        void Serialize(Stream &s) const REQUIRES(!getCs())
     {
         LOCK(cs);
 
@@ -499,7 +501,7 @@ public:
         Check();
     }
 
-    void Clear()
+    void Clear() REQUIRES(!getCs())
     {
         LOCK(cs);
         std::vector<int>().swap(vRandom);
@@ -552,7 +554,7 @@ public:
     }
 
     //! Add a single address.
-    bool Add(const CAddress &addr, const CNetAddr& source, int64_t nTimePenalty = 0)
+    bool Add(const CAddress &addr, const CNetAddr& source, int64_t nTimePenalty = 0) REQUIRES(!getCs())
     {
         bool fRet = false;
         {
@@ -567,7 +569,7 @@ public:
     }
 
     //! Add multiple addresses.
-    bool Add(const std::vector<CAddress> &vAddr, const CNetAddr& source, int64_t nTimePenalty = 0)
+    bool Add(const std::vector<CAddress> &vAddr, const CNetAddr& source, int64_t nTimePenalty = 0) REQUIRES(!getCs())
     {
         int nAdd = 0;
         {
@@ -583,44 +585,38 @@ public:
     }
 
     //! Mark an entry as accessible.
-    void Good(const CService &addr, int64_t nTime = GetTime())
+    void Good(const CService &addr, int64_t nTime = GetTime()) REQUIRES(!getCs())
     {
-        {
-            LOCK(cs);
-            Check();
-            Good_(addr, nTime);
-            Check();
-        }
+        LOCK(cs);
+        Check();
+        Good_(addr, nTime);
+        Check();
     }
 
     //! Mark an entry as connection attempted to.
-    void Attempt(const CService &addr, int64_t nTime = GetTime())
+    void Attempt(const CService &addr, int64_t nTime = GetTime()) REQUIRES(!getCs())
     {
-        {
-            LOCK(cs);
-            Check();
-            Attempt_(addr, nTime);
-            Check();
-        }
+        LOCK(cs);
+        Check();
+        Attempt_(addr, nTime);
+        Check();
     }
 
     /**
      * Choose an address to connect to.
      */
-    CAddrInfo Select(bool newOnly = false)
+    CAddrInfo Select(bool newOnly = false) REQUIRES(!getCs())
     {
         CAddrInfo addrRet;
-        {
-            LOCK(cs);
-            Check();
-            addrRet = Select_(newOnly);
-            Check();
-        }
+        LOCK(cs);
+        Check();
+        addrRet = Select_(newOnly);
+        Check();
         return addrRet;
     }
 
     //! Return a bunch of addresses, selected at random.
-    std::vector<CAddress> GetAddr()
+    std::vector<CAddress> GetAddr() REQUIRES(!getCs())
     {
         Check();
         std::vector<CAddress> vAddr;
@@ -633,14 +629,12 @@ public:
     }
 
     //! Mark an entry as currently-connected-to.
-    void Connected(const CService &addr, int64_t nTime = GetTime())
+    void Connected(const CService &addr, int64_t nTime = GetTime()) REQUIRES(!getCs())
     {
-        {
-            LOCK(cs);
-            Check();
-            Connected_(addr, nTime);
-            Check();
-        }
+        LOCK(cs);
+        Check();
+        Connected_(addr, nTime);
+        Check();
     }
 
 };

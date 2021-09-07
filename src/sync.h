@@ -85,6 +85,8 @@ public:
     {
         return PARENT::try_lock();
     }
+
+    const AnnotatedMixin<PARENT> operator!() const { return *this; }
 };
 
 /**
@@ -122,7 +124,7 @@ class SCOPED_CAPABILITY CMutexLock
 private:
     boost::unique_lock<Mutex> lock;
 
-    void Enter(const char* pszName, const char* pszFile, int nLine)
+    void Enter(const char* pszName, const char* pszFile, int nLine) ACQUIRE()
     {
         EnterCritical(pszName, pszFile, nLine, (void*)(lock.mutex()));
 #ifdef DEBUG_LOCKCONTENTION
@@ -162,6 +164,16 @@ public:
             TryEnter(pszName, pszFile, nLine);
         else
             Enter(pszName, pszFile, nLine);
+    }
+    CMutexLock(Mutex& mutexIn) ACQUIRE(mutexIn) : lock(mutexIn, boost::defer_lock)
+    {
+        Enter("", "", 0);
+    }
+    // move constructor/assignment
+    CMutexLock(CMutexLock&& in) : lock(std::move(in.lock)) {}
+    CMutexLock& operator==(CMutexLock&& in)
+    {
+        lock = in.lock;
     }
 
     ~CMutexLock() RELEASE()

@@ -247,10 +247,10 @@ int64_t IsPaymentsvout(struct CCcontract_info *cp,const CTransaction& tx,int32_t
     return(0);
 }
 
-bool payments_game(int32_t &top, int32_t &bottom)
+bool payments_game(int32_t &top, int32_t &bottom) REQUIRES(!cs_main)
 {
     uint64_t x;
-    uint256 tmphash = chainActive[lastSnapShotHeight]->GetBlockHash();
+    uint256 tmphash = chainActive.at(lastSnapShotHeight)->GetBlockHash();
     memcpy(&x,&tmphash,sizeof(x));
     bottom = ((x & 0xff) % 50);
     if ( bottom == 0 ) bottom = 1;
@@ -262,9 +262,9 @@ bool payments_game(int32_t &top, int32_t &bottom)
     return true;
 }
 
-bool payments_lockedblocks(uint256 blockhash,int32_t lockedblocks,int32_t &blocksleft)
+bool payments_lockedblocks(uint256 blockhash,int32_t lockedblocks,int32_t &blocksleft) REQUIRES(!cs_main)
 {
-    int32_t ht = chainActive.Height();
+    int32_t ht = chainActive.GetHeight();
     CBlockIndex* pblockindex = komodo_blockindex(blockhash);
     if ( pblockindex == 0 || pblockindex->GetHeight()+lockedblocks > ht)
     {
@@ -318,7 +318,7 @@ int32_t payments_gettokenallocations(int32_t top, int32_t bottom, const std::vec
     return(0);
 }
 
-bool PaymentsValidate(struct CCcontract_info *cp,Eval* eval,const CTransaction &tx, uint32_t nIn)
+bool PaymentsValidate(struct CCcontract_info *cp,Eval* eval,const CTransaction &tx, uint32_t nIn) REQUIRES(!cs_main)
 {
     char temp[128], txidaddr[64]={0}; std::string scriptpubkey; uint256 createtxid, blockhash, tokenid; CTransaction plantx; int8_t funcid=0, fixedAmount=0;
     int32_t i,lockedblocks,minrelease,blocksleft,dust = 0, top,bottom=0,minimum=10000; int64_t change,totalallocations,actualtxfee,amountReleased=0; std::vector<uint256> txidoprets; bool fHasOpret = false,fIsMerge = false; CPubKey txidpk,Paymentspk;
@@ -350,8 +350,8 @@ bool PaymentsValidate(struct CCcontract_info *cp,Eval* eval,const CTransaction &
             Paymentspk = GetUnspendable(cp,0);
             txidpk = CCtxidaddr(txidaddr,createtxid);
             GetCCaddress1of2(cp,txidaddr,Paymentspk,txidpk);
-            //fprintf(stderr, "lockedblocks.%i minrelease.%i totalallocations.%i txidopret1.%s txidopret2.%s\n",lockedblocks, minrelease, totalallocations, txidoprets[0].ToString().c_str(), txidoprets[1].ToString().c_str() );
-            if ( !CheckTxFee(tx, PAYMENTS_TXFEE+1, chainActive.LastTip()->GetHeight(), chainActive.LastTip()->nTime, actualtxfee) )
+            auto *lastTip = chainActive.GetLastTip();
+            if ( !CheckTxFee(tx, PAYMENTS_TXFEE+1, lastTip->GetHeight(), lastTip->nTime, actualtxfee) )
                 return eval->Invalid("txfee is too high");
             // Check that the change vout is playing the txid address. 
             if ( IsPaymentsvout(cp,tx,0,txidaddr,ccopret) == 0 )
@@ -548,7 +548,9 @@ bool PaymentsValidate(struct CCcontract_info *cp,Eval* eval,const CTransaction &
 // end of consensus code
 
 // helper functions for rpc calls in rpcwallet.cpp
-int64_t AddPaymentsInputs(bool fLockedBlocks,int8_t GetBalance,struct CCcontract_info *cp,CMutableTransaction &mtx,CPubKey txidpk,int64_t total,int32_t maxinputs,uint256 createtxid,int32_t lockedblocks,int64_t minrelease,int32_t &blocksleft)
+int64_t AddPaymentsInputs(bool fLockedBlocks,int8_t GetBalance,struct CCcontract_info *cp,
+        CMutableTransaction &mtx,CPubKey txidpk,int64_t total,int32_t maxinputs,uint256 createtxid,
+        int32_t lockedblocks,int64_t minrelease,int32_t &blocksleft) REQUIRES(!cs_main)
 {
     char coinaddr[64]; CPubKey Paymentspk; int64_t nValue,threshold,price,totalinputs = 0; uint256 txid,checktxid,hashBlock; std::vector<uint8_t> origpubkey; CTransaction vintx; int32_t iter,vout,ht,n = 0;
     std::vector<std::pair<CAddressUnspentKey, CAddressUnspentValue> > unspentOutputs; CScript ccopret;
@@ -705,7 +707,7 @@ int32_t payments_parsehexdata(std::vector<uint8_t> &hexdata,cJSON *item,int32_t 
     } else return(-1);
 }
 
-UniValue PaymentsRelease(struct CCcontract_info *cp,char *jsonstr)
+UniValue PaymentsRelease(struct CCcontract_info *cp,char *jsonstr) REQUIRES(!cs_main)
 {
     LOCK(cs_main);
     CMutableTransaction tmpmtx,mtx = CreateNewContextualCMutableTransaction(Params().GetConsensus(),komodo_nextheight()); UniValue result(UniValue::VOBJ); uint256 createtxid,hashBlock,tokenid;
@@ -1028,7 +1030,7 @@ UniValue PaymentsFund(struct CCcontract_info *cp,char *jsonstr)
     return(result);
 }
 
-UniValue PaymentsMerge(struct CCcontract_info *cp,char *jsonstr)
+UniValue PaymentsMerge(struct CCcontract_info *cp,char *jsonstr) REQUIRES(!cs_main)
 {
     CMutableTransaction mtx = CreateNewContextualCMutableTransaction(Params().GetConsensus(), komodo_nextheight()); UniValue result(UniValue::VOBJ);
     CPubKey Paymentspk,mypk,txidpk; uint256 createtxid,hashBlock; int64_t inputsum,totalallocations=0; CScript opret; CTransaction tx; char txidaddr[64],destaddr[64]; std::string rawtx; 
@@ -1389,7 +1391,7 @@ UniValue PaymentsAirdropTokens(struct CCcontract_info *cp,char *jsonstr)
     return(result);
 }
 
-UniValue PaymentsInfo(struct CCcontract_info *cp,char *jsonstr)
+UniValue PaymentsInfo(struct CCcontract_info *cp,char *jsonstr) REQUIRES(!cs_main)
 {
     UniValue result(UniValue::VOBJ),a(UniValue::VARR); CTransaction tx,txO; CPubKey Paymentspk,txidpk; int32_t i,j,n,flag=0,numoprets=0,lockedblocks,minrelease,blocksleft=0; std::vector<uint256> txidoprets; int64_t funds,fundsopret,elegiblefunds,totalallocations=0,allocation; char fundsaddr[64],fundsopretaddr[64],txidaddr[64],*outstr; uint256 createtxid,hashBlock;
     int32_t top,bottom,minimum=10000; std::vector<std::vector<uint8_t>> excludeScriptPubKeys; // snapshot 

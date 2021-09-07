@@ -127,7 +127,7 @@
 
 
 // tx validation
-bool AssetsValidate(struct CCcontract_info *cpAssets,Eval* eval,const CTransaction &tx, uint32_t nIn)
+bool AssetsValidate(struct CCcontract_info *cpAssets,Eval* eval,const CTransaction &tx, uint32_t nIn) REQUIRES(!cs_main)
 {
     static uint256 zero;
     CTxDestination address; 
@@ -147,20 +147,15 @@ bool AssetsValidate(struct CCcontract_info *cpAssets,Eval* eval,const CTransacti
     outputsDummy = inputs = 0;
     preventCCvins = preventCCvouts = -1;
     
+    int activeChainHeight = chainActive.GetHeight();
+
     // add specific chains exceptions for old token support:
-    if (strcmp(ASSETCHAINS_SYMBOL, "SEC") == 0 && chainActive.Height() <= 144073)
+    if (strcmp(ASSETCHAINS_SYMBOL, "SEC") == 0 && activeChainHeight <= 144073)
         return true;
     
-    if (strcmp(ASSETCHAINS_SYMBOL, "MGNX") == 0 && chainActive.Height() <= 210190)
+    if (strcmp(ASSETCHAINS_SYMBOL, "MGNX") == 0 && activeChainHeight <= 210190)
         return true;
 
-    // add specific chains exceptions for old token support:
-    if (strcmp(ASSETCHAINS_SYMBOL, "SEC") == 0 && chainActive.Height() <= 144073)
-        return true;
-
-    if (strcmp(ASSETCHAINS_SYMBOL, "MGNX") == 0 && chainActive.Height() <= 210190)
-        return true;
-        
 	if (numvouts == 0)
 		return eval->Invalid("AssetValidate: no vouts");
 

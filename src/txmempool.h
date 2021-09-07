@@ -172,6 +172,7 @@ public:
     > indexed_transaction_set;
 
     mutable CCriticalSection cs;
+    CCriticalSection *getCs() const RETURN_CAPABILITY(cs); // declaration only, for static analysis
     indexed_transaction_set mapTx;
 
 private:
@@ -241,19 +242,19 @@ public:
     void NotifyRecentlyAdded();
     bool IsFullyNotified();
     
-    unsigned long size()
+    unsigned long size() REQUIRES(!getCs())
     {
         LOCK(cs);
         return mapTx.size();
     }
 
-    uint64_t GetTotalTxSize()
+    uint64_t GetTotalTxSize() REQUIRES(!getCs())
     {
         LOCK(cs);
         return totalTxSize;
     }
 
-    bool exists(uint256 hash) const
+    bool exists(uint256 hash) const REQUIRES(!getCs())
     {
         LOCK(cs);
         return (mapTx.count(hash) != 0);

@@ -874,6 +874,7 @@ public:
      *      strWalletFile (immutable after instantiation)
      */
     mutable CCriticalSection cs_wallet;
+    CCriticalSection *getCswallet() const RETURN_CAPABILITY(cs_wallet); // declaration only, for static analysis
 
     bool fFileBacked;
     std::string strWalletFile;
@@ -1226,7 +1227,7 @@ public:
 
     void UpdatedTransaction(const uint256 &hashTx);
 
-    void Inventory(const uint256 &hash)
+    void Inventory(const uint256 &hash) REQUIRES(!getCswallet())
     {
         {
             LOCK(cs_wallet);
@@ -1251,7 +1252,7 @@ public:
     bool SetMaxVersion(int nVersion);
 
     //! get the current wallet format (the oldest client version guaranteed to understand this wallet)
-    int GetVersion() { LOCK(cs_wallet); return nWalletVersion; }
+    int GetVersion() REQUIRES(!getCswallet()) { LOCK(cs_wallet); return nWalletVersion; }
 
     //! Get wallet transactions that conflict with given transaction (spend same outputs)
     std::set<uint256> GetConflicts(const uint256& txid) const;

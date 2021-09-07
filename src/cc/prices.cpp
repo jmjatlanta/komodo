@@ -453,11 +453,11 @@ static bool ValidateFinalTx(struct CCcontract_info *cp, Eval *eval, const CTrans
 // costbasis calculation
 // cashout balance (PricesExactAmounts)
 // use the special address for 50% fees
-bool PricesValidate(struct CCcontract_info *cp,Eval* eval,const CTransaction &tx, uint32_t nIn)
+bool PricesValidate(struct CCcontract_info *cp,Eval* eval,const CTransaction &tx, uint32_t nIn) REQUIRES(!cs_main)
 {
     vscript_t vopret;
 
-    if (strcmp(ASSETCHAINS_SYMBOL, "REKT0") == 0 && chainActive.Height() < 5851)
+    if (strcmp(ASSETCHAINS_SYMBOL, "REKT0") == 0 && chainActive.GetHeight() < 5851)
         return true;
     // check basic opret rules:
     if (PricesCheckOpret(tx, vopret) == 0)

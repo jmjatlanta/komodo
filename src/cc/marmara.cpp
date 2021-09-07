@@ -541,7 +541,7 @@ int32_t MarmaraSignature(uint8_t *utxosig,CMutableTransaction &mtx)
 
 // jl777: decide on what unlockht settlement change should have -> from utxo making change
 
-UniValue MarmaraSettlement(uint64_t txfee,uint256 refbatontxid)
+UniValue MarmaraSettlement(uint64_t txfee,uint256 refbatontxid) REQUIRES(!cs_main)
 {
     CMutableTransaction mtx = CreateNewContextualCMutableTransaction(Params().GetConsensus(), komodo_nextheight());
     UniValue result(UniValue::VOBJ),a(UniValue::VARR); std::vector<uint256> creditloop; uint256 batontxid,createtxid,refcreatetxid,hashBlock; uint8_t funcid; int32_t numerrs=0,i,n,numvouts,matures,refmatures,height; int64_t amount,refamount,remaining,inputsum,change; CPubKey Marmarapk,mypk,pk; std::string currency,refcurrency,rawtx; CTransaction tx,batontx; char coinaddr[64],myCCaddr[64],destaddr[64],batonCCaddr[64],str[2],txidaddr[64]; std::vector<CPubKey> pubkeys; struct CCcontract_info *cp,C;
@@ -551,22 +551,23 @@ UniValue MarmaraSettlement(uint64_t txfee,uint256 refbatontxid)
     mypk = pubkey2pk(Mypubkey());
     Marmarapk = GetUnspendable(cp,0);
     remaining = change = 0;
-    height = chainActive.LastTip()->GetHeight();
+    height = chainActive.GetLastTip()->GetHeight();
     if ( (n= MarmaraGetbatontxid(creditloop,batontxid,refbatontxid)) > 0 )
     {
         if ( myGetTransaction(batontxid,batontx,hashBlock) != 0 && (numvouts= batontx.vout.size()) > 1 )
         {
             if ( (funcid= MarmaraDecodeLoopOpret(batontx.vout[numvouts-1].scriptPubKey,refcreatetxid,pk,refamount,refmatures,refcurrency)) != 0 )
             {
+                auto *lastTip = chainActive.GetLastTip();
                 if ( refcreatetxid != creditloop[0] )
                 {
                     result.push_back(Pair("result",(char *)"error"));
                     result.push_back(Pair("error",(char *)"invalid refcreatetxid, setting to creditloop[0]"));
                     return(result);
                 }
-                else if ( chainActive.LastTip()->GetHeight() < refmatures )
+                else if ( lastTip->GetHeight() < refmatures )
                 {
-                    fprintf(stderr,"doesnt mature for another %d blocks\n",refmatures - chainActive.LastTip()->GetHeight());
+                    fprintf(stderr,"doesnt mature for another %d blocks\n",refmatures - lastTip->GetHeight());
                     result.push_back(Pair("result",(char *)"error"));
                     result.push_back(Pair("error",(char *)"cant settle immature creditloop"));
                     return(result);
@@ -694,7 +695,7 @@ int32_t MarmaraGetCreditloops(int64_t &totalamount,std::vector<uint256> &issuanc
     return(n);
 }
 
-UniValue MarmaraReceive(uint64_t txfee,CPubKey senderpk,int64_t amount,std::string currency,int32_t matures,uint256 batontxid,bool automaticflag)
+UniValue MarmaraReceive(uint64_t txfee,CPubKey senderpk,int64_t amount,std::string currency,int32_t matures,uint256 batontxid,bool automaticflag) REQUIRES(!cs_main)
 {
     CMutableTransaction mtx = CreateNewContextualCMutableTransaction(Params().GetConsensus(), komodo_nextheight());
     UniValue result(UniValue::VOBJ); CPubKey mypk; struct CCcontract_info *cp,C; std::string rawtx; char *errorstr=0; uint256 createtxid; int64_t batonamount; int32_t needbaton = 0;
@@ -713,7 +714,7 @@ UniValue MarmaraReceive(uint64_t txfee,CPubKey senderpk,int64_t amount,std::stri
         errorstr = (char *)"for now, only MARMARA loops are supported";
     else if ( amount <= txfee )
         errorstr = (char *)"amount must be for more than txfee";
-    else if ( matures <= chainActive.LastTip()->GetHeight() )
+    else if ( matures <= chainActive.GetLastTip()->GetHeight() )
         errorstr = (char *)"it must mature in the future";
     if ( errorstr == 0 )
     {
@@ -751,7 +752,7 @@ UniValue MarmaraReceive(uint64_t txfee,CPubKey senderpk,int64_t amount,std::stri
     return(result);
 }
 
-UniValue MarmaraIssue(uint64_t txfee,uint8_t funcid,CPubKey receiverpk,int64_t amount,std::string currency,int32_t matures,uint256 approvaltxid,uint256 batontxid)
+UniValue MarmaraIssue(uint64_t txfee,uint8_t funcid,CPubKey receiverpk,int64_t amount,std::string currency,int32_t matures,uint256 approvaltxid,uint256 batontxid) REQUIRES(!cs_main)
 {
     CMutableTransaction mtx = CreateNewContextualCMutableTransaction(Params().GetConsensus(), komodo_nextheight());
     UniValue result(UniValue::VOBJ); CPubKey mypk,Marmarapk; struct CCcontract_info *cp,C; std::string rawtx; uint256 createtxid; char *errorstr=0;
@@ -767,7 +768,7 @@ UniValue MarmaraIssue(uint64_t txfee,uint8_t funcid,CPubKey receiverpk,int64_t a
         errorstr = (char *)"for now, only MARMARA loops are supported";
     else if ( amount <= txfee )
         errorstr = (char *)"amount must be for more than txfee";
-    else if ( matures <= chainActive.LastTip()->GetHeight() )
+    else if ( matures <= chainActive.GetLastTip()->GetHeight() )
         errorstr = (char *)"it must mature in the future";
     if ( errorstr == 0 )
     {

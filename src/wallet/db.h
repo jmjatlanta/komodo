@@ -57,9 +57,10 @@ private:
     std::string strPath;
 
     void EnvShutdown();
-
 public:
     mutable CCriticalSection cs_db;
+    CCriticalSection *getCsdb() RETURN_CAPABILITY(cs_db); // declaration only, for static thread analysis
+    
     DbEnv *dbenv;
     std::map<std::string, int> mapFileUseCount;
     std::map<std::string, Db*> mapDb;

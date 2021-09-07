@@ -608,7 +608,7 @@ protected:
     std::vector<CBlockIndex*> vChain;
     CBlockIndex *lastTip;
 
-    CBlockIndex *at(int nHeight) const REQUIRES(cs_main)
+    CBlockIndex *at(int nHeight) const REQUIRES_SHARED(cs_main)
     {
         if (nHeight < 0 || nHeight >= (int)vChain.size())
             return nullptr;
@@ -620,28 +620,28 @@ public:
     /*****
      * @returns the index entry for the geneis block (nullptr if none)
      */
-    virtual CBlockIndex *Genesis() const REQUIRES(cs_main) {
+    virtual CBlockIndex *Genesis() const REQUIRES_SHARED(cs_main) {
         return vChain.size() > 0 ? vChain[0] : nullptr;
     }
 
     /** 
      * @returns the index entry for the tip of this chain, or nullptr if none. 
      */
-    virtual CBlockIndex *Tip() const REQUIRES(cs_main) {
+    virtual CBlockIndex *Tip() const REQUIRES_SHARED(cs_main) {
         return vChain.size() > 0 ? vChain[vChain.size() - 1] : nullptr;
     }
     
     /** 
      * @returns the last tip of the chain, or nullptr if none. 
      */
-    virtual CBlockIndex *LastTip() const REQUIRES(cs_main) {
+    virtual CBlockIndex *LastTip() const REQUIRES_SHARED(cs_main) {
         return vChain.size() > 0 ? lastTip : nullptr;
     }
 
     /** 
      * @returns the index entry at a particular height in this chain, or nullptr if no such height exists. 
      */
-    virtual CBlockIndex *operator[](int nHeight) const REQUIRES(cs_main) {
+    virtual CBlockIndex *operator[](int nHeight) const REQUIRES_SHARED(cs_main) {
         return at(nHeight);
     }
 
@@ -651,7 +651,7 @@ public:
      * @param b
      * @returns true if a == b
      */
-    friend bool operator==(const CChain &a, const CChain &b) REQUIRES(cs_main) {
+    friend bool operator==(const CChain &a, const CChain &b) REQUIRES_SHARED(cs_main) {
         return a.Height() == b.Height() &&
                a.LastTip() == b.LastTip();
     }
@@ -661,7 +661,7 @@ public:
      * @param pindex the CBlockIndex to check
      * @returns true if the block is present in this chain
      */
-    virtual bool Contains(const CBlockIndex *pindex) const REQUIRES(cs_main) {
+    virtual bool Contains(const CBlockIndex *pindex) const REQUIRES_SHARED(cs_main) {
         return (*this)[pindex->GetHeight()] == pindex;
     }
 
@@ -670,7 +670,7 @@ public:
      * @param pindex what to search for
      * @returns the next index after pindex, or nullptr if pindex not found or is the current tip
      */
-    virtual CBlockIndex *Next(const CBlockIndex *pindex) const REQUIRES(cs_main) {
+    virtual CBlockIndex *Next(const CBlockIndex *pindex) const REQUIRES_SHARED(cs_main) {
         if (Contains(pindex))
             return (*this)[pindex->GetHeight() + 1];
         else
@@ -680,7 +680,7 @@ public:
     /** 
      * @return the current height
      */
-    virtual int Height() const REQUIRES(cs_main) {
+    virtual int Height() const REQUIRES_SHARED(cs_main) {
         return vChain.size() - 1;
     }
 
@@ -694,13 +694,48 @@ public:
      * @brief Return a CBlockLocator that refers to a block in this chain
      * @param pindex the block index (nullptr will return the tip)
      */
-    virtual CBlockLocator GetLocator(const CBlockIndex *pindex = nullptr) const REQUIRES(cs_main);
+    virtual CBlockLocator GetLocator(const CBlockIndex *pindex = nullptr) const REQUIRES_SHARED(cs_main);
 
     /** 
      * @param pindex
      * @returns the last common block between this chain and pindex
      */
-    virtual const CBlockIndex *FindFork(const CBlockIndex *pindex) const REQUIRES(cs_main);
+    virtual const CBlockIndex *FindFork(const CBlockIndex *pindex) const REQUIRES_SHARED(cs_main);
+};
+
+/***
+ * An in-memory sorted list of blocks with locking
+ */
+class LockableCChain : public CChain
+{
+public:
+    /****
+     * @returns a mutex
+     */
+    CMutexLock<CCriticalSection> GetScopedLock() { return std::move(CMutexLock<CCriticalSection>(cs_main)); }
+    CMutexLock<CCriticalSection> GetScopedSharedLock() { return std::move(CMutexLock<CCriticalSection>(cs_main)); }
+    /*****
+     * @returns the height, protected by a shared (read) lock
+     */
+    int GetHeight() REQUIRES(!cs_main)
+    {
+        LOCK(cs_main);
+        return Height();
+    }
+    /******
+     * @returns the last tip, protected by a lock
+     */
+    CBlockIndex *GetLastTip() REQUIRES(!cs_main)
+    {
+        CMutexLock<CCriticalSection> lock(cs_main);
+        return LastTip();
+    }
+
+    CBlockIndex *at(int index) REQUIRES(!cs_main)
+    {
+        LOCK(cs_main);
+        return (*this)[index];
+    }
 };
 
 #ifdef DEBUG_LOCKORDER

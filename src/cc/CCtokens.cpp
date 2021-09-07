@@ -44,7 +44,7 @@
 
 
 // tx validation
-bool TokensValidate(struct CCcontract_info *cp, Eval* eval, const CTransaction &tx, uint32_t nIn)
+bool TokensValidate(struct CCcontract_info *cp, Eval* eval, const CTransaction &tx, uint32_t nIn) REQUIRES(!cs_main)
 {
 	static uint256 zero;
 	CTxDestination address; CTransaction vinTx, createTx; uint256 hashBlock, tokenid, tokenid2;
@@ -56,7 +56,7 @@ bool TokensValidate(struct CCcontract_info *cp, Eval* eval, const CTransaction &
 	char destaddr[64], origaddr[64], CCaddr[64];
 	std::vector<CPubKey> voutTokenPubkeys, vinTokenPubkeys;
 
-    if (strcmp(ASSETCHAINS_SYMBOL, "ROGUE") == 0 && chainActive.Height() <= 12500)
+    if (strcmp(ASSETCHAINS_SYMBOL, "ROGUE") == 0 && chainActive.GetHeight() <= 12500)
         return true;
 
 	numvins = tx.vin.size();
