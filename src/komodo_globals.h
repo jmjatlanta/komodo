@@ -26,7 +26,7 @@ void komodo_init(int32_t height);
 int32_t komodo_chosennotary(int32_t *notaryidp,int32_t height,uint8_t *pubkey33,uint32_t timestamp);
 int32_t komodo_isrealtime(int32_t *kmdheightp);
 uint64_t komodo_paxtotal();
-int32_t komodo_longestchain();
+int32_t komodo_longestchain() REQUIRES(!cs_vNodes);
 uint64_t komodo_maxallowed(int32_t baseid);
 int32_t komodo_bannedset(int32_t *indallvoutsp,uint256 *array,int32_t max);
 int32_t komodo_checkvout(int32_t vout,int32_t k,int32_t indallvouts);

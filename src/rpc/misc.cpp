@@ -63,10 +63,10 @@ using namespace std;
 int32_t Jumblr_depositaddradd(char *depositaddr);
 int32_t Jumblr_secretaddradd(char *secretaddr);
 uint64_t komodo_interestsum();
-int32_t komodo_longestchain();
+int32_t komodo_longestchain() REQUIRES(!cs_vNodes);
 int32_t komodo_notarized_height(int32_t *prevMoMheightp,uint256 *hashp,uint256 *txidp);
 bool komodo_txnotarizedconfirmed(uint256 txid);
-uint32_t komodo_chainactive_timestamp();
+uint32_t komodo_chainactive_timestamp() REQUIRES(cs_main);
 int32_t komodo_whoami(char *pubkeystr,int32_t height,uint32_t timestamp);
 extern uint64_t KOMODO_INTERESTSUM,KOMODO_WALLETBALANCE;
 extern bool IS_KOMODO_NOTARY;
@@ -177,9 +177,10 @@ UniValue geterablockheights(const UniValue& params, bool fHelp, const CPubKey& m
       
     CBlockIndex *pindex; int8_t lastera,era = 0; UniValue ret(UniValue::VOBJ);
 
-    for (size_t i = 1; i < chainActive.LastTip()->GetHeight(); i++)
+    auto height = chainActive.GetLastTip()->GetHeight();
+    for (size_t i = 1; i < height; i++)
     {
-        pindex = chainActive[i];
+        pindex = chainActive.at(i);
         era = getera(pindex->nTime)+1;
         if ( era > lastera )
         {
@@ -420,7 +421,9 @@ public:
 
 UniValue coinsupply(const UniValue& params, bool fHelp, const CPubKey& mypk)
 {
-    int32_t height = 0; int32_t currentHeight; int64_t blocks_per_year,zf1,zf3,zf12,sf1,sf3,sf12,sproutfunds,zfunds,supply1,supply3,supply12,supply = 0; UniValue result(UniValue::VOBJ);
+    int32_t height = 0; 
+    int64_t blocks_per_year,zf1,zf3,zf12,sf1,sf3,sf12,sproutfunds,zfunds,supply1,supply3,supply12,supply = 0; 
+    UniValue result(UniValue::VOBJ);
     if (fHelp || params.size() > 1)
         throw runtime_error("coinsupply <height>\n"
             "\nReturn coin supply information at a given block height. If no height is given, the current height is used.\n"
@@ -440,10 +443,11 @@ UniValue coinsupply(const UniValue& params, bool fHelp, const CPubKey& mypk)
             + HelpExampleCli("coinsupply", "420")
             + HelpExampleRpc("coinsupply", "420")
         );
+    int32_t currentHeight = chainActive.GetHeight();
     if ( params.size() == 0 )
-        height = chainActive.Height();
-    else height = atoi(params[0].get_str());
-    currentHeight = chainActive.Height();
+        height = currentHeight;
+    else 
+        height = atoi(params[0].get_str());
 
     if (height >= 0 && height <= currentHeight) {
         if ( (supply= komodo_coinsupply(&zfunds,&sproutfunds,height)) > 0 )
@@ -1223,7 +1227,7 @@ UniValue getaddressdeltas(const UniValue& params, bool fHelp, const CPubKey& myp
     }
 }
 
-CAmount checkburnaddress(CAmount &received, int64_t &nNotaryPay, int32_t &height, std::string sAddress)
+CAmount checkburnaddress(CAmount &received, int64_t &nNotaryPay, int32_t &height, std::string sAddress) REQUIRES(!cs_main)
 {
     CBitcoinAddress address(sAddress);
     uint160 hashBytes; int type = 0; CAmount balance = 0;
@@ -1239,7 +1243,7 @@ CAmount checkburnaddress(CAmount &received, int64_t &nNotaryPay, int32_t &height
                 balance += it->second;
             }
             // Get notary pay from current chain tip
-            CBlockIndex* pindex = chainActive.LastTip();
+            CBlockIndex* pindex = chainActive.GetLastTip();
             nNotaryPay = pindex->nNotaryPay;
             height = pindex->GetHeight();
         }
@@ -1303,7 +1307,7 @@ UniValue getnotarypayinfo(const UniValue& params, bool fHelp, const CPubKey& myp
     // pubkey 020000000000000000000000000000000
     balance = checkburnaddress(received, TotalNotaryPay, height, "REDVp3ox1pbcWYCzySadfHhk8UU3HM4k5x");
     
-    notarycount = komodo_notaries(notarypubkeys, height, chainActive[height]->GetBlockTime());
+    notarycount = komodo_notaries(notarypubkeys, height, chainActive.at(height)->GetBlockTime());
     NotaryPay = komodo_notarypayamount(height, notarycount)*notarycount;
     bool spent = (received != balance);
     if ( !spent )

@@ -78,7 +78,7 @@ namespace {
 // Global state variables
 //
 extern uint16_t ASSETCHAINS_P2PPORT;
-extern int8_t is_STAKED(const char *chain_name);
+uint8_t is_STAKED(const char *chain_name);
 extern char ASSETCHAINS_SYMBOL[65];
 
 bool fDiscover = true;
@@ -439,9 +439,11 @@ void CNode::CloseSocketDisconnect()
     }
 
     // in case this fails, we'll empty the recv buffer when the CNode is deleted
-    TRY_LOCK(cs_vRecvMsg, lockRecv);
-    if (lockRecv)
+    if (cs_vRecvMsg.try_lock())
+    {
+        ADOPT_LOCK(cs_vRecvMsg, lock);
         vRecvMsg.clear();
+    }
 }
 
 extern int32_t KOMODO_NSPV;
@@ -1055,15 +1057,17 @@ void ThreadSocketHandler()
                 {
                     bool fDelete = false;
                     {
-                        TRY_LOCK(pnode->cs_vSend, lockSend);
-                        if (lockSend)
+                        if (pnode->cs_vSend.try_lock())
                         {
-                            TRY_LOCK(pnode->cs_vRecvMsg, lockRecv);
-                            if (lockRecv)
+                            ADOPT_LOCK(pnode->cs_vSend, lockSend);
+                            if (pnode->cs_vRecvMsg.try_lock())
                             {
-                                TRY_LOCK(pnode->cs_inventory, lockInv);
-                                if (lockInv)
+                                ADOPT_LOCK(pnode->cs_vRecvMsg, lockRecv);
+                                if (pnode->cs_inventory.try_lock())
+                                {
+                                    ADOPT_LOCK(pnode->cs_inventory, lockInv);
                                     fDelete = true;
+                                }
                             }
                         }
                     }
@@ -1128,18 +1132,25 @@ void ThreadSocketHandler()
                 // * We wait for data to be received (and disconnect after timeout).
                 // * We process a message in the buffer (message handler thread).
                 {
-                    TRY_LOCK(pnode->cs_vSend, lockSend);
-                    if (lockSend && !pnode->vSendMsg.empty()) {
-                        FD_SET(pnode->hSocket, &fdsetSend);
-                        continue;
+                    if (pnode->cs_vSend.try_lock())
+                    {
+                        ADOPT_LOCK(pnode->cs_vSend, lockSend);
+                        if (!pnode->vSendMsg.empty()) 
+                        {
+                            FD_SET(pnode->hSocket, &fdsetSend);
+                            continue;
+                        }
                     }
                 }
                 {
-                    TRY_LOCK(pnode->cs_vRecvMsg, lockRecv);
-                    if (lockRecv && (
-                        pnode->vRecvMsg.empty() || !pnode->vRecvMsg.front().complete() ||
-                        pnode->GetTotalRecvSize() <= ReceiveFloodSize()))
-                        FD_SET(pnode->hSocket, &fdsetRecv);
+                    
+                    if (pnode->cs_vRecvMsg.try_lock())
+                    {
+                        ADOPT_LOCK(pnode->cs_vRecvMsg, lockRecv);
+                        if (pnode->vRecvMsg.empty() || !pnode->vRecvMsg.front().complete() ||
+                                pnode->GetTotalRecvSize() <= ReceiveFloodSize())
+                            FD_SET(pnode->hSocket, &fdsetRecv);
+                    }
                 }
             }
         }
@@ -1194,38 +1205,36 @@ void ThreadSocketHandler()
                 continue;
             if (FD_ISSET(pnode->hSocket, &fdsetRecv) || FD_ISSET(pnode->hSocket, &fdsetError))
             {
-                TRY_LOCK(pnode->cs_vRecvMsg, lockRecv);
-                if (lockRecv)
+                if (pnode->cs_vRecvMsg.try_lock())
                 {
+                    ADOPT_LOCK(pnode->cs_vRecvMsg, lockRecv);
+                    // typical socket buffer is 8K-64K
+                    char pchBuf[0x10000];
+                    int nBytes = recv(pnode->hSocket, pchBuf, sizeof(pchBuf), MSG_DONTWAIT);
+                    if (nBytes > 0)
                     {
-                        // typical socket buffer is 8K-64K
-                        char pchBuf[0x10000];
-                        int nBytes = recv(pnode->hSocket, pchBuf, sizeof(pchBuf), MSG_DONTWAIT);
-                        if (nBytes > 0)
-                        {
-                            if (!pnode->ReceiveMsgBytes(pchBuf, nBytes))
-                                pnode->CloseSocketDisconnect();
-                            pnode->nLastRecv = GetTime();
-                            pnode->nRecvBytes += nBytes;
-                            pnode->RecordBytesRecv(nBytes);
-                        }
-                        else if (nBytes == 0)
-                        {
-                            // socket closed gracefully
-                            if (!pnode->fDisconnect)
-                                LogPrint("net", "socket closed\n");
+                        if (!pnode->ReceiveMsgBytes(pchBuf, nBytes))
                             pnode->CloseSocketDisconnect();
-                        }
-                        else if (nBytes < 0)
+                        pnode->nLastRecv = GetTime();
+                        pnode->nRecvBytes += nBytes;
+                        pnode->RecordBytesRecv(nBytes);
+                    }
+                    else if (nBytes == 0)
+                    {
+                        // socket closed gracefully
+                        if (!pnode->fDisconnect)
+                            LogPrint("net", "socket closed\n");
+                        pnode->CloseSocketDisconnect();
+                    }
+                    else if (nBytes < 0)
+                    {
+                        // error
+                        int nErr = WSAGetLastError();
+                        if (nErr != WSAEWOULDBLOCK && nErr != WSAEMSGSIZE && nErr != WSAEINTR && nErr != WSAEINPROGRESS)
                         {
-                            // error
-                            int nErr = WSAGetLastError();
-                            if (nErr != WSAEWOULDBLOCK && nErr != WSAEMSGSIZE && nErr != WSAEINTR && nErr != WSAEINPROGRESS)
-                            {
-                                if (!pnode->fDisconnect)
-                                    LogPrintf("socket recv error %s\n", NetworkErrorString(nErr));
-                                pnode->CloseSocketDisconnect();
-                            }
+                            if (!pnode->fDisconnect)
+                                LogPrintf("socket recv error %s\n", NetworkErrorString(nErr));
+                            pnode->CloseSocketDisconnect();
                         }
                     }
                 }
@@ -1238,9 +1247,11 @@ void ThreadSocketHandler()
                 continue;
             if (FD_ISSET(pnode->hSocket, &fdsetSend))
             {
-                TRY_LOCK(pnode->cs_vSend, lockSend);
-                if (lockSend)
+                if (pnode->cs_vSend.try_lock())
+                {
+                    ADOPT_LOCK(pnode->cs_vSend, lockSend);
                     SocketSendData(pnode);
+                }
             }
 
             //
@@ -1598,9 +1609,9 @@ void ThreadMessageHandler()
 
             // Receive messages
             {
-                TRY_LOCK(pnode->cs_vRecvMsg, lockRecv);
-                if (lockRecv)
+                if (pnode->cs_vRecvMsg.try_lock())
                 {
+                    ADOPT_LOCK(pnode->cs_vRecvMsg, lockRecv);
                     if (!g_signals.ProcessMessages(pnode))
                         pnode->CloseSocketDisconnect();
 
@@ -1617,9 +1628,11 @@ void ThreadMessageHandler()
 
             // Send messages
             {
-                TRY_LOCK(pnode->cs_vSend, lockSend);
-                if (lockSend)
+                if (pnode->cs_vSend.try_lock())
+                {
+                    ADOPT_LOCK(pnode->cs_vSend, lockSend);
                     g_signals.SendMessages(pnode, pnode == pnodeTrickle || pnode->fWhitelisted);
+                }
             }
             boost::this_thread::interruption_point();
         }
@@ -1817,7 +1830,6 @@ void StartNode(boost::thread_group& threadGroup, CScheduler& scheduler)
     Discover(threadGroup);
 
     // skip DNS seeds for staked chains.
-    extern int8_t is_STAKED(const char *chain_name);
     extern char ASSETCHAINS_SYMBOL[65];
     if ( is_STAKED(ASSETCHAINS_SYMBOL) != 0 )
         SoftSetBoolArg("-dnsseed", false);
@@ -2202,7 +2214,7 @@ void CNode::AskFor(const CInv& inv)
     mapAskFor.insert(std::make_pair(nRequestTime, inv));
 }
 
-void CNode::BeginMessage(const char* pszCommand) ACQUIRE(cs_vSend)
+void CNode::BeginMessage(const char* pszCommand)
 {
     ENTER_CRITICAL_SECTION(cs_vSend);
     assert(ssSend.size() == 0);
@@ -2210,7 +2222,7 @@ void CNode::BeginMessage(const char* pszCommand) ACQUIRE(cs_vSend)
     LogPrint("net", "sending: %s ", SanitizeString(pszCommand));
 }
 
-void CNode::AbortMessage() RELEASE(cs_vSend)
+void CNode::AbortMessage()
 {
     ssSend.clear();
 
@@ -2219,7 +2231,7 @@ void CNode::AbortMessage() RELEASE(cs_vSend)
     LogPrint("net", "(aborted)\n");
 }
 
-void CNode::EndMessage() RELEASE(cs_vSend)
+void CNode::EndMessage()
 {
     // The -*messagestest options are intentionally not documented in the help message,
     // since they are only used during development to debug the networking code and are

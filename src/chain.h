@@ -46,7 +46,7 @@ extern uint64_t ASSETCHAINS_NOTARY_PAY[];
 extern int32_t ASSETCHAINS_STAKED;
 extern const uint32_t nStakedDecemberHardforkTimestamp; //December 2019 hardfork
 extern const int32_t nDecemberHardforkHeight;   //December 2019 hardfork
-extern int8_t is_STAKED(const char *chain_name);
+extern uint8_t is_STAKED(const char *chain_name);
 
 struct CDiskBlockPos
 {
@@ -694,7 +694,7 @@ public:
      * @brief Return a CBlockLocator that refers to a block in this chain
      * @param pindex the block index (nullptr will return the tip)
      */
-    virtual CBlockLocator GetLocator(const CBlockIndex *pindex = nullptr) const REQUIRES_SHARED(cs_main);
+    virtual CBlockLocator Locator(const CBlockIndex *pindex = nullptr) const REQUIRES_SHARED(cs_main);
 
     /** 
      * @param pindex
@@ -712,8 +712,8 @@ public:
     /****
      * @returns a mutex
      */
-    CMutexLock<CCriticalSection> GetScopedLock() { return std::move(CMutexLock<CCriticalSection>(cs_main)); }
-    CMutexLock<CCriticalSection> GetScopedSharedLock() { return std::move(CMutexLock<CCriticalSection>(cs_main)); }
+    CMutexLock<CCriticalSection> GetScopedLock() { return std::move(CCriticalBlock(cs_main, "cs_main", "chain.h", 715)); }
+    CMutexLock<CCriticalSection> GetScopedSharedLock() { return std::move(CCriticalBlock(cs_main, "cs_main", "chain.h", 716)); }
     /*****
      * @returns the height, protected by a shared (read) lock
      */
@@ -727,7 +727,7 @@ public:
      */
     CBlockIndex *GetLastTip() REQUIRES(!cs_main)
     {
-        CMutexLock<CCriticalSection> lock(cs_main);
+        LOCK(cs_main);
         return LastTip();
     }
 
@@ -735,6 +735,12 @@ public:
     {
         LOCK(cs_main);
         return (*this)[index];
+    }
+
+    CBlockLocator GetLocator(const CBlockIndex *pindex = nullptr) const REQUIRES(!cs_main)
+    {
+        LOCK(cs_main);
+        return Locator(pindex);
     }
 };
 
@@ -761,7 +767,7 @@ public:
     CBlockIndex *Next(const CBlockIndex *pindex) const override { AssertLockHeld(mutex); return CChain::Next(pindex); }
     int Height() const override { AssertLockHeld(mutex); return CChain::Height(); }
     void SetTip(CBlockIndex *pindex) override { AssertLockHeld(mutex); CChain::SetTip(pindex); }
-    CBlockLocator GetLocator(const CBlockIndex *pindex = nullptr) const override { AssertLockHeld(mutex); return CChain::GetLocator(pindex); }
+    CBlockLocator Locator(const CBlockIndex *pindex = nullptr) const override { AssertLockHeld(mutex); return CChain::Locator(pindex); }
     const CBlockIndex *FindFork(const CBlockIndex *pindex) const override { AssertLockHeld(mutex); return CChain::FindFork(pindex); }
 private:
     size_t size() { AssertLockHeld(mutex); return vChain.size(); }

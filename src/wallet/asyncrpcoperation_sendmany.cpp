@@ -57,7 +57,7 @@ extern char ASSETCHAINS_SYMBOL[65];
 int32_t komodo_dpowconfs(int32_t height,int32_t numconfs);
 int32_t komodo_blockheight(uint256 hash);
 int tx_height( const uint256 &hash );
-bool komodo_hardfork_active(uint32_t time);
+bool komodo_hardfork_active(uint32_t time) REQUIRES(cs_main);
 extern UniValue signrawtransaction(const UniValue& params, bool fHelp, const CPubKey& mypk);
 extern UniValue sendrawtransaction(const UniValue& params, bool fHelp, const CPubKey& mypk);
 

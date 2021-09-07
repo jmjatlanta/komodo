@@ -18,6 +18,9 @@
 #include "arith_uint256.h"
 #include "chain.h"
 #include "komodo_nk.h"
+#include "sync.h"
+extern CCriticalSection cs_vNodes;
+extern CCriticalSection cs_main;
 
 #define KOMODO_EARLYTXID_HEIGHT 100
 //#define ADAPTIVEPOW_CHANGETO_DEFAULTON 1572480000
@@ -545,7 +548,7 @@ int32_t komodo_minerids(uint8_t *minerids,int32_t height,int32_t width);
 int32_t komodo_kvsearch(uint256 *refpubkeyp,int32_t current_height,uint32_t *flagsp,int32_t *heightp,uint8_t value[IGUANA_MAXSCRIPTSIZE],uint8_t *key,int32_t keylen);
 
 uint32_t komodo_blocktime(uint256 hash);
-int32_t komodo_longestchain();
+int32_t komodo_longestchain() REQUIRES(!cs_vNodes);
 int32_t komodo_dpowconfs(int32_t height,int32_t numconfs);
 int8_t komodo_segid(int32_t nocache,int32_t height);
 int32_t komodo_heightpricebits(uint64_t *seedp,uint32_t *heightbits,int32_t nHeight);
@@ -562,7 +565,7 @@ uint64_t komodo_accrued_interest(int32_t *txheightp,uint32_t *locktimep,uint256 
 int32_t komodo_currentheight();
 int32_t komodo_notarized_bracket(struct notarized_checkpoint *nps[2],int32_t height);
 arith_uint256 komodo_adaptivepow_target(int32_t height,arith_uint256 bnTarget,uint32_t nTime);
-bool komodo_hardfork_active(uint32_t time);
+bool komodo_hardfork_active(uint32_t time) REQUIRES(cs_main);
 int32_t komodo_newStakerActive(int32_t height, uint32_t timestamp);
 
 uint256 Parseuint256(const char *hexstr);
@@ -570,11 +573,11 @@ void komodo_sendmessage(int32_t minpeers, int32_t maxpeers, const char *message,
 CBlockIndex *komodo_getblockindex(uint256 hash);
 int32_t komodo_nextheight();
 CBlockIndex *komodo_blockindex(uint256 hash);
-CBlockIndex *komodo_chainactive(int32_t height);
+CBlockIndex *komodo_chainactive(int32_t height) REQUIRES(cs_main);
 int32_t komodo_blockheight(uint256 hash);
 bool komodo_txnotarizedconfirmed(uint256 txid);
 int32_t komodo_blockload(CBlock& block, CBlockIndex *pindex);
-uint32_t komodo_chainactive_timestamp();
+uint32_t komodo_chainactive_timestamp() REQUIRES(cs_main);
 uint32_t GetLatestTimestamp(int32_t height);
 
 #ifndef KOMODO_NSPV_FULLNODE

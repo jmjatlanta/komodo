@@ -8,13 +8,14 @@
 
 extern pthread_mutex_t staked_mutex;
 
-int8_t is_STAKED(const char *chain_name) 
+uint8_t is_STAKED(const char *chain_name) 
 {
-    static int8_t STAKED,doneinit;
+    static int8_t STAKED;
+    static bool doneinit = false;
     if ( chain_name[0] == 0 )
-        return(0);
-    if (doneinit == 1 && ASSETCHAINS_SYMBOL[0] != 0)
-        return(STAKED);
+        return 0;
+    if (doneinit == true && ASSETCHAINS_SYMBOL[0] != 0)
+        return STAKED;
     else STAKED = 0;
     if ( (strcmp(chain_name, "LABS") == 0) ) 
         STAKED = 1; // These chains are allowed coin emissions.
@@ -25,9 +26,9 @@ int8_t is_STAKED(const char *chain_name)
     else if ( (strcmp(chain_name, "TEST") == 0) || (strncmp(chain_name, "TEST", 4) == 0) )
         STAKED = 4; // These chains are for testing consensus to create a chain etc. Not meant to be actually used for anything important.
     else if ( (strcmp(chain_name, "THIS_CHAIN_IS_BANNED") == 0) )
-        STAKED = 255; // Any chain added to this group is banned, no notarisations are valid, as a consensus rule. Can be used to remove a chain from cluster if needed.
-    doneinit = 1;
-    return(STAKED);
+        STAKED = 127; // Any chain added to this group is banned, no notarisations are valid, as a consensus rule. Can be used to remove a chain from cluster if needed.
+    doneinit = true;
+    return STAKED;
 };
 
 int32_t STAKED_era(int timestamp)

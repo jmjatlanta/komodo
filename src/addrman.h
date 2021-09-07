@@ -379,7 +379,7 @@ public:
     }
 
     template<typename Stream>
-    void Unserialize(Stream& s)
+    void Unserialize(Stream& s) REQUIRES(!getCs())
     {
         LOCK(cs);
 

@@ -114,15 +114,15 @@ void EraseBackNotarisations(const NotarisationsInBlock notarisations, CDBBatch &
  * Scan notarisationsdb backwards for blocks containing a notarisation
  * for given symbol. Return height of matched notarisation or 0.
  */
-int ScanNotarisationsDB(int height, std::string symbol, int scanLimitBlocks, Notarisation& out)
+int ScanNotarisationsDB(int height, std::string symbol, int scanLimitBlocks, Notarisation& out) REQUIRES(!cs_main)
 {
-    if (height < 0 || height > chainActive.Height())
+    if (height < 0 || height > chainActive.GetHeight())
         return false;
 
     for (int i=0; i<scanLimitBlocks; i++) {
         if (i > height) break;
         NotarisationsInBlock notarisations;
-        uint256 blockHash = *chainActive[height-i]->phashBlock;
+        uint256 blockHash = *chainActive.at(height-i)->phashBlock;
         if (!GetBlockNotarisations(blockHash, notarisations))
             continue;
 
@@ -136,10 +136,10 @@ int ScanNotarisationsDB(int height, std::string symbol, int scanLimitBlocks, Not
     return 0;
 }
 
-int ScanNotarisationsDB2(int height, std::string symbol, int scanLimitBlocks, Notarisation& out)
+int ScanNotarisationsDB2(int height, std::string symbol, int scanLimitBlocks, Notarisation& out) REQUIRES(!cs_main)
 {
     int32_t i,maxheight,ht;
-    maxheight = chainActive.Height();
+    maxheight = chainActive.GetHeight();
     if ( height < 0 || height > maxheight )
         return false;
     for (i=0; i<scanLimitBlocks; i++)
@@ -148,7 +148,7 @@ int ScanNotarisationsDB2(int height, std::string symbol, int scanLimitBlocks, No
         if ( ht > maxheight )
             break;
         NotarisationsInBlock notarisations;
-        uint256 blockHash = *chainActive[ht]->phashBlock;
+        uint256 blockHash = *chainActive.at(ht)->phashBlock;
         if ( !GetBlockNotarisations(blockHash,notarisations) )
             continue;
         BOOST_FOREACH(Notarisation& nota,notarisations)

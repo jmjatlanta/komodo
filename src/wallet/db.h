@@ -59,7 +59,7 @@ private:
     void EnvShutdown();
 public:
     mutable CCriticalSection cs_db;
-    CCriticalSection *getCsdb() RETURN_CAPABILITY(cs_db); // declaration only, for static thread analysis
+    //CCriticalSection *getCsdb() RETURN_CAPABILITY(cs_db); // declaration only, for static thread analysis
     
     DbEnv *dbenv;
     std::map<std::string, int> mapFileUseCount;
@@ -90,7 +90,7 @@ public:
      * for huge databases.
      */
     typedef std::pair<std::vector<unsigned char>, std::vector<unsigned char> > KeyValPair;
-    bool Salvage(const std::string& strFile, bool fAggressive, std::vector<KeyValPair>& vResult);
+    bool Salvage(const std::string& strFile, bool fAggressive, std::vector<KeyValPair>& vResult) REQUIRES(!cs_db);
 
     bool Open(const boost::filesystem::path& path);
     void Close();

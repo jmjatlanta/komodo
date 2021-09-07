@@ -19,6 +19,8 @@
 
 #include "CCinclude.h"
 #include <gmp.h>
+#include "sync.h"
+extern CCriticalSection cs_main;
 
 #define EVAL_REWARDS 0xe5
 #define REWARDSCC_MAXAPR (COIN * 25)
@@ -30,6 +32,6 @@ UniValue RewardsList();
 std::string RewardsCreateFunding(uint64_t txfee,char *planstr,int64_t funds,int64_t APR,int64_t minseconds,int64_t maxseconds,int64_t mindeposit);
 std::string RewardsAddfunding(uint64_t txfee,char *planstr,uint256 fundingtxid,int64_t amount);
 std::string RewardsLock(uint64_t txfee,char *planstr,uint256 fundingtxid,int64_t amount);
-std::string RewardsUnlock(uint64_t txfee,char *planstr,uint256 fundingtxid,uint256 locktxid);
+std::string RewardsUnlock(uint64_t txfee,char *planstr,uint256 fundingtxid,uint256 locktxid) REQUIRES(cs_main);
 
 #endif

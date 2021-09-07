@@ -46,6 +46,8 @@
 #include <boost/foreach.hpp>
 #include <boost/signals2/signal.hpp>
 
+extern CCriticalSection cs_vNodes; // here for static analysis
+
 class CAddrMan;
 class CBlockIndex;
 class CScheduler;
@@ -98,7 +100,7 @@ void SocketSendData(CNode *pnode);
 typedef int NodeId;
 
 class CNodeStats;
-void CopyNodeStats(std::vector<CNodeStats>& vstats);
+void CopyNodeStats(std::vector<CNodeStats>& vstats) REQUIRES(!cs_vNodes);
 
 struct CombinerAll
 {
@@ -278,6 +280,7 @@ public:
     std::deque<CInv> vRecvGetData;
     std::deque<CNetMessage> vRecvMsg;
     CCriticalSection cs_vRecvMsg;
+    CCriticalSection *getCsvrecvmsg() RETURN_CAPABILITY(cs_vRecvMsg);
     uint64_t nRecvBytes;
     int nRecvVersion;
 
@@ -388,7 +391,7 @@ public:
     }
 
     // requires LOCK(cs_vRecvMsg)
-    unsigned int GetTotalRecvSize()
+    unsigned int GetTotalRecvSize() REQUIRES(getCsvrecvmsg())
     {
         unsigned int total = 0;
         BOOST_FOREACH(const CNetMessage &msg, vRecvMsg)
@@ -397,10 +400,10 @@ public:
     }
 
     // requires LOCK(cs_vRecvMsg)
-    bool ReceiveMsgBytes(const char *pch, unsigned int nBytes);
+    bool ReceiveMsgBytes(const char *pch, unsigned int nBytes) REQUIRES(getCsvrecvmsg());
 
     // requires LOCK(cs_vRecvMsg)
-    void SetRecvVersion(int nVersionIn)
+    void SetRecvVersion(int nVersionIn) REQUIRES(getCsvrecvmsg())
     {
         nRecvVersion = nVersionIn;
         BOOST_FOREACH(CNetMessage &msg, vRecvMsg)
@@ -440,7 +443,7 @@ public:
     }
 
 
-    void AddInventoryKnown(const CInv& inv) REQUIRES(!cs_inventory) REQUIRES(!getCsinventory())
+    void AddInventoryKnown(const CInv& inv) REQUIRES(!getCsinventory())
     {
         LOCK(cs_inventory);
         setInventoryKnown.insert(inv);
@@ -455,16 +458,13 @@ public:
 
     void AskFor(const CInv& inv);
 
-    // TODO: Document the postcondition of this function.  Is cs_vSend locked?
-    void BeginMessage(const char* pszCommand) ACQUIRE(cs_vSend);
+    void BeginMessage(const char* pszCommand) ACQUIRE(getCsvsend());
 
-    // TODO: Document the precondition of this function.  Is cs_vSend locked?
-    void AbortMessage() RELEASE(cs_vSend);
+    void AbortMessage() RELEASE(getCsvsend());
 
-    // TODO: Document the precondition of this function.  Is cs_vSend locked?
-    void EndMessage() RELEASE(cs_vSend);
+    void EndMessage() RELEASE(getCsvsend());
 
-    void PushVersion();
+    void PushVersion() REQUIRES(!getCsvsend());
 
 
     void PushMessage(const char* pszCommand) REQUIRES(!getCsvsend())

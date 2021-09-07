@@ -20,6 +20,7 @@ private:
     size_t nPeersBehind;
 
 public:
+    CCriticalSection *getCs() RETURN_CAPABILITY(cs); // declaration only, for static analysis
     static const size_t TIMEDATA_WARNING_SAMPLES = 8;
     static const size_t TIMEDATA_WARNING_MAJORITY = 6;
     static const size_t TIMEDATA_MAX_SAMPLES = 20;
@@ -29,7 +30,7 @@ public:
     CTimeWarning() : nPeersBehind(0), nPeersAhead(0) {}
     virtual ~CTimeWarning() {}
 
-    int64_t AddTimeData(const CNetAddr& ip, int64_t nTime, int64_t now);
+    int64_t AddTimeData(const CNetAddr& ip, int64_t nTime, int64_t now) REQUIRES(!getCs());
     virtual void Warn(size_t peersAhead, size_t peersBehind);
 };
 

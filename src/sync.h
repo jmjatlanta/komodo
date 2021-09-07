@@ -122,6 +122,7 @@ template <typename Mutex>
 class SCOPED_CAPABILITY CMutexLock
 {
 private:
+    Mutex *mutex;
     boost::unique_lock<Mutex> lock;
 
     void Enter(const char* pszName, const char* pszFile, int nLine) ACQUIRE()
@@ -147,32 +148,56 @@ private:
     }
 
 public:
-    CMutexLock(Mutex& mutexIn, const char* pszName, const char* pszFile, int nLine, bool fTry = false) ACQUIRE(mutexIn) : lock(mutexIn, boost::defer_lock)
+    CMutexLock(Mutex& mutexIn, const char* pszName, const char* pszFile, int nLine) 
+            ACQUIRE(mutexIn) : mutex(&mutexIn), lock(mutexIn, boost::defer_lock)
     {
-        if (fTry)
-            TryEnter(pszName, pszFile, nLine);
-        else
-            Enter(pszName, pszFile, nLine);
+        Enter(pszName, pszFile, nLine);
     }
 
-    CMutexLock(Mutex* pmutexIn, const char* pszName, const char* pszFile, int nLine, bool fTry = false) ACQUIRE(pmutexIn)
+    CMutexLock(Mutex* pmutexIn, const char* pszName, const char* pszFile, int nLine) 
+            ACQUIRE(pmutexIn) : mutex(pmutexIn)
     {
         if (!pmutexIn) return;
 
         lock = boost::unique_lock<Mutex>(*pmutexIn, boost::defer_lock);
-        if (fTry)
-            TryEnter(pszName, pszFile, nLine);
-        else
-            Enter(pszName, pszFile, nLine);
+        Enter(pszName, pszFile, nLine);
     }
-    CMutexLock(Mutex& mutexIn) ACQUIRE(mutexIn) : lock(mutexIn, boost::defer_lock)
+    CMutexLock(Mutex& mutexIn, const char* pszName, const char* pszFile, int nLine, boost::try_to_lock_t) 
+            ACQUIRE(mutexIn) : mutex(&mutexIn), lock(mutexIn, boost::defer_lock)
     {
-        Enter("", "", 0);
+        TryEnter(pszName, pszFile, nLine);
     }
+    CMutexLock(Mutex* pmutexIn, const char* pszName, const char* pszFile, int nLine, boost::try_to_lock_t) 
+            ACQUIRE(pmutexIn) : mutex(pmutexIn)
+    {
+        if (!pmutexIn) 
+            return;
+
+        lock = boost::unique_lock<Mutex>(*pmutexIn, boost::defer_lock);
+        TryEnter(pszName, pszFile, nLine);
+    }
+    /****
+     * Build the scoping mechanism for a mutex for a mutex that is already locked
+     * @param mutexIn The mutex
+     * @param pszName the name of the mutex
+     * @param pszFile calling point
+     * @param nLine calling line
+     */
+    CMutexLock(Mutex& mutexIn, const char* pszName, const char* pszFile, int nLine, boost::adopt_lock_t) 
+            REQUIRES_SHARED(mutexIn): mutex(&mutexIn), lock(mutexIn, boost::adopt_lock)
+    {
+    }
+
+    bool TryLock() TRY_ACQUIRE(true, getMutex())
+    {
+        return lock.try_lock();
+    }
+
     // move constructor/assignment
-    CMutexLock(CMutexLock&& in) : lock(std::move(in.lock)) {}
-    CMutexLock& operator==(CMutexLock&& in)
+    CMutexLock(CMutexLock&& in) : mutex(std::move(in.mutex)), lock(std::move(in.lock)) {}
+    CMutexLock& operator=(CMutexLock&& in)
     {
+        mutex = in.mutex;
         lock = in.lock;
     }
 
@@ -186,13 +211,15 @@ public:
     {
         return lock.owns_lock();
     }
+    Mutex *getMutex() RETURN_CAPABILITY(mutex); // declaration only, for static analysis
 };
 
 typedef CMutexLock<CCriticalSection> CCriticalBlock;
 
 #define LOCK(cs) CCriticalBlock criticalblock(cs, #cs, __FILE__, __LINE__)
 #define LOCK2(cs1, cs2) CCriticalBlock criticalblock1(cs1, #cs1, __FILE__, __LINE__), criticalblock2(cs2, #cs2, __FILE__, __LINE__)
-#define TRY_LOCK(cs, name) CCriticalBlock name(cs, #cs, __FILE__, __LINE__, true)
+#define TRY_LOCK(cs, name) CCriticalBlock name(cs, #cs, __FILE__, __LINE__, boost::try_to_lock)
+#define ADOPT_LOCK(cs, name) CCriticalBlock name(cs, #cs, __FILE__, __LINE__, boost::adopt_lock)
 
 #define ENTER_CRITICAL_SECTION(cs)                            \
     {                                                         \

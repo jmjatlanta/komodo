@@ -49,7 +49,7 @@ CBlockIndex *komodo_getblockindex(uint256 hash);
 
 /* On KMD */
 uint256 CalculateProofRoot(const char* symbol, uint32_t targetCCid, int kmdHeight,
-        std::vector<uint256> &moms, uint256 &destNotarisationTxid) REQUIRES(!cs_main)
+        std::vector<uint256> &moms, uint256 &destNotarisationTxid)
 {
     /*
      * Notaries don't wait for confirmation on KMD before performing a backnotarisation,
@@ -256,32 +256,6 @@ bool IsSameAssetChain(const Notarisation &nota) {
     return strcmp(nota.second.symbol, ASSETCHAINS_SYMBOL) == 0;
 };
 
-
-/* On assetchain */
-bool GetNextBacknotarisation(uint256 kmdNotarisationTxid, Notarisation &out)
-{
-    /*
-     * Here we are given a txid, and a proof.
-     * We go from the KMD notarisation txid to the backnotarisation,
-     * then jump to the next backnotarisation, which contains the corresponding MoMoM.
-     */
-    Notarisation bn;
-    if (!GetBackNotarisation(kmdNotarisationTxid, bn))
-        return false;
-
-    // Need to get block height of that backnotarisation
-    EvalRef eval;
-    CBlockIndex block;
-    CTransaction tx;
-    if (!eval->GetTxConfirmed(bn.first, tx, block)){
-        fprintf(stderr, "Can't get height of backnotarisation, this should not happen\n");
-        return false;
-    }
-
-    return (bool) ScanNotarisationsFromHeight(block.GetHeight()+1, &IsSameAssetChain, out);
-}
-
-
 bool CheckMoMoM(uint256 kmdNotarisationHash, uint256 momom)
 {
     /*
@@ -425,7 +399,7 @@ bool CheckNotariesApproval(uint256 burntxid, const std::vector<uint256> & notary
  * out: pair<notarisationTxHash,merkleBranch>
  */
 
-TxProof GetAssetchainProof(uint256 hash,CTransaction burnTx) REQUIRES(!cs_main)
+TxProof GetAssetchainProof(uint256 hash,CTransaction burnTx)
 {
     int nIndex;
     CBlockIndex* blockIndex;

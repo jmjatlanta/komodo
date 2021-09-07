@@ -60,7 +60,7 @@ bool fSendFreeTransactions = false;
 bool fPayAtLeastCustomFee = true;
 #include "komodo_defs.h"
 
-CBlockIndex *komodo_chainactive(int32_t height);
+CBlockIndex *komodo_chainactive(int32_t height) REQUIRES(cs_main);
 extern std::string DONATION_PUBKEY;
 int32_t komodo_dpowconfs(int32_t height,int32_t numconfs);
 int tx_height( const uint256 &hash );

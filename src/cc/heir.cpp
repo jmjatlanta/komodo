@@ -332,15 +332,6 @@ uint8_t _DecodeHeirEitherOpRet(CScript scriptPubKey, uint256 &tokenid, CPubKey& 
 
 
 	if (DecodeTokenOpRet(scriptPubKey, evalCodeTokens, tokenid, voutPubkeysDummy, oprets) != 0 && GetOpretBlob(oprets, OPRETID_HEIRDATA, vopretExtra)) {
-        /* if (vopretExtra.size() > 1) {
-            // restore the second opret:
-
-            /* unmarshalled in DecodeTokenOpRet:
-            if (!E_UNMARSHAL(vopretExtra, { ss >> vopretStripped; })) {  //strip string size
-                if (!noLogging) std::cerr << "_DecodeHeirEitherOpret() could not unmarshal vopretStripped" << std::endl;
-                return (uint8_t)0;
-            }
-        } */
         if (vopretExtra.size() < 1) {
 			if (!noLogging) std::cerr << "_DecodeHeirEitherOpret() empty vopretExtra" << std::endl;
 			return (uint8_t)0;

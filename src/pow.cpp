@@ -35,7 +35,7 @@
 #ifdef ENABLE_RUST
 #include "librustzcash.h"
 #endif // ENABLE_RUST
-uint32_t komodo_chainactive_timestamp();
+uint32_t komodo_chainactive_timestamp() REQUIRES(cs_main);
 
 #include "komodo_defs.h"
 
@@ -809,14 +809,16 @@ bool CheckProofOfWork(const CBlockHeader &blkHeader, uint8_t *pubkey33, int32_t 
 {
     extern int32_t KOMODO_REWIND;
     uint256 hash;
-    bool fNegative,fOverflow; uint8_t origpubkey33[33]; int32_t i,nonzpkeys=0,nonz=0,special=0,special2=0,notaryid=-1,flag = 0, mids[66]; uint32_t tiptime,blocktimes[66];
+    bool fNegative,fOverflow; 
+    uint8_t origpubkey33[33]; 
+    int32_t i,nonzpkeys=0,nonz=0,special=0,special2=0,notaryid=-1,flag = 0, mids[66]; 
+    uint32_t blocktimes[66];
     arith_uint256 bnTarget; uint8_t pubkeys[66][33];
     //for (i=31; i>=0; i--)
     //    fprintf(stderr,"%02x",((uint8_t *)&hash)[i]);
     //fprintf(stderr," checkpow\n");
     memcpy(origpubkey33,pubkey33,33);
     memset(blocktimes,0,sizeof(blocktimes));
-    tiptime = komodo_chainactive_timestamp();
     bnTarget.SetCompact(blkHeader.nBits, &fNegative, &fOverflow);
     if ( height == 0 )
     {
@@ -825,6 +827,11 @@ bool CheckProofOfWork(const CBlockHeader &blkHeader, uint8_t *pubkey33, int32_t 
     }
     if ( height > 34000 && ASSETCHAINS_SYMBOL[0] == 0 ) // 0 -> non-special notary
     {
+        uint32_t tiptime;
+        {
+            LOCK(cs_main);
+            tiptime = komodo_chainactive_timestamp();
+        }
         special = komodo_chosennotary(&notaryid,height,pubkey33,tiptime);
         for (i=0; i<33; i++)
         {

@@ -189,17 +189,13 @@ int32_t komodo_longestchain()
          * KOMODO_LONGESTCHAIN, anyway, on next call it will be updated, when lock will success.
         */
 
-        TRY_LOCK(cs_main, lockMain); // Acquire cs_main
-        if (!lockMain) {
-            return(KOMODO_LONGESTCHAIN);
-        }
+        if (!cs_main.try_lock()) 
+            return KOMODO_LONGESTCHAIN;
+        ADOPT_LOCK(cs_main, lockMain);
 
         depth++;
         vector<CNodeStats> vstats;
-        {
-            //LOCK(cs_main);
-            CopyNodeStats(vstats);
-        }
+        CopyNodeStats(vstats);
         BOOST_FOREACH(const CNodeStats& stats, vstats)
         {
             //fprintf(stderr,"komodo_longestchain iter.%d\n",n);

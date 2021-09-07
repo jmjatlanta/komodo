@@ -61,7 +61,7 @@ int32_t komodo_newStakerActive(int32_t height, uint32_t timestamp);
  * or over the difficulty averaging window if 'lookup' is nonpositive.
  * If 'height' is nonnegative, compute the estimate at the time when a given block was found.
  */
-int64_t GetNetworkHashPS(int lookup, int height) 
+int64_t GetNetworkHashPS(int lookup, int height) REQUIRES(cs_main)
 {
     CBlockIndex *pb = chainActive.LastTip();
 
@@ -404,7 +404,7 @@ UniValue setgenerate(const UniValue& params, bool fHelp, const CPubKey& mypk)
 }
 #endif
 
-CBlockIndex *komodo_chainactive(int32_t height);
+CBlockIndex *komodo_chainactive(int32_t height) REQUIRES(cs_main);
 arith_uint256 zawy_ctB(arith_uint256 bnTarget,uint32_t solvetime);
 
 UniValue genminingCSV(const UniValue& params, bool fHelp, const CPubKey& mypk)

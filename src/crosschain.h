@@ -32,17 +32,17 @@ int GetSymbolAuthority(const char* symbol);
 bool CheckTxAuthority(const CTransaction &tx, CrosschainAuthority auth);
 
 /* On assetchain */
-TxProof GetAssetchainProof(uint256 hash,CTransaction burnTx);
+TxProof GetAssetchainProof(uint256 hash,CTransaction burnTx) REQUIRES(!cs_main);
 
 /* On KMD */
 uint256 CalculateProofRoot(const char* symbol, uint32_t targetCCid, int kmdHeight,
-        std::vector<uint256> &moms, uint256 &destNotarisationTxid);
+        std::vector<uint256> &moms, uint256 &destNotarisationTxid) REQUIRES(!cs_main);
 TxProof GetCrossChainProof(const uint256 txid, const char* targetSymbol, uint32_t targetCCid,
-        const TxProof assetChainProof,int32_t offset);
-void CompleteImportTransaction(CTransaction &importTx,int32_t offset);
+        const TxProof assetChainProof,int32_t offset) REQUIRES(!cs_main);
+void CompleteImportTransaction(CTransaction &importTx,int32_t offset) REQUIRES(!cs_main);
 
 /* On assetchain */
-bool CheckMoMoM(uint256 kmdNotarisationHash, uint256 momom);
+bool CheckMoMoM(uint256 kmdNotarisationHash, uint256 momom) REQUIRES(!cs_main);
 bool CheckNotariesApproval(uint256 burntxid, const std::vector<uint256> & notaryTxids);
 
 #endif /* CROSSCHAIN_H */

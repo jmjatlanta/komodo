@@ -218,7 +218,7 @@ std::string MakeCodaImportTx(uint64_t txfee, std::string receipt, std::string sr
     {
         sprintf(out + (i * 2), "%02x", hash[i]);
     }
-    out[65]='\0';
+    out[SHA256_DIGEST_LENGTH*2]='\0';
     LOGSTREAM("importcoin", CCLOG_DEBUG1, stream << "MakeCodaImportTx: hash=" << out << std::endl);
     codaburntxid.SetHex(out);
     LOGSTREAM("importcoin", CCLOG_DEBUG1, stream << "MakeCodaImportTx: receipt=" << receipt << " codaburntxid=" << codaburntxid.GetHex().data() << " amount=" << (double)amount / COIN  << std::endl);
@@ -302,7 +302,7 @@ int32_t CheckCODAimport(CTransaction importTx,CTransaction burnTx,std::vector<CT
     {
         sprintf(out + (i * 2), "%02x", hash[i]);
     }
-    out[65]='\0';
+    out[SHA256_DIGEST_LENGTH*2]='\0';
     codaburntxid.SetHex(out);
     result=CodaRPC(&retstr,"prove-payment","-address",srcaddr.c_str(),"-receipt-chain-hash",receipt.c_str(),"");
     if (result==0)
@@ -322,7 +322,7 @@ int32_t CheckCODAimport(CTransaction importTx,CTransaction burnTx,std::vector<CT
         }
         CTxDestination dest = DecodeDestination(destaddr);
         CScript scriptPubKey = GetScriptForDestination(dest);
-        if (payouts[0]!=CTxOut(amount*COIN,scriptPubKey));
+        if (payouts[0]!=CTxOut(amount*COIN,scriptPubKey))
         {
             LOGSTREAM("importcoin", CCLOG_INFO, stream << "Destination address in burn tx does not match destination in import tx" << std::endl);
             free(result);
@@ -525,7 +525,8 @@ int32_t CheckPUBKEYimport(TxProof proof,std::vector<uint8_t> rawproof,CTransacti
     return(0);
 }
 
-bool CheckMigration(Eval *eval, const CTransaction &importTx, const CTransaction &burnTx, std::vector<CTxOut> & payouts, const ImportProof &proof, const std::vector<uint8_t> &rawproof)
+bool CheckMigration(Eval *eval, const CTransaction &importTx, const CTransaction &burnTx, std::vector<CTxOut> & payouts, 
+        const ImportProof &proof, const std::vector<uint8_t> &rawproof) REQUIRES(!cs_main)
 {
     vscript_t vimportOpret;
     if (!GetOpReturnData(importTx.vout.back().scriptPubKey, vimportOpret)  ||        

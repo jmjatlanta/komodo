@@ -1520,7 +1520,7 @@ UniValue PaymentsInfo(struct CCcontract_info *cp,char *jsonstr) REQUIRES(!cs_mai
                 // Blocks until minrelease can be released. 
                 elegiblefunds = AddPaymentsInputs(true,3,cp,mtx,txidpk,0,CC_MAXVINS,createtxid,lockedblocks,minrelease,blocksleft);
                 result.push_back(Pair("elegiblefunds",ValueFromAmount(elegiblefunds)));
-                result.push_back(Pair("min_release_height",chainActive.Height()+blocksleft));
+                result.push_back(Pair("min_release_height",chainActive.GetHeight()+blocksleft));
                 result.push_back(Pair("result","success"));
             }
         }

@@ -1097,7 +1097,7 @@ uint32_t komodo_blocktime(uint256 hash)
     return(0);
 }
 
-int32_t komodo_checkpoint(int32_t *notarized_heightp,int32_t nHeight,uint256 hash)
+int32_t komodo_checkpoint(int32_t *notarized_heightp,int32_t nHeight,uint256 hash) REQUIRES(cs_main)
 {
     AssertLockHeld(cs_main);
     int32_t notarized_height,MoMdepth; uint256 MoM,notarized_hash,notarized_desttxid; CBlockIndex *notary,*pindex;

@@ -1139,9 +1139,9 @@ void ThreadFlushWalletDB(const string& strFile)
 
         if (nLastFlushed != nWalletDBUpdated && GetTime() - nLastWalletUpdate >= 2)
         {
-            TRY_LOCK(bitdb.cs_db,lockDb);
-            if (lockDb)
+            if (bitdb.cs_db.try_lock())
             {
+                ADOPT_LOCK(bitdb.cs_db, lockDb);
                 // Don't do this if any databases are in use
                 int nRefCount = 0;
                 map<string, int>::iterator mi = bitdb.mapFileUseCount.begin();

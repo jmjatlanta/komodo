@@ -73,8 +73,19 @@ extern void mpz_set_lli( mpz_t rop, long long op );
 extern int64_t mpz_get_si2( mpz_t op );
 // mpz_get_ui2 gets a mpz_t and returns a unsigned long long int
 extern uint64_t mpz_get_ui2( mpz_t op );
- 
-uint64_t RewardsCalc(int64_t amount, uint256 txid, int64_t APR, int64_t minseconds, int64_t maxseconds, uint32_t timestamp)
+
+/****
+ * Calculate the reward
+ * @param amount
+ * @param txid
+ * @param APR
+ * @param minseconds
+ * @param maxseconds
+ * @param hardforkActive true if the hardfork is active
+ * @returns the reward
+ */
+uint64_t RewardsCalc(int64_t amount, uint256 txid, int64_t APR, int64_t minseconds, 
+        int64_t maxseconds, bool hardforkActive)
 {
     int32_t numblocks; int64_t duration; uint64_t reward = 0;
     //fprintf(stderr,"minseconds %llu maxseconds %llu\n",(long long)minseconds,(long long)maxseconds);
@@ -85,11 +96,7 @@ uint64_t RewardsCalc(int64_t amount, uint256 txid, int64_t APR, int64_t minsecon
         //duration = (uint32_t)time(NULL) - (1532713903 - 3600 * 24);
     } else if ( duration > maxseconds )
         duration = maxseconds;
-    /* if ( 0 ) // amount * APR * duration / COIN * 100 * 365*24*3600
-        reward = (((amount * APR) / COIN) * duration) / (365*24*3600LL * 100);
-    else reward = (((amount * duration) / (365 * 24 * 3600LL)) * (APR / 1000000)) / 10000;
-    */
-    if ( !komodo_hardfork_active(timestamp) )
+    if ( !hardforkActive )
         reward = (((amount * duration) / (365 * 24 * 3600LL)) * (APR / 1000000)) / 10000;
     else 
     {
@@ -230,6 +237,12 @@ bool RewardsExactAmounts(struct CCcontract_info *cp,Eval *eval,const CTransactio
     else return(true);
 }
 
+bool is_komodo_hardfork_active(uint32_t timestamp) REQUIRES(!cs_main)
+{
+    LOCK(cs_main);
+    return komodo_hardfork_active(timestamp);
+}
+
 bool RewardsValidate(struct CCcontract_info *cp,Eval* eval,const CTransaction &tx, uint32_t nIn) REQUIRES(!cs_main)
 {
     uint256 txid,fundingtxid,hashBlock,vinfundingtxid; uint64_t vinsbits,sbits,APR,minseconds,maxseconds,mindeposit,amount,reward,txfee=10000; int32_t numvins,numvouts,preventCCvins,preventCCvouts,i; uint8_t funcid; CScript scriptPubKey; CTransaction fundingTx,vinTx;
@@ -297,7 +310,8 @@ bool RewardsValidate(struct CCcontract_info *cp,Eval* eval,const CTransaction &t
                     if ( !CheckTxFee(tx, txfee, chainActive.GetLastTip()->GetHeight(), chainActive.GetLastTip()->nTime, dummy) )
                         return eval->Invalid("txfee is too high");
                     amount = vinTx.vout[0].nValue;
-                    reward = RewardsCalc((int64_t)amount,tx.vin[0].prevout.hash,(int64_t)APR,(int64_t)minseconds,(int64_t)maxseconds,GetLatestTimestamp(eval->GetCurrentHeight()));
+                    reward = RewardsCalc((int64_t)amount,tx.vin[0].prevout.hash,(int64_t)APR,(int64_t)minseconds,
+                            (int64_t)maxseconds,is_komodo_hardfork_active(GetLatestTimestamp(eval->GetCurrentHeight())));
                     if ( reward == 0 )
                         return eval->Invalid("no eligible rewards");
                     if ( numvins == 1 && tx.vout[0].scriptPubKey.IsPayToCryptoCondition() == 0 )
@@ -709,7 +723,8 @@ std::string RewardsUnlock(uint64_t txfee,char *planstr,uint256 fundingtxid,uint2
     }
     if ( amount > txfee )
     {
-        reward = RewardsCalc((int64_t)amount,mtx.vin[0].prevout.hash,(int64_t)APR,(int64_t)minseconds,(int64_t)maxseconds,komodo_chainactive_timestamp());
+        reward = RewardsCalc((int64_t)amount,mtx.vin[0].prevout.hash,(int64_t)APR,(int64_t)minseconds,
+                (int64_t)maxseconds,komodo_hardfork_active(komodo_chainactive_timestamp()));
         if ( scriptPubKey.size() > 0 )
         {
             if ( reward > txfee )

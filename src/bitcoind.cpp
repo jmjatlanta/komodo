@@ -62,9 +62,9 @@ extern char ASSETCHAINS_SYMBOL[KOMODO_ASSETCHAIN_MAXLEN];
 extern int32_t ASSETCHAINS_BLOCKTIME;
 extern uint64_t ASSETCHAINS_CBOPRET;
 uint64_t komodo_interestsum();
-int32_t komodo_longestchain();
+int32_t komodo_longestchain() REQUIRES(!cs_vNodes);
 void komodo_cbopretupdate(int32_t forceflag);
-CBlockIndex *komodo_chainactive(int32_t height);
+CBlockIndex *komodo_chainactive(int32_t height) REQUIRES(cs_main);
 
 void WaitForShutdown(boost::thread_group* threadGroup)
 {

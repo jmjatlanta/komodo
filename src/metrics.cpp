@@ -115,7 +115,7 @@ static boost::synchronized_value<std::list<std::string>> messageBox;
 static boost::synchronized_value<std::string> initMessage;
 static bool loaded = false;
 
-extern int64_t GetNetworkHashPS(int lookup, int height);
+extern int64_t GetNetworkHashPS(int lookup, int height) REQUIRES(cs_main);
 
 void TrackMinedBlock(uint256 hash)
 {

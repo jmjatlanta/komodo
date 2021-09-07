@@ -164,7 +164,7 @@ void CDBEnv::MakeMock()
     fMockDb = true;
 }
 
-CDBEnv::VerifyResult CDBEnv::Verify(const std::string& strFile, bool (*recoverFunc)(CDBEnv& dbenv, const std::string& strFile)) REQUIRES(!getCsdb())
+CDBEnv::VerifyResult CDBEnv::Verify(const std::string& strFile, bool (*recoverFunc)(CDBEnv& dbenv, const std::string& strFile))
 {
     LOCK(cs_db);
     assert(mapFileUseCount.count(strFile) == 0);
@@ -181,7 +181,7 @@ CDBEnv::VerifyResult CDBEnv::Verify(const std::string& strFile, bool (*recoverFu
     return (fRecovered ? RECOVER_OK : RECOVER_FAIL);
 }
 
-bool CDBEnv::Salvage(const std::string& strFile, bool fAggressive, std::vector<CDBEnv::KeyValPair>& vResult) REQUIRES(!cs_db)
+bool CDBEnv::Salvage(const std::string& strFile, bool fAggressive, std::vector<CDBEnv::KeyValPair>& vResult)
 {
     LOCK(cs_db);
     assert(mapFileUseCount.count(strFile) == 0);
@@ -330,7 +330,7 @@ void CDB::Close()
     }
 }
 
-void CDBEnv::CloseDb(const string& strFile) REQUIRES(!cs_db)
+void CDBEnv::CloseDb(const string& strFile)
 {
     {
         LOCK(cs_db);
@@ -344,7 +344,7 @@ void CDBEnv::CloseDb(const string& strFile) REQUIRES(!cs_db)
     }
 }
 
-bool CDBEnv::RemoveDb(const string& strFile) REQUIRES(!cs_db)
+bool CDBEnv::RemoveDb(const string& strFile)
 {
     this->CloseDb(strFile);
 
@@ -353,7 +353,7 @@ bool CDBEnv::RemoveDb(const string& strFile) REQUIRES(!cs_db)
     return (rc == 0);
 }
 
-bool CDB::Rewrite(const string& strFile, const char* pszSkip) REQUIRES(!bitdb.cs_db)
+bool CDB::Rewrite(const string& strFile, const char* pszSkip)
 {
     while (true) {
         {
@@ -437,7 +437,7 @@ bool CDB::Rewrite(const string& strFile, const char* pszSkip) REQUIRES(!bitdb.cs
 }
 
 
-void CDBEnv::Flush(bool fShutdown) REQUIRES(!cs_db)
+void CDBEnv::Flush(bool fShutdown)
 {
     int64_t nStart = GetTimeMillis();
     // Flush log data to the actual data file on all files that are not in use

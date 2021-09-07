@@ -4022,7 +4022,7 @@ bool static FlushStateToDisk(CValidationState &state, FlushStateMode mode) {
         }
         if ((mode == FLUSH_STATE_ALWAYS || mode == FLUSH_STATE_PERIODIC) && nNow > nLastSetChain + (int64_t)DATABASE_WRITE_INTERVAL * 1000000) {
             // Update best block in wallet (so we can detect restored wallets).
-            GetMainSignals().SetBestChain(chainActive.GetLocator());
+            GetMainSignals().SetBestChain(chainActive.Locator());
             nLastSetChain = nNow;
         }
     } catch (const std::runtime_error& e) {
@@ -5836,7 +5836,7 @@ bool ProcessNewBlock(bool from_miner,int32_t height,CValidationState &state, CNo
             /*if ( ASSETCHAINS_SYMBOL[0] == 0 )
             {
                 //fprintf(stderr,"request headers from failed process block peer\n");
-                pfrom->PushMessage("getheaders", chainActive.GetLocator(chainActive.LastTip()), uint256());
+                pfrom->PushMessage("getheaders", chainActive.Locator(chainActive.LastTip()), uint256());
             }*/
             komodo_longestchain();
             return error("%s: AcceptBlock FAILED", __func__);
@@ -7645,7 +7645,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
                     // time the block arrives, the header chain leading up to it is already validated. Not
                     // doing this will result in the received block being rejected as an orphan in case it is
                     // not a direct successor.
-                    pfrom->PushMessage("getheaders", chainActive.GetLocator(pindexBestHeader), inv.hash);
+                    pfrom->PushMessage("getheaders", chainActive.Locator(pindexBestHeader), inv.hash);
                     CNodeState *nodestate = State(pfrom->GetId());
                     if (chainActive.Tip()->GetBlockTime() > GetTime() - chainparams.GetConsensus().nPowTargetSpacing * 20 &&
                         nodestate->nBlocksInFlight < MAX_BLOCKS_IN_TRANSIT_PER_PEER) {
@@ -8008,7 +8008,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
             {
                 pfrom->sendhdrsreq = (int32_t)pindexLast->GetHeight();
                 LogPrint("net", "more getheaders (%d) to end to peer=%d (startheight:%d)\n", pindexLast->GetHeight(), pfrom->id, pfrom->nStartingHeight);
-                pfrom->PushMessage("getheaders", chainActive.GetLocator(pindexLast), uint256());
+                pfrom->PushMessage("getheaders", chainActive.Locator(pindexLast), uint256());
             }
         }
 
@@ -8359,9 +8359,10 @@ bool SendMessages(CNode* pto, bool fSendTrickle)
             }
         }
 
-        TRY_LOCK(cs_main, lockMain); // Acquire cs_main for IsInitialBlockDownload() and CNodeState()
-        if (!lockMain)
+        // Acquire cs_main for IsInitialBlockDownload() and CNodeState()
+        if (!cs_main.try_lock())
             return true;
+        ADOPT_LOCK(cs_main, lockMain);
 
         // Address refresh broadcast
         static int64_t nLastRebroadcast;
@@ -8442,7 +8443,7 @@ bool SendMessages(CNode* pto, bool fSendTrickle)
                 nSyncStarted++;
                 CBlockIndex *pindexStart = pindexBestHeader->pprev ? pindexBestHeader->pprev : pindexBestHeader;
                 LogPrint("net", "initial getheaders (%d) to peer=%d (startheight:%d)\n", pindexStart->GetHeight(), pto->id, pto->nStartingHeight);
-                pto->PushMessage("getheaders", chainActive.GetLocator(pindexStart), uint256());
+                pto->PushMessage("getheaders", chainActive.Locator(pindexStart), uint256());
             }
         }
 
