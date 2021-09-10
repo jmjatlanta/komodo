@@ -315,7 +315,7 @@ UniValue generate(const UniValue& params, bool fHelp, const CPubKey& mypk)
         }
 endloop:
         CValidationState state;
-        if (!ProcessNewBlock(1,chainActive.LastTip()->GetHeight()+1,state, NULL, pblock, true, NULL))
+        if (!ProcessNewBlock(1,chainActive.GetLastTip()->GetHeight()+1,state, NULL, pblock, true, NULL))
             throw JSONRPCError(RPC_INTERNAL_ERROR, "ProcessNewBlock, block not accepted");
         ++nHeight;
         blockHashes.push_back(pblock->GetHash().GetHex());
@@ -420,14 +420,13 @@ UniValue genminingCSV(const UniValue& params, bool fHelp, const CPubKey& mypk)
         height = komodo_nextheight();
         for (i=0; i<height; i++)
         {
-            if ( (pindex= komodo_chainactive(i)) != 0 )
+            if ( (pindex= komodo_chainactive(i)) != nullptr )
             {
                 bnTarget.SetCompact(pindex->nBits,&fNegative,&fOverflow);
                 solvetime = (prevtime==0) ? 0 : (int32_t)(pindex->nTime - prevtime);
                 for (z=0; z<16; z++)
                     sprintf(&str[z<<1],"%02x",((uint8_t *)&bnTarget)[31-z]);
                 str[32] = 0;
-                //hash = pindex->GetBlockHash();
                 memset(&hash,0,sizeof(hash));
                 if ( i >= 64 && (pindex->nBits & 3) != 0 )
                     hash = ArithToUint256(zawy_ctB(bnTarget,solvetime));
@@ -483,7 +482,7 @@ UniValue getmininginfo(const UniValue& params, bool fHelp, const CPubKey& mypk)
     obj.push_back(Pair("blocks",           (int)chainActive.Height()));
     obj.push_back(Pair("currentblocksize", (uint64_t)nLastBlockSize));
     obj.push_back(Pair("currentblocktx",   (uint64_t)nLastBlockTx));
-    obj.push_back(Pair("difficulty",       (double)GetNetworkDifficulty()));
+    obj.push_back(Pair("difficulty",       GetNetworkDifficulty(chainActive.LastTip())));
     obj.push_back(Pair("errors",           GetWarnings("statusbar")));
     obj.push_back(Pair("genproclimit",     (int)GetArg("-genproclimit", -1)));
     if (ASSETCHAINS_ALGO == ASSETCHAINS_EQUIHASH)
@@ -746,7 +745,7 @@ UniValue getblocktemplate(const UniValue& params, bool fHelp, const CPubKey& myp
             checktxtime = boost::get_system_time() + boost::posix_time::minutes(1);
 
             boost::unique_lock<boost::mutex> lock(csBestBlock);
-            while (chainActive.LastTip()->GetBlockHash() == hashWatchedChain && IsRPCRunning())
+            while (chainActive.GetLastTip()->GetBlockHash() == hashWatchedChain && IsRPCRunning())
             {
                 if (!cvBlockChange.timed_wait(lock, checktxtime))
                 {
@@ -978,7 +977,7 @@ UniValue submitblock(const UniValue& params, bool fHelp, const CPubKey& mypk)
     submitblock_StateCatcher sc(block.GetHash());
     RegisterValidationInterface(&sc);
     //printf("submitblock, height=%d, coinbase sequence: %d, scriptSig: %s\n", chainActive.LastTip()->GetHeight()+1, block.vtx[0].vin[0].nSequence, block.vtx[0].vin[0].scriptSig.ToString().c_str());
-    bool fAccepted = ProcessNewBlock(1,chainActive.LastTip()->GetHeight()+1,state, NULL, &block, true, NULL);
+    bool fAccepted = ProcessNewBlock(1,chainActive.GetLastTip()->GetHeight()+1,state, NULL, &block, true, NULL);
     UnregisterValidationInterface(&sc);
     if (fBlockPresent)
     {

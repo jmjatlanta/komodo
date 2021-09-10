@@ -146,7 +146,6 @@ int32_t My_notaryid = -1;
 int32_t komodo_chosennotary(int32_t *notaryidp,int32_t height,uint8_t *pubkey33,uint32_t timestamp);
 int32_t komodo_pax_opreturn(int32_t height,uint8_t *opret,int32_t maxsize);
 int32_t komodo_baseid(char *origbase);
-int32_t komodo_longestchain() REQUIRES(!cs_vNodes);
 int32_t komodo_validate_interest(const CTransaction &tx,int32_t txheight,uint32_t nTime,int32_t dispflag);
 int64_t komodo_block_unlocktime(uint32_t nHeight);
 uint64_t komodo_commission(const CBlock *block,int32_t height);
@@ -159,7 +158,7 @@ int32_t komodo_is_notarytx(const CTransaction& tx);
 CScript Marmara_scriptPubKey(int32_t height,CPubKey pk);
 CScript MarmaraCoinbaseOpret(uint8_t funcid,int32_t height,CPubKey pk);
 uint64_t komodo_notarypay(CMutableTransaction &txNew, std::vector<int8_t> &NotarisationNotaries, uint32_t timestamp, int32_t height, uint8_t *script, int32_t len);
-int32_t komodo_notaries(uint8_t pubkeys[64][33],int32_t height,uint32_t timestamp);
+int32_t komodo_notaries(uint8_t pubkeys[64][33],int32_t height,uint32_t timestamp) REQUIRES(cs_main);
 int32_t komodo_getnotarizedheight(uint32_t timestamp,int32_t height, uint8_t *script, int32_t len);
 CScript komodo_mineropret(int32_t nHeight);
 bool komodo_appendACscriptpub();
@@ -1147,7 +1146,7 @@ static bool ProcessBlockFound(CBlock* pblock) REQUIRES(!cs_main)
 
     // Process this block the same as if we had received it from another node
     CValidationState state;
-    if (!ProcessNewBlock(1,chainActive.LastTip()->GetHeight()+1,state, NULL, pblock, true, NULL))
+    if (!ProcessNewBlock(1,chainActive.GetLastTip()->GetHeight()+1,state, NULL, pblock, true, NULL))
         return error("KomodoMiner: ProcessNewBlock, block not accepted");
 
     TrackMinedBlock(pblock->GetHash());
@@ -1156,7 +1155,7 @@ static bool ProcessBlockFound(CBlock* pblock) REQUIRES(!cs_main)
 }
 
 int32_t komodo_baseid(char *origbase);
-int32_t komodo_eligiblenotary(uint8_t pubkeys[66][33],int32_t *mids,uint32_t *blocktimes,int32_t *nonzpkeysp,int32_t height);
+bool komodo_eligiblenotary(uint8_t pubkeys[66][33],int32_t *mids,uint32_t *blocktimes,int32_t *nonzpkeysp,int32_t height) REQUIRES(!cs_main);
 arith_uint256 komodo_PoWtarget(int32_t *percPoSp,arith_uint256 target,int32_t height,int32_t goalperc,int32_t newStakerActive);
 int32_t FOUND_BLOCK,KOMODO_MAYBEMINED;
 extern int32_t KOMODO_LASTMINED,KOMODO_INSYNC;
@@ -1210,25 +1209,23 @@ void waitForPeers(const CChainParams &chainparams)
 }
 
 #ifdef ENABLE_WALLET
-CBlockIndex *get_chainactive(int32_t height)
+CBlockIndex *get_chainactive(int32_t height) REQUIRES(!cs_main)
 {
+    LOCK(cs_main);
     if ( chainActive.LastTip() != 0 )
     {
         if ( height <= chainActive.LastTip()->GetHeight() )
         {
-            LOCK(cs_main);
-            return(chainActive[height]);
+            return chainActive[height];
         }
-        // else fprintf(stderr,"get_chainactive height %d > active.%d\n",height,chainActive.Tip()->GetHeight());
     }
-    //fprintf(stderr,"get_chainactive null chainActive.Tip() height %d\n",height);
-    return(0);
+    return nullptr;
 }
 
 /*
  * A separate thread to stake, while the miner threads mine.
  */
-void static VerusStaker(CWallet *pwallet)
+void static VerusStaker(CWallet *pwallet) REQUIRES(!cs_main)
 {
     LogPrintf("Verus staker thread started\n");
     RenameThread("verus-staker");
@@ -1255,17 +1252,17 @@ void static VerusStaker(CWallet *pwallet)
     // try a nice clean peer connection to start
     CBlockIndex *pindexPrev, *pindexCur;
     do {
-        pindexPrev = chainActive.LastTip();
+        pindexPrev = chainActive.GetLastTip();
         MilliSleep(5000 + rand() % 5000);
         waitForPeers(chainparams);
-        pindexCur = chainActive.LastTip();
+        pindexCur = chainActive.GetLastTip();
     } while (pindexPrev != pindexCur);
 
     try {
         while (true)
         {
             waitForPeers(chainparams);
-            CBlockIndex* pindexPrev = chainActive.LastTip();
+            CBlockIndex* pindexPrev = chainActive.GetLastTip();
             printf("Staking height %d for %s\n", pindexPrev->GetHeight() + 1, ASSETCHAINS_SYMBOL);
 
             // Create new block
@@ -1287,7 +1284,7 @@ void static VerusStaker(CWallet *pwallet)
             if ( ptr == 0 )
             {
                 // wait to try another staking block until after the tip moves again
-                while ( chainActive.LastTip() == pindexPrev )
+                while ( chainActive.GetLastTip() == pindexPrev )
                     sleep(1);
                 continue;
             }
@@ -1334,9 +1331,10 @@ void static VerusStaker(CWallet *pwallet)
                 continue;
             }
 
-            if ( pindexPrev != chainActive.LastTip() )
+            CBlockIndex * possibleNewTip = chainActive.GetLastTip();
+            if ( pindexPrev != possibleNewTip )
             {
-                printf("Block %d added to chain\n", chainActive.LastTip()->GetHeight());
+                printf("Block %d added to chain\n", possibleNewTip->GetHeight());
                 MilliSleep(250);
                 continue;
             }
@@ -1390,9 +1388,30 @@ void static VerusStaker(CWallet *pwallet)
     }
 }
 
-void static BitcoinMiner_noeq(CWallet *pwallet)
+/****
+ * @brief update lastChainTipPrinted if needed
+ * @param prevIndex 
+ * @param lastChainTipPrinted
+ * @returns true if prevIndex does not match lastChainTipPrinted
+ */
+bool updateLastChainTipPrinted(const CBlockIndex * const prevIndex, CBlockIndex* lastChainTipPrinted) REQUIRES(!cs_main)
+{
+    CBlockIndex *possibleNewTip = chainActive.GetLastTip();
+    if ( prevIndex != possibleNewTip )
+    {
+        if (lastChainTipPrinted != possibleNewTip)
+        {
+            lastChainTipPrinted = possibleNewTip;
+            printf("Block %d added to chain\n", lastChainTipPrinted->GetHeight());
+        }
+        return true;
+    }
+    return false;
+}
+
+void static BitcoinMiner_noeq(CWallet *pwallet) REQUIRES(!cs_main)
 #else
-void static BitcoinMiner_noeq()
+void static BitcoinMiner_noeq() REQUIRES(!cs_main)
 #endif
 {
     LogPrintf("%s miner started\n", ASSETCHAINS_ALGORITHMS[ASSETCHAINS_ALGO]);
@@ -1422,10 +1441,10 @@ void static BitcoinMiner_noeq()
     // try a nice clean peer connection to start
     CBlockIndex *pindexPrev, *pindexCur;
     do {
-        pindexPrev = chainActive.LastTip();
+        pindexPrev = chainActive.GetLastTip();
         MilliSleep(5000 + rand() % 5000);
         waitForPeers(chainparams);
-        pindexCur = chainActive.LastTip();
+        pindexCur = chainActive.GetLastTip();
     } while (pindexPrev != pindexCur);
 
     // this will not stop printing more than once in all cases, but it will allow us to print in all cases
@@ -1441,16 +1460,16 @@ void static BitcoinMiner_noeq()
             miningTimer.stop();
             waitForPeers(chainparams);
 
-            pindexPrev = chainActive.LastTip();
+            pindexPrev = chainActive.GetLastTip();
             sleep(1);
 
             // prevent forking on startup before the diff algorithm kicks in
-            if (pindexPrev->GetHeight() < 50 || pindexPrev != chainActive.LastTip())
+            if (pindexPrev->GetHeight() < 50 || pindexPrev != chainActive.GetLastTip())
             {
                 do {
-                    pindexPrev = chainActive.LastTip();
+                    pindexPrev = chainActive.GetLastTip();
                     MilliSleep(5000 + rand() % 5000);
-                } while (pindexPrev != chainActive.LastTip());
+                } while (pindexPrev != chainActive.GetLastTip());
             }
 
             // Create new block
@@ -1525,13 +1544,8 @@ void static BitcoinMiner_noeq()
 
             Mining_start = 0;
 
-            if ( pindexPrev != chainActive.LastTip() )
+            if (updateLastChainTipPrinted(pindexPrev, lastChainTipPrinted))
             {
-                if (lastChainTipPrinted != chainActive.LastTip())
-                {
-                    lastChainTipPrinted = chainActive.LastTip();
-                    printf("Block %d added to chain\n", lastChainTipPrinted->GetHeight());
-                }
                 MilliSleep(250);
                 continue;
             }
@@ -1626,15 +1640,8 @@ void static BitcoinMiner_noeq()
                     // check periodically if we're stale
                     if (!--hashesToGo)
                     {
-                        if ( pindexPrev != chainActive.LastTip() )
-                        {
-                            if (lastChainTipPrinted != chainActive.LastTip())
-                            {
-                                lastChainTipPrinted = chainActive.LastTip();
-                                printf("Block %d added to chain\n", lastChainTipPrinted->GetHeight());
-                            }
+                        if (updateLastChainTipPrinted(pindexPrev, lastChainTipPrinted))
                             break;
-                        }
                         hashesToGo = ASSETCHAINS_HASHESPERROUND[ASSETCHAINS_ALGO];
                     }
                 }
@@ -1662,15 +1669,8 @@ void static BitcoinMiner_noeq()
                     break;
                 }
 
-                if ( pindexPrev != chainActive.LastTip() )
-                {
-                    if (lastChainTipPrinted != chainActive.LastTip())
-                    {
-                        lastChainTipPrinted = chainActive.LastTip();
-                        printf("Block %d added to chain\n", lastChainTipPrinted->GetHeight());
-                    }
+                if (updateLastChainTipPrinted(pindexPrev, lastChainTipPrinted))
                     break;
-                }
 
 #ifdef _WIN32
                 printf("%llu mega hashes complete - working\n", (ASSETCHAINS_NONCEMASK[ASSETCHAINS_ALGO] + 1) / 1048576);
@@ -1701,9 +1701,9 @@ int32_t gotinvalid;
 extern int32_t getkmdseason(int32_t height);
 
 #ifdef ENABLE_WALLET
-void static BitcoinMiner(CWallet *pwallet)
+void static BitcoinMiner(CWallet *pwallet) REQUIRES(!cs_main)
 #else
-void static BitcoinMiner()
+void static BitcoinMiner() REQUIRES(!cs_main)
 #endif
 {
     LogPrintf("KomodoMiner started\n");
@@ -1729,7 +1729,7 @@ void static BitcoinMiner()
             break;
     }
     if ( ASSETCHAINS_SYMBOL[0] == 0 )
-        komodo_chosennotary(&notaryid,chainActive.Height()+1,NOTARY_PUBKEY33,(uint32_t)chainActive.Tip()->GetMedianTimePast());
+        komodo_chosennotary(&notaryid,chainActive.GetHeight()+1,NOTARY_PUBKEY33,(uint32_t)chainActive.GetTip()->GetMedianTimePast());
     if ( notaryid != My_notaryid )
         My_notaryid = notaryid;
     std::string solver;
@@ -1782,7 +1782,7 @@ void static BitcoinMiner()
             // Create new block
             //
             unsigned int nTransactionsUpdatedLast = mempool.GetTransactionsUpdated();
-            CBlockIndex* pindexPrev = chainActive.LastTip();
+            CBlockIndex* pindexPrev = chainActive.GetLastTip();
             if ( Mining_height != pindexPrev->GetHeight()+1 )
             {
                 Mining_height = pindexPrev->GetHeight()+1;
@@ -1929,7 +1929,6 @@ void static BitcoinMiner()
                 //fprintf(stderr,"gotinvalid.%d\n",gotinvalid);
                 if ( gotinvalid != 0 )
                     break;
-                // komodo_longestchain();
                 // Hash state
                 KOMODO_CHOSEN_ONE = 0;
 
@@ -1959,7 +1958,7 @@ void static BitcoinMiner()
 #else
                 [&pblock, &hashTarget, &m_cs, &cancelSolver, &chainparams, &hashTarget_POW]
 #endif
-                (std::vector<unsigned char> soln) {
+                (std::vector<unsigned char> soln) REQUIRES(!cs_main) {
                     int32_t z; arith_uint256 h; CBlock B;
                     // Write the solution to the hash and compute the result.
                     LogPrint("pow", "- Checking solution against target\n");
@@ -1988,7 +1987,7 @@ void static BitcoinMiner()
                         while ( GetTime() < B.nTime-2 )
                         {
                             sleep(1);
-                            if ( chainActive.LastTip()->GetHeight() >= Mining_height )
+                            if ( chainActive.GetLastTip()->GetHeight() >= Mining_height )
                             {
                                 fprintf(stderr,"new block arrived\n");
                                 return(false);
@@ -2024,7 +2023,7 @@ void static BitcoinMiner()
                         fprintf(stderr, "\n");
                     }
                     CValidationState state;
-                    if ( !TestBlockValidity(state,B, chainActive.LastTip(), true, false))
+                    if ( !TestBlockValidity(state,B, chainActive.GetLastTip(), true, false))
                     {
                         h = UintToArith256(B.GetHash());
                         //for (z=31; z>=0; z--)
@@ -2144,7 +2143,7 @@ void static BitcoinMiner()
                             fprintf(stderr,"timeout, break\n");
                         break;
                     }
-                    if ( pindexPrev != chainActive.LastTip() )
+                    if ( pindexPrev != chainActive.GetLastTip() )
                     {
                         if ( 0 && ASSETCHAINS_SYMBOL[0] != 0 )
                             fprintf(stderr,"Tip advanced, break\n");

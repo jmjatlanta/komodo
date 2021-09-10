@@ -826,8 +826,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
 /** Context-independent validity checks */
 bool CheckBlockHeader(int32_t *futureblockp,int32_t height,CBlockIndex *pindex,const CBlockHeader& block, CValidationState& state, bool fCheckPOW = true);
 bool CheckBlock(int32_t *futureblockp,int32_t height,CBlockIndex *pindex,const CBlock& block, CValidationState& state,
-                libzcash::ProofVerifier& verifier,
-                bool fCheckPOW = true, bool fCheckMerkleRoot = true);
+                libzcash::ProofVerifier& verifier, bool fCheckPOW = true, bool fCheckMerkleRoot = true) REQUIRES(cs_main);
 
 /** Context-dependent validity checks */
 bool ContextualCheckBlockHeader(const CBlockHeader& block, CValidationState& state, CBlockIndex *pindexPrev);
@@ -921,7 +920,7 @@ public:
 };
 
 /** Find the last common block between the parameter chain and a locator. */
-CBlockIndex* FindForkInGlobalIndex(const CChain& chain, const CBlockLocator& locator);
+CBlockIndex* FindForkInGlobalIndex(const CChain& chain, const CBlockLocator& locator) REQUIRES(cs_main);
 
 /** Mark a block as invalid. */
 bool InvalidateBlock(CValidationState& state, CBlockIndex *pindex);

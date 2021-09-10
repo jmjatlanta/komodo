@@ -943,7 +943,7 @@ uint64_t komodo_block_prg(uint32_t nHeight)
     {
         int i;
         uint8_t hashSrc[8];
-        uint64_t result=0, hashSrc64 = (uint64_t)ASSETCHAINS_MAGIC << 32 + nHeight;
+        uint64_t result=0, hashSrc64 = (uint64_t)ASSETCHAINS_MAGIC << (32 + nHeight);
         bits256 hashResult;
 
         for ( i = 0; i < sizeof(hashSrc); i++ )
@@ -2417,7 +2417,7 @@ void komodo_prefetch(FILE *fp)
 
 // check if block timestamp is more than S5 activation time
 // this function is to activate the ExtractDestination fix 
-bool komodo_is_vSolutionsFixActive()
+bool komodo_is_vSolutionsFixActive() REQUIRES(!cs_main)
 {
     return GetLatestTimestamp(komodo_currentheight()) > nS5Timestamp;
 }

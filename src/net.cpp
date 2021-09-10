@@ -2214,7 +2214,7 @@ void CNode::AskFor(const CInv& inv)
     mapAskFor.insert(std::make_pair(nRequestTime, inv));
 }
 
-void CNode::BeginMessage(const char* pszCommand)
+void CNode::BeginMessage(const char* pszCommand) ACQUIRE(getCsvsend())
 {
     ENTER_CRITICAL_SECTION(cs_vSend);
     assert(ssSend.size() == 0);

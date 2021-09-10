@@ -722,6 +722,15 @@ public:
         LOCK(cs_main);
         return Height();
     }
+    /*******
+     * @note need to see what is different between this and LastTip
+     * @returns the last tip, protected by a lock
+     */
+    CBlockIndex *GetTip() REQUIRES(!cs_main)
+    {
+        LOCK(cs_main);
+        return Tip();
+    }
     /******
      * @returns the last tip, protected by a lock
      */
@@ -741,6 +750,11 @@ public:
     {
         LOCK(cs_main);
         return Locator(pindex);
+    }
+    CBlockIndex  *GetNext(const CBlockIndex *pindex) const REQUIRES(!cs_main)
+    {
+        LOCK(cs_main);
+        return Next(pindex);
     }
 };
 

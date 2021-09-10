@@ -88,8 +88,6 @@ CTxMemPool::~CTxMemPool()
 
 void CTxMemPool::pruneSpent(const uint256 &hashTx, CCoins &coins)
 {
-    LOCK(cs);
-
     std::map<COutPoint, CInPoint>::iterator it = mapNextTx.lower_bound(COutPoint(hashTx, 0));
 
     // iterate over all COutPoints in mapNextTx whose hash equals the provided hashTx
@@ -236,7 +234,6 @@ bool CTxMemPool::getAddressIndex(std::vector<std::pair<uint160, int> > &addresse
 
 bool CTxMemPool::removeAddressIndex(const uint256 txhash)
 {
-    LOCK(cs);
     addressDeltaMapInserted::iterator it = mapAddressInserted.find(txhash);
 
     if (it != mapAddressInserted.end()) {
@@ -320,7 +317,6 @@ bool CTxMemPool::getSpentIndex(CSpentIndexKey &key, CSpentIndexValue &value)
 
 bool CTxMemPool::removeSpentIndex(const uint256 txhash)
 {
-    LOCK(cs);
     mapSpentIndexInserted::iterator it = mapSpentInserted.find(txhash);
 
     if (it != mapSpentInserted.end()) {
@@ -334,60 +330,63 @@ bool CTxMemPool::removeSpentIndex(const uint256 txhash)
     return true;
 }
 
+void CTxMemPool::Remove(const CTransaction &origTx, std::list<CTransaction>& removed, bool fRecursive)
+{
+    LOCK(cs);
+    remove(origTx, removed, fRecursive);
+}
+
 void CTxMemPool::remove(const CTransaction &origTx, std::list<CTransaction>& removed, bool fRecursive)
 {
     // Remove transaction from memory pool
+    std::deque<uint256> txToRemove;
+    txToRemove.push_back(origTx.GetHash());
+    if (fRecursive && !mapTx.count(origTx.GetHash())) {
+        // If recursively removing but origTx isn't in the mempool
+        // be sure to remove any children that are in the pool. This can
+        // happen during chain re-orgs if origTx isn't re-accepted into
+        // the mempool for any reason.
+        for (unsigned int i = 0; i < origTx.vout.size(); i++) {
+            std::map<COutPoint, CInPoint>::iterator it = mapNextTx.find(COutPoint(origTx.GetHash(), i));
+            if (it == mapNextTx.end())
+                continue;
+            txToRemove.push_back(it->second.ptx->GetHash());
+        }
+    }
+    while (!txToRemove.empty())
     {
-        LOCK(cs);
-        std::deque<uint256> txToRemove;
-        txToRemove.push_back(origTx.GetHash());
-        if (fRecursive && !mapTx.count(origTx.GetHash())) {
-            // If recursively removing but origTx isn't in the mempool
-            // be sure to remove any children that are in the pool. This can
-            // happen during chain re-orgs if origTx isn't re-accepted into
-            // the mempool for any reason.
-            for (unsigned int i = 0; i < origTx.vout.size(); i++) {
-                std::map<COutPoint, CInPoint>::iterator it = mapNextTx.find(COutPoint(origTx.GetHash(), i));
+        uint256 hash = txToRemove.front();
+        txToRemove.pop_front();
+        if (!mapTx.count(hash))
+            continue;
+        const CTransaction& tx = mapTx.find(hash)->GetTx();
+        if (fRecursive) {
+            for (unsigned int i = 0; i < tx.vout.size(); i++) {
+                std::map<COutPoint, CInPoint>::iterator it = mapNextTx.find(COutPoint(hash, i));
                 if (it == mapNextTx.end())
                     continue;
                 txToRemove.push_back(it->second.ptx->GetHash());
             }
         }
-        while (!txToRemove.empty())
-        {
-            uint256 hash = txToRemove.front();
-            txToRemove.pop_front();
-            if (!mapTx.count(hash))
-                continue;
-            const CTransaction& tx = mapTx.find(hash)->GetTx();
-            if (fRecursive) {
-                for (unsigned int i = 0; i < tx.vout.size(); i++) {
-                    std::map<COutPoint, CInPoint>::iterator it = mapNextTx.find(COutPoint(hash, i));
-                    if (it == mapNextTx.end())
-                        continue;
-                    txToRemove.push_back(it->second.ptx->GetHash());
-                }
+        mapRecentlyAddedTx.erase(hash);
+        BOOST_FOREACH(const CTxIn& txin, tx.vin)
+            mapNextTx.erase(txin.prevout);
+        BOOST_FOREACH(const JSDescription& joinsplit, tx.vjoinsplit) {
+            BOOST_FOREACH(const uint256& nf, joinsplit.nullifiers) {
+                mapSproutNullifiers.erase(nf);
             }
-            mapRecentlyAddedTx.erase(hash);
-            BOOST_FOREACH(const CTxIn& txin, tx.vin)
-                mapNextTx.erase(txin.prevout);
-            BOOST_FOREACH(const JSDescription& joinsplit, tx.vjoinsplit) {
-                BOOST_FOREACH(const uint256& nf, joinsplit.nullifiers) {
-                    mapSproutNullifiers.erase(nf);
-                }
-            }
-            for (const SpendDescription &spendDescription : tx.vShieldedSpend) {
-                mapSaplingNullifiers.erase(spendDescription.nullifier);
-            }
-            removed.push_back(tx);
-            totalTxSize -= mapTx.find(hash)->GetTxSize();
-            cachedInnerUsage -= mapTx.find(hash)->DynamicMemoryUsage();
-            mapTx.erase(hash);
-            nTransactionsUpdated++;
-            minerPolicyEstimator->removeTx(hash);
-            removeAddressIndex(hash);
-            removeSpentIndex(hash);
         }
+        for (const SpendDescription &spendDescription : tx.vShieldedSpend) {
+            mapSaplingNullifiers.erase(spendDescription.nullifier);
+        }
+        removed.push_back(tx);
+        totalTxSize -= mapTx.find(hash)->GetTxSize();
+        cachedInnerUsage -= mapTx.find(hash)->DynamicMemoryUsage();
+        mapTx.erase(hash);
+        nTransactionsUpdated++;
+        minerPolicyEstimator->removeTx(hash);
+        removeAddressIndex(hash);
+        removeSpentIndex(hash);
     }
 }
 
@@ -474,7 +473,6 @@ void CTxMemPool::removeConflicts(const CTransaction &tx, std::list<CTransaction>
 {
     // Remove transactions which depend on inputs of tx, recursively
     list<CTransaction> result;
-    LOCK(cs);
     BOOST_FOREACH(const CTxIn &txin, tx.vin) {
         std::map<COutPoint, CInPoint>::iterator it = mapNextTx.find(txin.prevout);
         if (it != mapNextTx.end()) {
@@ -558,7 +556,7 @@ void CTxMemPool::removeForBlock(const std::vector<CTransaction>& vtx, unsigned i
         std::list<CTransaction> dummy;
         remove(tx, dummy, false);
         removeConflicts(tx, conflicts);
-        ClearPrioritisation(tx.GetHash());
+        clearPrioritisation(tx.GetHash());
     }
     // After the txs in the new block have been removed from the mempool, update policy estimates
     minerPolicyEstimator->processBlock(nBlockHeight, entries, fCurrentEstimate);
@@ -811,7 +809,6 @@ void CTxMemPool::PrioritiseTransaction(const uint256 hash, const string strHash,
 
 void CTxMemPool::ApplyDeltas(const uint256 hash, double &dPriorityDelta, CAmount &nFeeDelta)
 {
-    LOCK(cs);
     std::map<uint256, std::pair<double, CAmount> >::iterator pos = mapDeltas.find(hash);
     if (pos == mapDeltas.end())
         return;
@@ -820,16 +817,15 @@ void CTxMemPool::ApplyDeltas(const uint256 hash, double &dPriorityDelta, CAmount
     nFeeDelta += deltas.second;
 }
 
-void CTxMemPool::ClearPrioritisation(const uint256 hash)
+void CTxMemPool::clearPrioritisation(const uint256 hash)
 {
-    LOCK(cs);
     mapDeltas.erase(hash);
 }
 
 bool CTxMemPool::HasNoInputsOf(const CTransaction &tx) const
 {
     for (unsigned int i = 0; i < tx.vin.size(); i++)
-        if (exists(tx.vin[i].prevout.hash))
+        if (Exists(tx.vin[i].prevout.hash))
             return false;
     return true;
 }
@@ -889,6 +885,18 @@ bool CTxMemPool::IsFullyNotified() {
     return nRecentlyAddedSequence == nNotifiedSequence;
 }
 
+bool CTxMemPool::Exists(uint256 hash) const
+{
+    LOCK(cs);
+    return exists(hash);
+}
+
+bool CTxMemPool::exists(uint256 hash) const
+{
+    return (mapTx.count(hash) != 0);
+}
+
+
 CCoinsViewMemPool::CCoinsViewMemPool(CCoinsView *baseIn, CTxMemPool &mempoolIn) : CCoinsViewBacked(baseIn), mempool(mempoolIn) { }
 
 bool CCoinsViewMemPool::GetNullifier(const uint256 &nf, ShieldedType type) const
@@ -909,7 +917,7 @@ bool CCoinsViewMemPool::GetCoins(const uint256 &txid, CCoins &coins) const {
 }
 
 bool CCoinsViewMemPool::HaveCoins(const uint256 &txid) const {
-    return mempool.exists(txid) || base->HaveCoins(txid);
+    return mempool.Exists(txid) || base->HaveCoins(txid);
 }
 
 size_t CTxMemPool::DynamicMemoryUsage() const {

@@ -512,7 +512,7 @@ namespace {
 
     /** Update pindexLastCommonBlock and add not-in-flight missing successors to vBlocks, until it has
      *  at most count entries. */
-    void FindNextBlocksToDownload(NodeId nodeid, unsigned int count, std::vector<CBlockIndex*>& vBlocks, NodeId& nodeStaller) {
+    void FindNextBlocksToDownload(NodeId nodeid, unsigned int count, std::vector<CBlockIndex*>& vBlocks, NodeId& nodeStaller) REQUIRES(cs_main) {
         if (count == 0)
             return;
 
@@ -675,7 +675,7 @@ UniValue komodo_snapshot(int top)
     return(result);
 }
 
-bool komodo_snapshot2(std::map <std::string, CAmount> &addressAmounts)
+bool komodo_snapshot2(std::map <std::string, CAmount> &addressAmounts) REQUIRES(!cs_main)
 {
     if ( fAddressIndex && pblocktree != 0 ) 
     {
@@ -687,7 +687,7 @@ bool komodo_snapshot2(std::map <std::string, CAmount> &addressAmounts)
 int32_t lastSnapShotHeight = 0;
 std::vector <std::pair<CAmount, CTxDestination>> vAddressSnapshot;
 
-bool komodo_dailysnapshot(int32_t height)
+bool komodo_dailysnapshot(int32_t height) REQUIRES(!cs_main)
 {
     int reorglimit = 100; 
     uint256 notarized_hash,notarized_desttxid; int32_t prevMoMheight,notarized_height,undo_height,extraoffset;
@@ -1883,7 +1883,7 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
 //fprintf(stderr,"addmempool 3\n");
     // is it already in the memory pool?
     uint256 hash = tx.GetHash();
-    if (pool.exists(hash))
+    if (pool.Exists(hash))
     {
         //fprintf(stderr,"already in mempool\n");
         return state.Invalid(false, REJECT_DUPLICATE, "already in mempool");
@@ -2435,19 +2435,6 @@ bool ReadBlockFromDisk(int32_t height,CBlock& block, const CDiskBlockPos& pos,bo
     catch (const std::exception& e) {
         fprintf(stderr,"readblockfromdisk err B\n");
         return error("%s: Deserialize or I/O error - %s at %s", __func__, e.what(), pos.ToString());
-    }
-    // Check the header
-    if ( 0 && checkPOW != 0 )
-    {
-        komodo_block2pubkey33(pubkey33,(CBlock *)&block);
-        if (!(CheckEquihashSolution(&block, Params()) && CheckProofOfWork(block, pubkey33, height, Params().GetConsensus())))
-        {
-            int32_t i; for (i=0; i<33; i++)
-                fprintf(stderr,"%02x",pubkey33[i]);
-            fprintf(stderr," warning unexpected diff at ht.%d\n",height);
-
-            return error("ReadBlockFromDisk: Errors in block header at %s", pos.ToString());
-        }
     }
     return true;
 }
@@ -4155,7 +4142,7 @@ bool static DisconnectTip(CValidationState &state, bool fBare = false) {
             // don't keep staking or invalid transactions
             if (tx.IsCoinBase() || (i == block.vtx.size()-1 && komodo_newStakerActive(0, pindexDelete->nTime) == 0 && komodo_isPoS((CBlock *)&block,pindexDelete->GetHeight(),0) != 0) || !AcceptToMemoryPool(mempool, stateDummy, tx, false, NULL))
             {
-                mempool.remove(tx, removed, true);
+                mempool.Remove(tx, removed, true);
             }
         }
         if (sproutAnchorBeforeDisconnect != sproutAnchorAfterDisconnect) {
@@ -4274,7 +4261,8 @@ static int64_t nTimePostConnect = 0;
  * corresponding to pindexNew, to bypass loading it again from disk.
  * You probably want to call mempool.removeWithoutBranchId after this, with cs_main held.
  */
-bool static ConnectTip(CValidationState &state, CBlockIndex *pindexNew, CBlock *pblock) {
+bool static ConnectTip(CValidationState &state, CBlockIndex *pindexNew, CBlock *pblock) REQUIRES(cs_main)
+{
 
     assert(pindexNew->pprev == chainActive.Tip());
     // Read block from disk.
@@ -5142,10 +5130,6 @@ bool CheckBlockHeader(int32_t *futureblockp,int32_t height,CBlockIndex *pindex, 
         if ( !CheckEquihashSolution(&blockhdr, Params()) )
             return state.DoS(100, error("CheckBlockHeader(): Equihash solution invalid"),REJECT_INVALID, "invalid-solution");
     }
-    // Check proof of work matches claimed amount
-    /*komodo_index2pubkey33(pubkey33,pindex,height);
-     if ( fCheckPOW && !CheckProofOfWork(height,pubkey33,blockhdr.GetHash(), blockhdr.nBits, Params().GetConsensus(),blockhdr.nTime) )
-     return state.DoS(50, error("CheckBlockHeader(): proof of work failed"),REJECT_INVALID, "high-hash");*/
     return true;
 }
 
@@ -5260,7 +5244,7 @@ bool CheckBlock(int32_t *futureblockp,int32_t height,CBlockIndex *pindex,const C
         }
         BOOST_FOREACH(const CTransaction& tx, transactionsToRemove) {
             list<CTransaction> removed;
-            mempool.remove(tx, removed, false);
+            mempool.Remove(tx, removed, false);
         }
         // add all the txs in the block to the empty mempool.
         // CC validation shouldnt (cant) depend on the state of mempool!
@@ -5286,7 +5270,7 @@ bool CheckBlock(int32_t *futureblockp,int32_t height,CBlockIndex *pindex,const C
                     } else rejects++;
                 }
                 // here we remove any txs in the temp mempool that were included in the block.
-                tmpmempool.remove(tx, removed, false);
+                tmpmempool.Remove(tx, removed, false);
             }
             //fprintf(stderr, "removed.%ld\n",removed.size());
             if ( rejects == 0 || rejects == lastrejects )
@@ -5796,7 +5780,8 @@ CBlockIndex *oldkomodo_ensure(CBlock *pblock, uint256 hash)
     return(pindex);
 }
 
-bool ProcessNewBlock(bool from_miner,int32_t height,CValidationState &state, CNode* pfrom, CBlock* pblock, bool fForceProcessing, CDiskBlockPos *dbp)
+bool ProcessNewBlock(bool from_miner,int32_t height,CValidationState &state, CNode* pfrom, CBlock* pblock, 
+        bool fForceProcessing, CDiskBlockPos *dbp) REQUIRES(!cs_main)
 {
     // Preliminary checks
     bool checked; uint256 hash; int32_t futureblock=0;
@@ -7054,7 +7039,7 @@ bool static AlreadyHave(const CInv& inv) REQUIRES(cs_main)
             }
 
             return recentRejects->contains(inv.hash) ||
-            mempool.exists(inv.hash) ||
+            mempool.Exists(inv.hash) ||
             mapOrphanTransactions.count(inv.hash) ||
             pcoinsTip->HaveCoins(inv.hash);
         }

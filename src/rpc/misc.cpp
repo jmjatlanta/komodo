@@ -196,7 +196,8 @@ UniValue geterablockheights(const UniValue& params, bool fHelp, const CPubKey& m
 
 UniValue getinfo(const UniValue& params, bool fHelp, const CPubKey& mypk)
 {
-    uint256 notarized_hash,notarized_desttxid; int32_t prevMoMheight,notarized_height,longestchain,kmdnotarized_height,txid_height;
+    uint256 notarized_hash,notarized_desttxid; 
+    int32_t prevMoMheight,notarized_height,longestchain,kmdnotarized_height,txid_height;
     if (fHelp || params.size() != 0)
         throw runtime_error(
             "getinfo\n"
@@ -224,23 +225,17 @@ UniValue getinfo(const UniValue& params, bool fHelp, const CPubKey& mypk)
             + HelpExampleCli("getinfo", "")
             + HelpExampleRpc("getinfo", "")
         );
-    //#ifdef ENABLE_WALLET
-    //    LOCK2(cs_main, pwalletMain ? &pwalletMain->cs_wallet : NULL);
-    //#else
     LOCK(cs_main);
-    //#endif
     
     proxyType proxy;
     GetProxy(NET_IPV4, proxy);
     notarized_height = komodo_notarized_height(&prevMoMheight,&notarized_hash,&notarized_desttxid);
-    //fprintf(stderr,"after notarized_height %u\n",(uint32_t)time(NULL));
     
     UniValue obj(UniValue::VOBJ);
     obj.push_back(Pair("version", CLIENT_VERSION));
     obj.push_back(Pair("protocolversion", PROTOCOL_VERSION));
     obj.push_back(Pair("KMDversion", KOMODO_VERSION));
     obj.push_back(Pair("synced", KOMODO_INSYNC!=0));
-    //obj.push_back(Pair("VRSCversion", VERUS_VERSION));
     obj.push_back(Pair("notarized", notarized_height));
     obj.push_back(Pair("prevMoMheight", prevMoMheight));
     obj.push_back(Pair("notarizedhash", notarized_hash.ToString()));
@@ -254,7 +249,6 @@ UniValue getinfo(const UniValue& params, bool fHelp, const CPubKey& mypk)
         if ( ASSETCHAINS_SYMBOL[0] != 0 )
             obj.push_back(Pair("KMDnotarized_height", kmdnotarized_height));
         obj.push_back(Pair("notarized_confirms", txid_height < kmdnotarized_height ? (kmdnotarized_height - txid_height + 1) : 0));
-        //fprintf(stderr,"after notarized_confirms %u\n",(uint32_t)time(NULL));
 #ifdef ENABLE_WALLET
         if (pwalletMain) {
             obj.push_back(Pair("walletversion", pwalletMain->GetVersion()));
@@ -277,7 +271,7 @@ UniValue getinfo(const UniValue& params, bool fHelp, const CPubKey& mypk)
         obj.push_back(Pair("longestchain",        longestchain));
         if ( chainActive.LastTip() != 0 )
             obj.push_back(Pair("tiptime", (int)chainActive.LastTip()->nTime));
-        obj.push_back(Pair("difficulty",    (double)GetDifficulty()));
+        obj.push_back(Pair("difficulty",  GetDifficulty(chainActive.LastTip())));
 #ifdef ENABLE_WALLET
         if (pwalletMain) {
             obj.push_back(Pair("keypoololdest", pwalletMain->GetOldestKeyPoolTime()));

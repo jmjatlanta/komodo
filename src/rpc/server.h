@@ -25,8 +25,10 @@
 #include "rpc/protocol.h"
 #include "uint256.h"
 #include "sync.h"
+#include "txmempool.h"
 extern CCriticalSection cs_main;
 extern CCriticalSection cs_vNodes;
+extern CTxMemPool mempool;
 
 #include <list>
 #include <map>
@@ -191,8 +193,12 @@ extern std::vector<unsigned char> ParseHexO(const UniValue& o, std::string strKe
 extern int64_t nWalletUnlockTime;
 extern CAmount AmountFromValue(const UniValue& value);
 extern UniValue ValueFromAmount(const CAmount& amount);
-extern double GetDifficulty(const CBlockIndex* blockindex = NULL) REQUIRES(!cs_main);
-extern double GetNetworkDifficulty(const CBlockIndex* blockindex = NULL) REQUIRES(!cs_main);
+/****
+ * @param blockindex the current position
+ * @returns the difficulty level
+ */
+double GetDifficulty(const CBlockIndex* blockindex = nullptr);
+double GetNetworkDifficulty(const CBlockIndex* blockindex = nullptr);
 extern std::string HelpRequiringPassphrase();
 extern std::string HelpExampleCli(const std::string& methodname, const std::string& args);
 extern std::string HelpExampleRpc(const std::string& methodname, const std::string& args);
@@ -214,7 +220,7 @@ extern UniValue getaddresstxids(const UniValue& params, bool fHelp, const CPubKe
 extern UniValue getsnapshot(const UniValue& params, bool fHelp, const CPubKey& mypk);
 extern UniValue getaddressbalance(const UniValue& params, bool fHelp, const CPubKey& mypk);
 extern UniValue getpeerinfo(const UniValue& params, bool fHelp, const CPubKey& mypk) REQUIRES(!cs_vNodes);
-extern UniValue checknotarization(const UniValue& params, bool fHelp, const CPubKey& mypk);
+extern UniValue checknotarization(const UniValue& params, bool fHelp, const CPubKey& mypk) REQUIRES(!cs_main);
 extern UniValue getnotarypayinfo(const UniValue& params, bool fHelp, const CPubKey& mypk) REQUIRES(!cs_main);
 extern UniValue ping(const UniValue& params, bool fHelp, const CPubKey& mypk);
 extern UniValue addnode(const UniValue& params, bool fHelp, const CPubKey& mypk);
@@ -233,14 +239,14 @@ extern UniValue importwallet(const UniValue& params, bool fHelp, const CPubKey& 
 
 extern UniValue getgenerate(const UniValue& params, bool fHelp, const CPubKey& mypk); // in rpcmining.cpp
 extern UniValue setgenerate(const UniValue& params, bool fHelp, const CPubKey& mypk);
-extern UniValue generate(const UniValue& params, bool fHelp, const CPubKey& mypk);
+extern UniValue generate(const UniValue& params, bool fHelp, const CPubKey& mypk) REQUIRES(!cs_main);
 extern UniValue getlocalsolps(const UniValue& params, bool fHelp, const CPubKey& mypk);
 extern UniValue getnetworksolps(const UniValue& params, bool fHelp, const CPubKey& mypk);
 extern UniValue getnetworkhashps(const UniValue& params, bool fHelp, const CPubKey& mypk) REQUIRES(!cs_main);
 extern UniValue getmininginfo(const UniValue& params, bool fHelp, const CPubKey& mypk);
 extern UniValue prioritisetransaction(const UniValue& params, bool fHelp, const CPubKey& mypk);
 extern UniValue getblocktemplate(const UniValue& params, bool fHelp, const CPubKey& mypk);
-extern UniValue submitblock(const UniValue& params, bool fHelp, const CPubKey& mypk);
+extern UniValue submitblock(const UniValue& params, bool fHelp, const CPubKey& mypk) REQUIRES(!cs_main);
 extern UniValue estimatefee(const UniValue& params, bool fHelp, const CPubKey& mypk);
 extern UniValue estimatepriority(const UniValue& params, bool fHelp, const CPubKey& mypk);
 extern UniValue coinsupply(const UniValue& params, bool fHelp, const CPubKey& mypk) REQUIRES(!cs_main);
@@ -401,7 +407,7 @@ extern UniValue encryptwallet(const UniValue& params, bool fHelp, const CPubKey&
 extern UniValue validateaddress(const UniValue& params, bool fHelp, const CPubKey& mypk);
 extern UniValue txnotarizedconfirmed(const UniValue& params, bool fHelp, const CPubKey& mypk);
 extern UniValue decodeccopret(const UniValue& params, bool fHelp, const CPubKey& mypk);
-extern UniValue getinfo(const UniValue& params, bool fHelp, const CPubKey& mypk);
+extern UniValue getinfo(const UniValue& params, bool fHelp, const CPubKey& mypk) REQUIRES(!cs_main);
 extern UniValue getiguanajson(const UniValue& params, bool fHelp, const CPubKey& mypk);
 extern UniValue getnotarysendmany(const UniValue& params, bool fHelp, const CPubKey& mypk);
 extern UniValue geterablockheights(const UniValue& params, bool fHelp, const CPubKey& mypk) REQUIRES(!cs_main);
@@ -437,12 +443,12 @@ extern UniValue sendrawtransaction(const UniValue& params, bool fHelp, const CPu
 extern UniValue gettxoutproof(const UniValue& params, bool fHelp, const CPubKey& mypk);
 extern UniValue verifytxoutproof(const UniValue& params, bool fHelp, const CPubKey& mypk);
 
-extern UniValue getblockcount(const UniValue& params, bool fHelp, const CPubKey& mypk); // in rpcblockchain.cpp
+extern UniValue getblockcount(const UniValue& params, bool fHelp, const CPubKey& mypk) REQUIRES(!cs_main); // in rpcblockchain.cpp
 extern UniValue getbestblockhash(const UniValue& params, bool fHelp, const CPubKey& mypk);
-extern UniValue getdifficulty(const UniValue& params, bool fHelp, const CPubKey& mypk);
+extern UniValue getdifficulty(const UniValue& params, bool fHelp, const CPubKey& mypk) REQUIRES(!cs_main);
 extern UniValue settxfee(const UniValue& params, bool fHelp, const CPubKey& mypk);
 extern UniValue getmempoolinfo(const UniValue& params, bool fHelp, const CPubKey& mypk);
-extern UniValue getrawmempool(const UniValue& params, bool fHelp, const CPubKey& mypk);
+extern UniValue getrawmempool(const UniValue& params, bool fHelp, const CPubKey& mypk) REQUIRES(!cs_main) REQUIRES(!mempool.cs);
 extern UniValue getblockhashes(const UniValue& params, bool fHelp, const CPubKey& mypk);
 extern UniValue getblockdeltas(const UniValue& params, bool fHelp, const CPubKey& mypk);
 extern UniValue getblockhash(const UniValue& params, bool fHelp, const CPubKey& mypk);
@@ -524,8 +530,8 @@ extern UniValue migrate_completeimporttransaction(const UniValue& params, bool f
 extern UniValue migrate_checkburntransactionsource(const UniValue& params, bool fHelp, const CPubKey& mypk);
 extern UniValue migrate_createnotaryapprovaltransaction(const UniValue& params, bool fHelp, const CPubKey& mypk);
 
-extern UniValue notaries(const UniValue& params, bool fHelp, const CPubKey& mypk);
-extern UniValue minerids(const UniValue& params, bool fHelp, const CPubKey& mypk);
+extern UniValue notaries(const UniValue& params, bool fHelp, const CPubKey& mypk) REQUIRES(!cs_main);
+extern UniValue minerids(const UniValue& params, bool fHelp, const CPubKey& mypk) REQUIRES(!cs_main);
 extern UniValue kvsearch(const UniValue& params, bool fHelp, const CPubKey& mypk);
 extern UniValue kvupdate(const UniValue& params, bool fHelp, const CPubKey& mypk);
 extern UniValue paxprice(const UniValue& params, bool fHelp, const CPubKey& mypk);

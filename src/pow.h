@@ -44,8 +44,17 @@ unsigned int lwmaGetNextPOSRequired(const CBlockIndex* pindexLast, const Consens
 /** Check whether the Equihash solution in a block header is valid */
 bool CheckEquihashSolution(const CBlockHeader *pblock, const CChainParams&);
 
-/** Check whether a block hash satisfies the proof-of-work requirement specified by nBits */
-bool CheckProofOfWork(const CBlockHeader &blkHeader, uint8_t *pubkey33, int32_t height, const Consensus::Params& params) REQUIRES(!cs_main);
+/**** 
+ * @brief Check whether a block hash satisfies the proof-of-work requirement specified by nBits 
+ * @param blkHeader the block header
+ * @param pubkey33
+ * @param height
+ * @param params
+ * @returns true on success
+ */
+bool CheckProofOfWork(const CBlockHeader &blkHeader, uint8_t *pubkey33, int32_t height, 
+        const Consensus::Params& params);
+
 CChainPower GetBlockProof(const CBlockIndex& block);
 
 /** Return the time it would take to redo the work difference between from and to, assuming the current hashrate corresponds to the difficulty at tip, in seconds. */

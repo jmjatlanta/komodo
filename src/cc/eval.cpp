@@ -60,7 +60,7 @@ bool RunCCEval(const CC *cond, const CTransaction &tx, unsigned int nIn)
         // Miner will mine 1 invalid block, but doesnt stop them mining until a restart.
         // This would almost never happen in normal use.
         std::list<CTransaction> dummy;
-        mempool.remove(tx,dummy,true);
+        mempool.Remove(tx,dummy,true);
     }
     return false;
 }
@@ -160,7 +160,7 @@ bool Eval::GetBlock(uint256 hash, CBlockIndex& blockIdx) const
     return false;
 }
 
-extern int32_t komodo_notaries(uint8_t pubkeys[64][33],int32_t height,uint32_t timestamp);
+int32_t komodo_notaries(uint8_t pubkeys[64][33],int32_t height,uint32_t timestamp) REQUIRES(cs_main);
 
 
 int32_t Eval::GetNotaries(uint8_t pubkeys[64][33], int32_t height, uint32_t timestamp) const

@@ -172,7 +172,7 @@ UniValue getpeerinfo(const UniValue& params, bool fHelp, const CPubKey& mypk)
 }
 
 int32_t KOMODO_LONGESTCHAIN;
-int32_t komodo_longestchain()
+int32_t komodo_longestchain() REQUIRES(!cs_vNodes)
 {
     static int32_t depth;
     int32_t ht,n=0,num=0,maxheight=0,height = 0;
@@ -180,25 +180,22 @@ int32_t komodo_longestchain()
         depth = 0;
     if ( depth == 0 )
     {
-
         /**
-         * Seems here we need to try to lock cs_main, to avoid wrong order of lock (cs_main, cs_vNodes),
+         * Seems here we need to try to lock cs_main. To avoid wrong order of lock (cs_main, cs_vNodes),
          * implementation of getting max(nStartingHeight, nSyncHeight, nCommonHeight) from CNodeStateStats
-         * and loop here is similar to getpeerinfo RPC and there we have LOCK(cs_main). If we'll not able
-         * to acquire lock on cs_main komodo_longestchain() will return previous saved value of
-         * KOMODO_LONGESTCHAIN, anyway, on next call it will be updated, when lock will success.
+         * and loop here is similar to getpeerinfo RPC and there we have LOCK(cs_main). If we're not able
+         * to acquire lock on cs_main, komodo_longestchain() will return previous saved value of
+         * KOMODO_LONGESTCHAIN. Anyway, on the next call it will be updated if lock succeeds.
         */
-
         if (!cs_main.try_lock()) 
             return KOMODO_LONGESTCHAIN;
         ADOPT_LOCK(cs_main, lockMain);
 
         depth++;
         vector<CNodeStats> vstats;
-        CopyNodeStats(vstats);
+        CopyNodeStats(vstats); // cs_vNodes cannot be locked before this call.
         BOOST_FOREACH(const CNodeStats& stats, vstats)
         {
-            //fprintf(stderr,"komodo_longestchain iter.%d\n",n);
             CNodeStateStats statestats;
             bool fStateStats = GetNodeStateStats(stats.nodeid,statestats);
             if ( statestats.nSyncHeight < 0 )

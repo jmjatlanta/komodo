@@ -29,6 +29,7 @@
 #include "coins.h"
 #include "primitives/transaction.h"
 #include "sync.h"
+extern CCriticalSection cs_main;
 
 #undef foreach
 #include "boost/multi_index_container.hpp"
@@ -201,46 +202,43 @@ public:
      * all inputs are in the mapNextTx array). If sanity-checking is turned off,
      * check does nothing.
      */
-    void check(const CCoinsViewCache *pcoins) const;
+    void check(const CCoinsViewCache *pcoins) const REQUIRES(!getCs());
     void setSanityCheck(double dFrequency = 1.0) { nCheckFrequency = static_cast<uint32_t>(dFrequency * 4294967295.0); }
 
-    bool addUnchecked(const uint256& hash, const CTxMemPoolEntry &entry, bool fCurrentEstimate = true);
-    void addAddressIndex(const CTxMemPoolEntry &entry, const CCoinsViewCache &view);
+    bool addUnchecked(const uint256& hash, const CTxMemPoolEntry &entry, bool fCurrentEstimate = true) REQUIRES(!getCs());
+    void addAddressIndex(const CTxMemPoolEntry &entry, const CCoinsViewCache &view) REQUIRES(!getCs());
     bool getAddressIndex(std::vector<std::pair<uint160, int> > &addresses,
-                         std::vector<std::pair<CMempoolAddressDeltaKey, CMempoolAddressDelta> > &results);
-    bool removeAddressIndex(const uint256 txhash);
+                         std::vector<std::pair<CMempoolAddressDeltaKey, CMempoolAddressDelta> > &results) REQUIRES(!getCs());
 
-    void addSpentIndex(const CTxMemPoolEntry &entry, const CCoinsViewCache &view);
-    bool getSpentIndex(CSpentIndexKey &key, CSpentIndexValue &value);
-    bool removeSpentIndex(const uint256 txhash);
-    void remove(const CTransaction &tx, std::list<CTransaction>& removed, bool fRecursive = false);
-    void removeWithAnchor(const uint256 &invalidRoot, ShieldedType type);
-    void removeForReorg(const CCoinsViewCache *pcoins, unsigned int nMemPoolHeight, int flags);
-    void removeConflicts(const CTransaction &tx, std::list<CTransaction>& removed);
-    void removeExpired(unsigned int nBlockHeight);
+    void addSpentIndex(const CTxMemPoolEntry &entry, const CCoinsViewCache &view) REQUIRES(!getCs());
+    bool getSpentIndex(CSpentIndexKey &key, CSpentIndexValue &value) REQUIRES(!getCs());
+    void Remove(const CTransaction &tx, std::list<CTransaction>& removed, bool fRecursive = false) REQUIRES(!getCs());
+    void removeWithAnchor(const uint256 &invalidRoot, ShieldedType type) REQUIRES(!getCs());
+    void removeForReorg(const CCoinsViewCache *pcoins, unsigned int nMemPoolHeight, int flags) REQUIRES(!getCs());
+    void removeExpired(unsigned int nBlockHeight) REQUIRES(cs_main) REQUIRES(!getCs());
     void removeForBlock(const std::vector<CTransaction>& vtx, unsigned int nBlockHeight,
-                        std::list<CTransaction>& conflicts, bool fCurrentEstimate = true);
-    void removeWithoutBranchId(uint32_t nMemPoolBranchId);
-    void clear();
-    void queryHashes(std::vector<uint256>& vtxid);
-    void pruneSpent(const uint256& hash, CCoins &coins);
-    unsigned int GetTransactionsUpdated() const;
-    void AddTransactionsUpdated(unsigned int n);
+                        std::list<CTransaction>& conflicts, bool fCurrentEstimate = true) REQUIRES(!getCs());
+    void removeWithoutBranchId(uint32_t nMemPoolBranchId) REQUIRES(!getCs());
+    void clear() REQUIRES(!getCs());
+    void queryHashes(std::vector<uint256>& vtxid) REQUIRES(!getCs());
+    void pruneSpent(const uint256& hash, CCoins &coins) REQUIRES(getCs());
+    unsigned int GetTransactionsUpdated() const REQUIRES(!getCs());
+    void AddTransactionsUpdated(unsigned int n) REQUIRES(!getCs());
     /**
      * Check that none of this transactions inputs are in the mempool, and thus
      * the tx is not dependent on other mempool transactions to be included in a block.
      */
-    bool HasNoInputsOf(const CTransaction& tx) const;
+    bool HasNoInputsOf(const CTransaction& tx) const REQUIRES(!getCs());
 
     /** Affect CreateNewBlock prioritisation of transactions */
-    void PrioritiseTransaction(const uint256 hash, const std::string strHash, double dPriorityDelta, const CAmount& nFeeDelta);
-    void ApplyDeltas(const uint256 hash, double &dPriorityDelta, CAmount &nFeeDelta);
-    void ClearPrioritisation(const uint256 hash);
+    void PrioritiseTransaction(const uint256 hash, const std::string strHash, double dPriorityDelta, 
+            const CAmount& nFeeDelta) REQUIRES(!getCs());
+    void ApplyDeltas(const uint256 hash, double &dPriorityDelta, CAmount &nFeeDelta) REQUIRES(getCs());
 
     bool nullifierExists(const uint256& nullifier, ShieldedType type) const;
 
-    void NotifyRecentlyAdded();
-    bool IsFullyNotified();
+    void NotifyRecentlyAdded() REQUIRES(!getCs());
+    bool IsFullyNotified() REQUIRES(!getCs());
     
     unsigned long size() REQUIRES(!getCs())
     {
@@ -254,30 +252,42 @@ public:
         return totalTxSize;
     }
 
-    bool exists(uint256 hash) const REQUIRES(!getCs())
-    {
-        LOCK(cs);
-        return (mapTx.count(hash) != 0);
-    }
-
-    bool lookup(uint256 hash, CTransaction& result) const;
+    bool lookup(uint256 hash, CTransaction& result) const REQUIRES(!getCs());
 
     /** Estimate fee rate needed to get into the next nBlocks */
-    CFeeRate estimateFee(int nBlocks) const;
+    CFeeRate estimateFee(int nBlocks) const REQUIRES(!getCs());
 
     /** Estimate priority needed to get into the next nBlocks */
-    double estimatePriority(int nBlocks) const;
+    double estimatePriority(int nBlocks) const REQUIRES(!getCs());
     
     /** Write/Read estimates to disk */
-    bool WriteFeeEstimates(CAutoFile& fileout) const;
-    bool ReadFeeEstimates(CAutoFile& filein);
+    bool WriteFeeEstimates(CAutoFile& fileout) const REQUIRES(!getCs());
+    bool ReadFeeEstimates(CAutoFile& filein) REQUIRES(!getCs());
 
-    size_t DynamicMemoryUsage() const;
+    size_t DynamicMemoryUsage() const REQUIRES(!getCs());
 
     /** Return nCheckFrequency */
     uint32_t GetCheckFrequency() const {
         return nCheckFrequency;
     }
+    /*****
+     * @brief check if hash exists in this collection
+     * @param hash the hash to check
+     * @returns true if exists
+     */
+    bool Exists(uint256 hash) const REQUIRES(!getCs());
+    /****
+     * @brief the non-locking version of Exists(hash)
+     * @param hash the hash to check
+     * @returns true if exists
+     */
+    bool exists(uint256 hash) const REQUIRES(getCs());
+private:
+    bool removeAddressIndex(const uint256 txhash) REQUIRES(getCs());
+    bool removeSpentIndex(const uint256 txhash) REQUIRES(getCs());
+    void remove(const CTransaction &tx, std::list<CTransaction>& removed, bool fRecursive = false) REQUIRES(getCs());
+    void removeConflicts(const CTransaction &tx, std::list<CTransaction>& removed) REQUIRES(getCs());
+    void clearPrioritisation(const uint256 hash) REQUIRES(getCs());
 };
 
 /** 

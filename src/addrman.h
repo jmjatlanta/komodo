@@ -501,9 +501,8 @@ public:
         Check();
     }
 
-    void Clear() REQUIRES(!getCs())
+    void Clear() REQUIRES(getCs())
     {
-        LOCK(cs);
         std::vector<int>().swap(vRandom);
         nKey = GetRandHash();
         for (size_t bucket = 0; bucket < ADDRMAN_NEW_BUCKET_COUNT; bucket++) {

@@ -552,7 +552,7 @@ bool CBlockTreeDB::Snapshot2(std::map <std::string, CAmount> &addressAmounts, Un
         // total of all the address's, does not count coins in CC vouts.
         ret->push_back(make_pair("total_includeCCvouts", (double) (total+cryptoConditionsTotals)/ COIN ));
         // The snapshot finished at this block height
-        ret->push_back(make_pair("ending_height", chainActive.Height()));
+        ret->push_back(make_pair("ending_height", chainActive.GetHeight()));
     }
     return true;
 }
@@ -672,8 +672,6 @@ bool CBlockTreeDB::ReadFlag(const std::string &name, bool &fValue) {
     return true;
 }
 
-void komodo_index2pubkey33(uint8_t *pubkey33,CBlockIndex *pindex,int32_t height);
-
 bool CBlockTreeDB::blockOnchainActive(const uint256 &hash) {
     BlockMap::const_iterator it = mapBlockIndex.find(hash);
     CBlockIndex* pblockindex = it != mapBlockIndex.end() ? it->second : NULL;
@@ -684,6 +682,9 @@ bool CBlockTreeDB::blockOnchainActive(const uint256 &hash) {
 
     return true;
 }
+
+void komodo_index2pubkey33(uint8_t *pubkey33,CBlockIndex *pindex,int32_t height);
+uint32_t komodo_chainactive_timestamp();
 
 bool CBlockTreeDB::LoadBlockIndexGuts()
 {

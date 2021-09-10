@@ -55,18 +55,21 @@ int32_t komodo_notarized_height(int32_t *prevMoMheightp,uint256 *hashp,uint256 *
 #include "komodo_defs.h"
 #include "komodo_structs.h"
 
+/*****
+ * @param blockindex the position in the chain (nullptr will always return 1.0)
+ * @param networkDifficulty true if we want network difficulty level
+ * @returns the difficulty level
+ */
 double GetDifficultyINTERNAL(const CBlockIndex* blockindex, bool networkDifficulty)
 {
     // Floating point number that is a multiple of the minimum difficulty,
     // minimum difficulty = 1.0.
-    if (blockindex == NULL)
+    if (blockindex == nullptr)
     {
-        if (chainActive.LastTip() == NULL)
+        blockindex = chainActive.GetLastTip();
+        if (blockindex == nullptr)
             return 1.0;
-        else
-            blockindex = chainActive.LastTip();
     }
-
     uint32_t bits;
     if (networkDifficulty) {
         bits = GetNextWorkRequired(blockindex, nullptr, Params().GetConsensus());
@@ -126,10 +129,10 @@ static UniValue ValuePoolDesc(
     return rv;
 }
 
-UniValue blockheaderToJSON(const CBlockIndex* blockindex)
+UniValue blockheaderToJSON(const CBlockIndex* blockindex) REQUIRES(!cs_main)
 {
     UniValue result(UniValue::VOBJ);
-    if ( blockindex == 0 )
+    if ( blockindex == nullptr )
     {
         result.push_back(Pair("error", "null blockhash"));
         return(result);
@@ -140,8 +143,11 @@ UniValue blockheaderToJSON(const CBlockIndex* blockindex)
     result.push_back(Pair("hash", blockindex->GetBlockHash().GetHex()));
     int confirmations = -1;
     // Only report confirmations if the block is on the main chain
-    if (chainActive.Contains(blockindex))
-        confirmations = chainActive.Height() - blockindex->GetHeight() + 1;
+    {
+        LOCK(cs_main);
+        if (chainActive.Contains(blockindex))
+            confirmations = chainActive.Height() - blockindex->GetHeight() + 1;
+    }
     result.push_back(Pair("confirmations", komodo_dpowconfs(blockindex->GetHeight(),confirmations)));
     result.push_back(Pair("rawconfirmations", confirmations));
     result.push_back(Pair("height", blockindex->GetHeight()));
@@ -158,22 +164,25 @@ UniValue blockheaderToJSON(const CBlockIndex* blockindex)
 
     if (blockindex->pprev)
         result.push_back(Pair("previousblockhash", blockindex->pprev->GetBlockHash().GetHex()));
-    CBlockIndex *pnext = chainActive.Next(blockindex);
+    CBlockIndex *pnext = chainActive.GetNext(blockindex);
     if (pnext)
         result.push_back(Pair("nextblockhash", pnext->GetBlockHash().GetHex()));
     return result;
 }
 
-UniValue blockToDeltasJSON(const CBlock& block, const CBlockIndex* blockindex)
+UniValue blockToDeltasJSON(const CBlock& block, const CBlockIndex* blockindex) REQUIRES(!cs_main)
 {
     UniValue result(UniValue::VOBJ);
     result.push_back(Pair("hash", block.GetHash().GetHex()));
     int confirmations = -1;
     // Only report confirmations if the block is on the main chain
-    if (chainActive.Contains(blockindex)) {
-        confirmations = chainActive.Height() - blockindex->GetHeight() + 1;
-    } else {
-        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Block is an orphan");
+    {
+        LOCK(cs_main);
+        if (chainActive.Contains(blockindex)) {
+            confirmations = chainActive.Height() - blockindex->GetHeight() + 1;
+        } else {
+            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Block is an orphan");
+        }
     }
     result.push_back(Pair("confirmations", komodo_dpowconfs(blockindex->GetHeight(),confirmations)));
     result.push_back(Pair("rawconfirmations", confirmations));
@@ -279,13 +288,13 @@ UniValue blockToDeltasJSON(const CBlock& block, const CBlockIndex* blockindex)
 
     if (blockindex->pprev)
         result.push_back(Pair("previousblockhash", blockindex->pprev->GetBlockHash().GetHex()));
-    CBlockIndex *pnext = chainActive.Next(blockindex);
+    CBlockIndex *pnext = chainActive.GetNext(blockindex);
     if (pnext)
         result.push_back(Pair("nextblockhash", pnext->GetBlockHash().GetHex()));
     return result;
 }
 
-UniValue blockToJSON(const CBlock& block, const CBlockIndex* blockindex, bool txDetails = false)
+UniValue blockToJSON(const CBlock& block, const CBlockIndex* blockindex, bool txDetails = false) REQUIRES(!cs_main)
 {
     UniValue result(UniValue::VOBJ);
     uint256 notarized_hash,notarized_desttxid; int32_t prevMoMheight,notarized_height;
@@ -294,8 +303,11 @@ UniValue blockToJSON(const CBlock& block, const CBlockIndex* blockindex, bool tx
     result.push_back(Pair("hash", block.GetHash().GetHex()));
     int confirmations = -1;
     // Only report confirmations if the block is on the main chain
-    if (chainActive.Contains(blockindex))
-        confirmations = chainActive.Height() - blockindex->GetHeight() + 1;
+    {
+        LOCK(cs_main);
+        if (chainActive.Contains(blockindex))
+            confirmations = chainActive.Height() - blockindex->GetHeight() + 1;
+    }
     result.push_back(Pair("confirmations", komodo_dpowconfs(blockindex->GetHeight(),confirmations)));
     result.push_back(Pair("rawconfirmations", confirmations));
     result.push_back(Pair("size", (int)::GetSerializeSize(block, SER_NETWORK, PROTOCOL_VERSION)));
@@ -333,7 +345,7 @@ UniValue blockToJSON(const CBlock& block, const CBlockIndex* blockindex, bool tx
 
     if (blockindex->pprev)
         result.push_back(Pair("previousblockhash", blockindex->pprev->GetBlockHash().GetHex()));
-    CBlockIndex *pnext = chainActive.Next(blockindex);
+    CBlockIndex *pnext = chainActive.GetNext(blockindex);
     if (pnext)
         result.push_back(Pair("nextblockhash", pnext->GetBlockHash().GetHex()));
     return result;
@@ -352,8 +364,7 @@ UniValue getblockcount(const UniValue& params, bool fHelp, const CPubKey& mypk)
             + HelpExampleRpc("getblockcount", "")
         );
 
-    LOCK(cs_main);
-    return chainActive.Height();
+    return chainActive.GetHeight();
 }
 
 UniValue getbestblockhash(const UniValue& params, bool fHelp, const CPubKey& mypk)
@@ -386,8 +397,7 @@ UniValue getdifficulty(const UniValue& params, bool fHelp, const CPubKey& mypk)
             + HelpExampleRpc("getdifficulty", "")
         );
 
-    LOCK(cs_main);
-    return GetNetworkDifficulty();
+    return GetNetworkDifficulty(chainActive.GetLastTip());
 }
 
 bool NSPV_spentinmempool(uint256 &spenttxid,int32_t &spentvini,uint256 txid,int32_t vout);
@@ -434,7 +444,7 @@ bool mytxid_inmempool(uint256 txid)
     return(false);
 }
 
-UniValue mempoolToJSON(bool fVerbose = false)
+UniValue mempoolToJSON(int currentHeight, bool fVerbose = false) REQUIRES(!mempool.cs)
 {
     if (fVerbose)
     {
@@ -449,7 +459,7 @@ UniValue mempoolToJSON(bool fVerbose = false)
             info.push_back(Pair("time", e.GetTime()));
             info.push_back(Pair("height", (int)e.GetHeight()));
             info.push_back(Pair("startingpriority", e.GetPriority(e.GetHeight())));
-            info.push_back(Pair("currentpriority", e.GetPriority(chainActive.Height())));
+            info.push_back(Pair("currentpriority", e.GetPriority(currentHeight)));
             const CTransaction& tx = e.GetTx();
             set<string> setDepends;
             BOOST_FOREACH(const CTxIn& txin, tx.vin)
@@ -514,13 +524,11 @@ UniValue getrawmempool(const UniValue& params, bool fHelp, const CPubKey& mypk)
             + HelpExampleRpc("getrawmempool", "true")
         );
 
-    LOCK(cs_main);
-
     bool fVerbose = false;
     if (params.size() > 0)
         fVerbose = params[0].get_bool();
 
-    return mempoolToJSON(fVerbose);
+    return mempoolToJSON(chainActive.GetHeight(), fVerbose);
 }
 
 UniValue getblockdeltas(const UniValue& params, bool fHelp, const CPubKey& mypk)
@@ -826,68 +834,70 @@ UniValue getblock(const UniValue& params, bool fHelp, const CPubKey& mypk)
             + HelpExampleCli("getblock", "12800")
             + HelpExampleRpc("getblock", "12800")
         );
-
-    LOCK(cs_main);
-
-    std::string strHash = params[0].get_str();
-
-    // If height is supplied, find the hash
-    if (strHash.size() < (2 * sizeof(uint256))) {
-        // std::stoi allows characters, whereas we want to be strict
-        regex r("[[:digit:]]+");
-        if (!regex_match(strHash, r)) {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid block height parameter");
-        }
-
-        int nHeight = -1;
-        try {
-            nHeight = std::stoi(strHash);
-        }
-        catch (const std::exception &e) {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid block height parameter");
-        }
-
-        if (nHeight < 0 || nHeight > chainActive.Height()) {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "Block height out of range");
-        }
-        strHash = chainActive[nHeight]->GetBlockHash().GetHex();
-    }
-
-    uint256 hash(uint256S(strHash));
-
     int verbosity = 1;
-    if (params.size() > 1) {
-        if(params[1].isNum()) {
-            verbosity = params[1].get_int();
-        } else {
-            verbosity = params[1].get_bool() ? 1 : 0;
-        }
-    }
-
-    if (verbosity < 0 || verbosity > 2) {
-        throw JSONRPCError(RPC_INVALID_PARAMETER, "Verbosity must be in range from 0 to 2");
-    }
-
-    if (mapBlockIndex.count(hash) == 0)
-        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Block not found");
-
     CBlock block;
-    CBlockIndex* pblockindex = mapBlockIndex[hash];
-
-    if (fHavePruned && !(pblockindex->nStatus & BLOCK_HAVE_DATA) && pblockindex->nTx > 0)
-        throw JSONRPCError(RPC_INTERNAL_ERROR, "Block not available (pruned data)");
-
-    if(!ReadBlockFromDisk(block, pblockindex,1))
-        throw JSONRPCError(RPC_INTERNAL_ERROR, "Can't read block from disk");
-
-    if (verbosity == 0)
+    CBlockIndex *pblockindex = nullptr;
     {
-        CDataStream ssBlock(SER_NETWORK, PROTOCOL_VERSION);
-        ssBlock << block;
-        std::string strHex = HexStr(ssBlock.begin(), ssBlock.end());
-        return strHex;
-    }
+        LOCK(cs_main);
 
+        std::string strHash = params[0].get_str();
+
+        // If height is supplied, find the hash
+        if (strHash.size() < (2 * sizeof(uint256))) {
+            // std::stoi allows characters, whereas we want to be strict
+            regex r("[[:digit:]]+");
+            if (!regex_match(strHash, r)) {
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid block height parameter");
+            }
+
+            int nHeight = -1;
+            try {
+                nHeight = std::stoi(strHash);
+            }
+            catch (const std::exception &e) {
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid block height parameter");
+            }
+
+            if (nHeight < 0 || nHeight > chainActive.Height()) {
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Block height out of range");
+            }
+            strHash = chainActive[nHeight]->GetBlockHash().GetHex();
+        }
+
+        uint256 hash(uint256S(strHash));
+
+        verbosity = 1;
+        if (params.size() > 1) {
+            if(params[1].isNum()) {
+                verbosity = params[1].get_int();
+            } else {
+                verbosity = params[1].get_bool() ? 1 : 0;
+            }
+        }
+
+        if (verbosity < 0 || verbosity > 2) {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Verbosity must be in range from 0 to 2");
+        }
+
+        if (mapBlockIndex.count(hash) == 0)
+            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Block not found");
+
+        pblockindex = mapBlockIndex[hash];
+
+        if (fHavePruned && !(pblockindex->nStatus & BLOCK_HAVE_DATA) && pblockindex->nTx > 0)
+            throw JSONRPCError(RPC_INTERNAL_ERROR, "Block not available (pruned data)");
+
+        if(!ReadBlockFromDisk(block, pblockindex,1))
+            throw JSONRPCError(RPC_INTERNAL_ERROR, "Can't read block from disk");
+
+        if (verbosity == 0)
+        {
+            CDataStream ssBlock(SER_NETWORK, PROTOCOL_VERSION);
+            ssBlock << block;
+            std::string strHex = HexStr(ssBlock.begin(), ssBlock.end());
+            return strHex;
+        }
+    } // unlock cs_main
     return blockToJSON(block, pblockindex, verbosity >= 2);
 }
 
@@ -991,14 +1001,17 @@ UniValue minerids(const UniValue& params, bool fHelp, const CPubKey& mypk)
     uint32_t timestamp = 0; UniValue ret(UniValue::VOBJ); UniValue a(UniValue::VARR); uint8_t minerids[2000],pubkeys[65][33]; int32_t i,j,n,numnotaries,tally[129];
     if ( fHelp || params.size() != 1 )
         throw runtime_error("minerids needs height\n");
-    LOCK(cs_main);
     int32_t height = atoi(params[0].get_str().c_str());
     if ( height <= 0 )
-        height = chainActive.LastTip()->GetHeight();
+    {
+        CBlockIndex *pblockindex = chainActive.GetLastTip();
+        height = pblockindex->GetHeight();
+        timestamp = pblockindex->GetBlockTime();
+    }
     else
     {
-        CBlockIndex *pblockindex = chainActive[height];
-        if ( pblockindex != 0 )
+        CBlockIndex *pblockindex = chainActive.at(height);
+        if ( pblockindex != nullptr )
             timestamp = pblockindex->GetBlockTime();
     }
     if ( (n= komodo_minerids(minerids,height,(int32_t)(sizeof(minerids)/sizeof(*minerids)))) > 0 )
@@ -1046,25 +1059,35 @@ UniValue minerids(const UniValue& params, bool fHelp, const CPubKey& mypk)
 
 UniValue notaries(const UniValue& params, bool fHelp, const CPubKey& mypk)
 {
-    UniValue a(UniValue::VARR); uint32_t timestamp=0; UniValue ret(UniValue::VOBJ); int32_t i,j,n,m; char *hexstr;  uint8_t pubkeys[64][33]; char btcaddr[64],kmdaddr[64],*ptr;
+    UniValue a(UniValue::VARR); 
+    uint32_t timestamp=0; 
+    UniValue ret(UniValue::VOBJ); 
+    int32_t i,j,n,m; 
+    char *hexstr;
+    uint8_t pubkeys[64][33]; 
+    char btcaddr[64],kmdaddr[64],*ptr;
+
     if ( fHelp || (params.size() != 1 && params.size() != 2) )
         throw runtime_error("notaries height timestamp\n");
-    LOCK(cs_main);
+
+    // height
     int32_t height = atoi(params[0].get_str().c_str());
-    if ( params.size() == 2 )
-        timestamp = (uint32_t)atol(params[1].get_str().c_str());
-    else timestamp = (uint32_t)time(NULL);
     if ( height < 0 )
     {
-        height = chainActive.LastTip()->GetHeight();
-        timestamp = chainActive.LastTip()->GetBlockTime();
+        CBlockIndex *pblockindex = chainActive.GetLastTip();
+        height = pblockindex->GetHeight();
+        timestamp = pblockindex->GetBlockTime();
     }
-    else if ( params.size() < 2 )
+    // timestamp
+    if ( params.size() < 2 )
     {
-        CBlockIndex *pblockindex = chainActive[height];
-        if ( pblockindex != 0 )
+        CBlockIndex *pblockindex = chainActive.at(height);
+        if ( pblockindex != nullptr )
             timestamp = pblockindex->GetBlockTime();
     }
+    else
+        timestamp = (uint32_t)atol(params[1].get_str().c_str());
+
     if ( (n= komodo_notaries(pubkeys,height,timestamp)) > 0 )
     {
         for (i=0; i<n; i++)
@@ -1715,7 +1738,7 @@ UniValue getblockchaininfo(const UniValue& params, bool fHelp, const CPubKey& my
     if ( ASSETCHAINS_SYMBOL[0] == 0 ) {
         progress = Checkpoints::GuessVerificationProgress(Params().Checkpoints(), chainActive.LastTip());
     } else {
-        int32_t longestchain = KOMODO_LONGESTCHAIN;//komodo_longestchain();
+        int32_t longestchain = KOMODO_LONGESTCHAIN;
 	    progress = (longestchain > 0 ) ? (double) chainActive.Height() / longestchain : 1.0;
     }
     UniValue obj(UniValue::VOBJ);
@@ -1724,7 +1747,7 @@ UniValue getblockchaininfo(const UniValue& params, bool fHelp, const CPubKey& my
     obj.push_back(Pair("synced",                KOMODO_INSYNC!=0));
     obj.push_back(Pair("headers",               pindexBestHeader ? pindexBestHeader->GetHeight() : -1));
     obj.push_back(Pair("bestblockhash",         chainActive.LastTip()->GetBlockHash().GetHex()));
-    obj.push_back(Pair("difficulty",            (double)GetNetworkDifficulty()));
+    obj.push_back(Pair("difficulty",            GetNetworkDifficulty(chainActive.LastTip())));
     obj.push_back(Pair("verificationprogress",  progress));
     obj.push_back(Pair("chainwork",             chainActive.LastTip()->chainPower.chainWork.GetHex()));
     if (ASSETCHAINS_LWMAPOS)

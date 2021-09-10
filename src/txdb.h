@@ -23,6 +23,8 @@
 
 #include "coins.h"
 #include "dbwrapper.h"
+#include "sync.h"
+extern CCriticalSection cs_main;
 
 #include <map>
 #include <string>
@@ -88,6 +90,7 @@ public:
 private:
     CBlockTreeDB(const CBlockTreeDB&);
     void operator=(const CBlockTreeDB&);
+    bool blockOnchainActive(const uint256 &hash) REQUIRES(cs_main);
 public:
     bool WriteBatchSync(const std::vector<std::pair<int, const CBlockFileInfo*> >& fileInfo, int nLastFile, const std::vector<const CBlockIndex*>& blockinfo);
     bool EraseBatchSync(const std::vector<const CBlockIndex*>& blockinfo);
@@ -108,15 +111,15 @@ public:
                           std::vector<std::pair<CAddressIndexKey, CAmount> > &addressIndex,
                           int start = 0, int end = 0);
     bool WriteTimestampIndex(const CTimestampIndexKey &timestampIndex);
-    bool ReadTimestampIndex(const unsigned int &high, const unsigned int &low, const bool fActiveOnly, std::vector<std::pair<uint256, unsigned int> > &vect);
+    bool ReadTimestampIndex(const unsigned int &high, const unsigned int &low, const bool fActiveOnly, 
+            std::vector<std::pair<uint256, unsigned int> > &vect) REQUIRES(cs_main);
     bool WriteTimestampBlockIndex(const CTimestampBlockIndexKey &blockhashIndex, const CTimestampBlockIndexValue &logicalts);
     bool ReadTimestampBlockIndex(const uint256 &hash, unsigned int &logicalTS);
     bool WriteFlag(const std::string &name, bool fValue);
     bool ReadFlag(const std::string &name, bool &fValue);
-    bool LoadBlockIndexGuts();
-    bool blockOnchainActive(const uint256 &hash);
-    UniValue Snapshot(int top);
-    bool Snapshot2(std::map <std::string, CAmount> &addressAmounts, UniValue *ret);
+    bool LoadBlockIndexGuts() REQUIRES(cs_main);
+    UniValue Snapshot(int top) REQUIRES(!cs_main);
+    bool Snapshot2(std::map <std::string, CAmount> &addressAmounts, UniValue *ret) REQUIRES(!cs_main);
 };
 
 #endif // BITCOIN_TXDB_H

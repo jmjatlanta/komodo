@@ -72,11 +72,11 @@ struct CCoin {
 };
 
 extern void TxToJSON(const CTransaction& tx, const uint256 hashBlock, UniValue& entry);
-extern UniValue blockToJSON(const CBlock& block, const CBlockIndex* blockindex, bool txDetails = false);
+extern UniValue blockToJSON(const CBlock& block, const CBlockIndex* blockindex, bool txDetails = false) REQUIRES(!cs_main);
 extern UniValue mempoolInfoToJSON();
-extern UniValue mempoolToJSON(bool fVerbose = false);
+extern UniValue mempoolToJSON(int currentHeight, bool fVerbose = false) REQUIRES(!mempool.cs);
 extern void ScriptPubKeyToJSON(const CScript& scriptPubKey, UniValue& out, bool fIncludeHex);
-extern UniValue blockheaderToJSON(const CBlockIndex* blockindex);
+extern UniValue blockheaderToJSON(const CBlockIndex* blockindex) REQUIRES(!cs_main);
 
 static bool RESTERR(HTTPRequest* req, enum HTTPStatusCode status, string message)
 {
@@ -131,7 +131,7 @@ static bool CheckWarmup(HTTPRequest* req)
 }
 
 static bool rest_headers(HTTPRequest* req,
-                         const std::string& strURIPart)
+                         const std::string& strURIPart) REQUIRES(!cs_main)
 {
     if (!CheckWarmup(req))
         return false;
@@ -206,7 +206,7 @@ static bool rest_headers(HTTPRequest* req,
 
 static bool rest_block(HTTPRequest* req,
                        const std::string& strURIPart,
-                       bool showTxDetails)
+                       bool showTxDetails) REQUIRES(!cs_main)
 {
     if (!CheckWarmup(req))
         return false;
@@ -268,12 +268,12 @@ static bool rest_block(HTTPRequest* req,
     return true; // continue to process further HTTP reqs on this cxn
 }
 
-static bool rest_block_extended(HTTPRequest* req, const std::string& strURIPart)
+static bool rest_block_extended(HTTPRequest* req, const std::string& strURIPart) REQUIRES(!cs_main)
 {
     return rest_block(req, strURIPart, true);
 }
 
-static bool rest_block_notxdetails(HTTPRequest* req, const std::string& strURIPart)
+static bool rest_block_notxdetails(HTTPRequest* req, const std::string& strURIPart) REQUIRES(!cs_main)
 {
     return rest_block(req, strURIPart, false);
 }
@@ -331,7 +331,7 @@ static bool rest_mempool_info(HTTPRequest* req, const std::string& strURIPart)
     return true; // continue to process further HTTP reqs on this cxn
 }
 
-static bool rest_mempool_contents(HTTPRequest* req, const std::string& strURIPart)
+static bool rest_mempool_contents(HTTPRequest* req, const std::string& strURIPart) REQUIRES(!cs_main) REQUIRES(!mempool.cs)
 {
     if (!CheckWarmup(req))
         return false;
@@ -340,7 +340,7 @@ static bool rest_mempool_contents(HTTPRequest* req, const std::string& strURIPar
 
     switch (rf) {
     case RF_JSON: {
-        UniValue mempoolObject = mempoolToJSON(true);
+        UniValue mempoolObject = mempoolToJSON( chainActive.GetHeight(), true);
 
         string strJSON = mempoolObject.write() + "\n";
         req->WriteHeader("Content-Type", "application/json");

@@ -19,10 +19,10 @@
 
 #include "CCinclude.h"
 
-bool OraclesValidate(struct CCcontract_info *cp,Eval* eval,const CTransaction &tx, uint32_t nIn);
+bool OraclesValidate(struct CCcontract_info *cp,Eval* eval,const CTransaction &tx, uint32_t nIn) REQUIRES(!cs_main);
 UniValue OracleCreate(const CPubKey& pk, int64_t txfee,std::string name,std::string description,std::string format);
-UniValue OracleFund(const CPubKey& pk, int64_t txfee,uint256 oracletxid);
-UniValue OracleRegister(const CPubKey& pk, int64_t txfee,uint256 oracletxid,int64_t datafee);
+UniValue OracleFund(const CPubKey& pk, int64_t txfee,uint256 oracletxid) REQUIRES(!cs_main);
+UniValue OracleRegister(const CPubKey& pk, int64_t txfee,uint256 oracletxid,int64_t datafee) REQUIRES(!cs_main);
 UniValue OracleSubscribe(const CPubKey& pk, int64_t txfee,uint256 oracletxid,CPubKey publisher,int64_t amount);
 UniValue OracleData(const CPubKey& pk, int64_t txfee,uint256 oracletxid,std::vector <uint8_t> data);
 // CCcustom

@@ -48,10 +48,10 @@ struct CBlockTemplate
 CBlockTemplate* CreateNewBlock(CPubKey _pk,const CScript& scriptPubKeyIn, int32_t gpucount, bool isStake = false) REQUIRES(!cs_main);
 #ifdef ENABLE_WALLET
 boost::optional<CScript> GetMinerScriptPubKey(CReserveKey& reservekey);
-CBlockTemplate* CreateNewBlockWithKey(CReserveKey& reservekey, int32_t nHeight, int32_t gpucount, bool isStake = false);
+CBlockTemplate* CreateNewBlockWithKey(CReserveKey& reservekey, int32_t nHeight, int32_t gpucount, bool isStake = false) REQUIRES(!cs_main);
 #else
 boost::optional<CScript> GetMinerScriptPubKey();
-CBlockTemplate* CreateNewBlockWithKey();
+CBlockTemplate* CreateNewBlockWithKey() REQUIRES(!cs_main);
 #endif
 
 #ifdef ENABLE_MINING
