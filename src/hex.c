@@ -19,17 +19,17 @@ int32_t unhex(char c)
 }
 
 /***
- * Check n characters of a string to see if it can be
- * interpreted as a hex string
+ * @brief Check n characters of a string to see if it can be interpreted as a hex string
  * @param str the input
  * @param n the size of input to check, 0 to check until null terminator found
- * @returns 0 on error, othewise a positive number
+ * @returns 0 on error, 1 if okay, strlen(str) if okay and n == 0
  */
-int32_t is_hexstr(const char *str,int32_t n)
+int32_t is_hexstr(const char *str, int32_t n)
 {
-    int32_t i;
     if ( str == 0 || str[0] == 0 )
-        return(0);
+        return 0;
+
+    int32_t i;
     for (i=0; str[i]!=0; i++)
     {
         if ( n > 0 && i >= n )
@@ -38,8 +38,8 @@ int32_t is_hexstr(const char *str,int32_t n)
             break;
     }
     if ( n == 0 )
-        return(i);
-    return(i == n);
+        return i;
+    return i == n;
 }
 
 /***
@@ -70,7 +70,7 @@ int32_t decode_hex(uint8_t *bytes, int32_t n,const char *str)
         memset(bytes,0,n); // give no results
         return 0;
     }
-    if (str[n*2+1] == 0 && str[n*2] != 0)
+    if (strlen(str) % 2 == 1)
     {
         // special case: odd number of char, then null terminator
         // treat first char as a whole byte
@@ -82,7 +82,11 @@ int32_t decode_hex(uint8_t *bytes, int32_t n,const char *str)
     if ( n > 0 )
     {
         for (int i=0; i<n; i++)
+        {
+            if (str[i*2] == 0) // null is next
+                break;
             bytes[i] = _decode_hex(&str[i*2]);
+        }
     }
     return n + extra;
 }
