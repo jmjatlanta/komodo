@@ -67,6 +67,8 @@
 #endif
 #include <mutex>
 
+#include "komodo_algorithms.h"
+
 using namespace std;
 
 //////////////////////////////////////////////////////////////////////////////
@@ -681,8 +683,7 @@ CBlockTemplate* CreateNewBlock(CPubKey _pk,const CScript& _scriptPubKeyIn, int32
                 if ( komodo_newStakerActive(nHeight, blocktime) != 0 )
                     nFees += utxovalue;
                 //fprintf(stderr, "added to coinbase.%llu staking tx valueout.%llu\n", (long long unsigned)utxovalue, (long long unsigned)txStaked.vout[0].nValue);
-                uint32_t delay = ASSETCHAINS_ALGO != ASSETCHAINS_EQUIHASH ? ASSETCHAINS_STAKED_BLOCK_FUTURE_MAX : ASSETCHAINS_STAKED_BLOCK_FUTURE_HALF;
-                if ( komodo_waituntilelegible(blocktime, stakeHeight, delay) == 0 )
+                if ( komodo_waituntilelegible(blocktime, stakeHeight, ASSETCHAINS_ALGO.delay) == 0 )
                     return(0);
             }
 
@@ -826,7 +827,7 @@ CBlockTemplate* CreateNewBlock(CPubKey _pk,const CScript& _scriptPubKeyIn, int32
             arith_uint256 nonce = UintToArith256(GetRandHash());
 
             // Clear the top 16 and bottom 16 or 24 bits (for local use as thread flags and counters)
-            nonce <<= ASSETCHAINS_NONCESHIFT[ASSETCHAINS_ALGO];
+            nonce <<= ASSETCHAINS_ALGO.nonce_shift;
             nonce >>= 16;
             pblock->nNonce = ArithToUint256(nonce);
         }
@@ -1278,10 +1279,10 @@ void static VerusStaker(CWallet *pwallet)
             {
                 if (GetArg("-mineraddress", "").empty()) {
                     LogPrintf("Error in %s staker: Keypool ran out, please call keypoolrefill before restarting the mining thread\n",
-                              ASSETCHAINS_ALGORITHMS[ASSETCHAINS_ALGO]);
+                              ASSETCHAINS_ALGO.name.c_str());
                 } else {
                     // Should never reach here, because -mineraddress validity is checked in init.cpp
-                    LogPrintf("Error in %s staker: Invalid %s -mineraddress\n", ASSETCHAINS_ALGORITHMS[ASSETCHAINS_ALGO], ASSETCHAINS_SYMBOL);
+                    LogPrintf("Error in %s staker: Invalid %s -mineraddress\n", ASSETCHAINS_ALGO.name.c_str(), ASSETCHAINS_SYMBOL);
                 }
                 return;
             }
@@ -1333,7 +1334,7 @@ void static VerusStaker(CWallet *pwallet)
 
             ProcessBlockFound(pblock, *pwallet, reservekey);
 
-            LogPrintf("Using %s algorithm:\n", ASSETCHAINS_ALGORITHMS[ASSETCHAINS_ALGO]);
+            LogPrintf("Using %s algorithm:\n", ASSETCHAINS_ALGO.name.c_str());
             LogPrintf("Staked block found  \n  hash: %s  \ntarget: %s\n", pblock->GetHash().GetHex(), hashTarget.GetHex());
             printf("Found block %d \n", Mining_height );
             printf("staking reward %.8f %s!\n", (double)subsidy / (double)COIN, ASSETCHAINS_SYMBOL);
@@ -1376,7 +1377,7 @@ void static BitcoinMiner_noeq(CWallet *pwallet)
 void static BitcoinMiner_noeq()
 #endif
 {
-    LogPrintf("%s miner started\n", ASSETCHAINS_ALGORITHMS[ASSETCHAINS_ALGO]);
+    LogPrintf("%s miner started\n", ASSETCHAINS_ALGO.name.c_str());
     RenameThread("verushash-miner");
 
 #ifdef ENABLE_WALLET
@@ -1416,7 +1417,7 @@ void static BitcoinMiner_noeq()
     miningTimer.start();
 
     try {
-        printf("Mining %s with %s\n", ASSETCHAINS_SYMBOL, ASSETCHAINS_ALGORITHMS[ASSETCHAINS_ALGO]);
+        printf("Mining %s with %s\n", ASSETCHAINS_SYMBOL, ASSETCHAINS_ALGO.name.c_str());
         while (true)
         {
             miningTimer.stop();
@@ -1468,10 +1469,10 @@ void static BitcoinMiner_noeq()
             {
                 if (GetArg("-mineraddress", "").empty()) {
                     LogPrintf("Error in %s miner: Keypool ran out, please call keypoolrefill before restarting the mining thread\n",
-                              ASSETCHAINS_ALGORITHMS[ASSETCHAINS_ALGO]);
+                              ASSETCHAINS_ALGO.name.c_str());
                 } else {
                     // Should never reach here, because -mineraddress validity is checked in init.cpp
-                    LogPrintf("Error in %s miner: Invalid %s -mineraddress\n", ASSETCHAINS_ALGORITHMS[ASSETCHAINS_ALGO], ASSETCHAINS_SYMBOL);
+                    LogPrintf("Error in %s miner: Invalid %s -mineraddress\n", ASSETCHAINS_ALGO.name.c_str(), ASSETCHAINS_SYMBOL);
                 }
                 return;
             }
@@ -1491,7 +1492,7 @@ void static BitcoinMiner_noeq()
                 }
             }
             IncrementExtraNonce(pblock, pindexPrev, nExtraNonce);
-            LogPrintf("Running %s miner with %u transactions in block (%u bytes)\n",ASSETCHAINS_ALGORITHMS[ASSETCHAINS_ALGO],
+            LogPrintf("Running %s miner with %u transactions in block (%u bytes)\n",ASSETCHAINS_ALGO.name.c_str(),
                        pblock->vtx.size(),::GetSerializeSize(*pblock,SER_NETWORK,PROTOCOL_VERSION));
             //
             // Search
@@ -1502,7 +1503,7 @@ void static BitcoinMiner_noeq()
             savebits = pblock->nBits;
             arith_uint256 hashTarget = arith_uint256().SetCompact(pblock->nBits);
             HASHTarget = arith_uint256().SetCompact(savebits);
-            arith_uint256 mask(ASSETCHAINS_NONCEMASK[ASSETCHAINS_ALGO]);
+            arith_uint256 mask( ASSETCHAINS_ALGO.nonce_mask);
 
             Mining_start = 0;
 
@@ -1535,7 +1536,7 @@ void static BitcoinMiner_noeq()
                 // This seems to be a really bad way to do this, but its better than copy pasting the entire miner function at this stage.
                 CVerusHashWriter ss = CVerusHashWriter(SER_GETHASH, PROTOCOL_VERSION);
                 ss << *((CBlockHeader *)pblock);
-                if ( ASSETCHAINS_ALGO == ASSETCHAINS_VERUSHASH )
+                if ( ASSETCHAINS_ALGO.algo == hash_algo::HASH_ALGO_VERUSHASH)
                     extraPtr = ss.xI64p();
                 CVerusHash &vh = ss.GetState();
                 uint256 hashResult = uint256();
@@ -1543,13 +1544,13 @@ void static BitcoinMiner_noeq()
                 
                 CVerusHashV2Writer ss2 = CVerusHashV2Writer(SER_GETHASH, PROTOCOL_VERSION);
                 ss2 << *((CBlockHeader *)pblock);
-                if ( ASSETCHAINS_ALGO == ASSETCHAINS_VERUSHASHV1_1 )
+                if ( ASSETCHAINS_ALGO.algo == hash_algo::HASH_ALGO_VERUSHASHV1_1 )
                     extraPtr = ss2.xI64p();
                 CVerusHashV2 &vh2 = ss2.GetState();
                 vh2.ClearExtra();
                 
-                int64_t i, count = ASSETCHAINS_NONCEMASK[ASSETCHAINS_ALGO] + 1;
-                int64_t hashesToGo = ASSETCHAINS_HASHESPERROUND[ASSETCHAINS_ALGO];
+                int64_t i, count = ASSETCHAINS_ALGO.nonce_mask + 1;
+                int64_t hashesToGo = ASSETCHAINS_ALGO.hashes_per_round;
                 if ( ASSETCHAINS_STAKED > 0 && ASSETCHAINS_STAKED < 100 )
                 {    
                     if ( KOMODO_MININGTHREADS > 0 )
@@ -1566,9 +1567,9 @@ void static BitcoinMiner_noeq()
                 for (i = 0; i < count; i++)
                 {
                     *extraPtr = i;
-                    if ( ASSETCHAINS_ALGO == ASSETCHAINS_VERUSHASH )
+                    if ( ASSETCHAINS_ALGO.algo == hash_algo::HASH_ALGO_VERUSHASH )
                         vh.ExtraHash((unsigned char *)&hashResult);
-                    else if ( ASSETCHAINS_ALGO == ASSETCHAINS_VERUSHASHV1_1 )
+                    else if ( ASSETCHAINS_ALGO.algo == hash_algo::HASH_ALGO_VERUSHASHV1_1 )
                         vh2.ExtraHash((unsigned char *)&hashResult);
 
                     if ( UintToArith256(hashResult) <= hashTarget )
@@ -1587,7 +1588,7 @@ void static BitcoinMiner_noeq()
                         int32_t unlockTime = komodo_block_unlocktime(Mining_height);
                         int64_t subsidy = (int64_t)(pblock->vtx[0].vout[0].nValue);
 
-                        LogPrintf("Using %s algorithm:\n", ASSETCHAINS_ALGORITHMS[ASSETCHAINS_ALGO]);
+                        LogPrintf("Using %s algorithm:\n", ASSETCHAINS_ALGO.name.c_str());
                         LogPrintf("proof-of-work found  \n  hash: %s  \ntarget: %s\n", pblock->GetHash().GetHex(), hashTarget.GetHex());
                         printf("Found block %d \n", Mining_height );
                         printf("mining reward %.8f %s!\n", (double)subsidy / (double)COIN, ASSETCHAINS_SYMBOL);
@@ -1616,7 +1617,7 @@ void static BitcoinMiner_noeq()
                             }
                             break;
                         }
-                        hashesToGo = ASSETCHAINS_HASHESPERROUND[ASSETCHAINS_ALGO];
+                        hashesToGo = ASSETCHAINS_ALGO.hashes_per_round;
                     }
                 }
 
@@ -1654,9 +1655,9 @@ void static BitcoinMiner_noeq()
                 }
 
 #ifdef _WIN32
-                printf("%llu mega hashes complete - working\n", (ASSETCHAINS_NONCEMASK[ASSETCHAINS_ALGO] + 1) / 1048576);
+                printf("%llu mega hashes complete - working\n", (ASSETCHAINS_ALGO.nonce_mask + 1) / 1048576);
 #else
-                printf("%lu mega hashes complete - working\n", (ASSETCHAINS_NONCEMASK[ASSETCHAINS_ALGO] + 1) / 1048576);
+                printf("%lu mega hashes complete - working\n", (ASSETCHAINS_ALGO.nonce_mask + 1) / 1048576);
 #endif
                 pblock->nBits = savebits;
                 break;
@@ -1666,13 +1667,13 @@ void static BitcoinMiner_noeq()
     catch (const boost::thread_interrupted&)
     {
         miningTimer.stop();
-        LogPrintf("%s miner terminated\n", ASSETCHAINS_ALGORITHMS[ASSETCHAINS_ALGO]);
+        LogPrintf("%s miner terminated\n", ASSETCHAINS_ALGO.name.c_str());
         throw;
     }
     catch (const std::runtime_error &e)
     {
         miningTimer.stop();
-        LogPrintf("%s miner runtime error: %s\n", ASSETCHAINS_ALGORITHMS[ASSETCHAINS_ALGO], e.what());
+        LogPrintf("%s miner runtime error: %s\n", ASSETCHAINS_ALGO.name.c_str(), e.what());
         return;
     }
     miningTimer.stop();
@@ -2216,12 +2217,12 @@ void static BitcoinMiner()
         for (int i = 0; i < nThreads; i++) {
 
 #ifdef ENABLE_WALLET
-            if ( ASSETCHAINS_ALGO == ASSETCHAINS_EQUIHASH )
+            if ( ASSETCHAINS_ALGO.algo == hash_algo::HASH_ALGO_EQUIHASH )
                 minerThreads->create_thread(boost::bind(&BitcoinMiner, pwallet));
             else
                 minerThreads->create_thread(boost::bind(&BitcoinMiner_noeq, pwallet));
 #else
-            if (ASSETCHAINS_ALGO == ASSETCHAINS_EQUIHASH )
+            if (ASSETCHAINS_ALGO.algo == hash_algo::HASH_ALGO_EQUIHASH )
                 minerThreads->create_thread(&BitcoinMiner);
             else
                 minerThreads->create_thread(&BitcoinMiner_noeq);
