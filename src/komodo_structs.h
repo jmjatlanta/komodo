@@ -120,7 +120,7 @@ struct event_notarized : public event
     event_notarized() : event(komodo_event_type::EVENT_NOTARIZED, 0), notarizedheight(0), MoMdepth(0) {}
     event_notarized(int32_t ht) : event(EVENT_NOTARIZED, ht), notarizedheight(0), MoMdepth(0) {}
     event_notarized(uint8_t* data, long &pos, long data_len, int32_t height, bool includeMoM = false);
-    event_notarized(FILE* fp, int32_t ht, bool includeMoM = false);
+    event_notarized(FILE* fp, int32_t ht, char *dest, bool includeMoM = false);
     uint256 blockhash;
     uint256 desttxid;
     uint256 MoM; 

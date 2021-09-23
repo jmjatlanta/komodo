@@ -185,7 +185,7 @@ event_notarized::event_notarized(uint8_t *data, long &pos, long data_len, int32_
     }
 }
 
-event_notarized::event_notarized(FILE* fp, int32_t height, bool includeMoM) 
+event_notarized::event_notarized(FILE* fp, int32_t height, char *dest, bool includeMoM) 
         : event(EVENT_NOTARIZED, height), MoMdepth(0)
 {
     MoM.SetNull();
@@ -202,6 +202,7 @@ event_notarized::event_notarized(FILE* fp, int32_t height, bool includeMoM)
         if ( fread(&MoMdepth,1,sizeof(MoMdepth),fp) != sizeof(MoMdepth) )
             throw parse_error("Invalid MoMdepth");
     }
+    memcpy(this->dest, dest, sizeof(this->dest));
 }
 
 std::ostream& operator<<(std::ostream& os, const event_notarized& in)
