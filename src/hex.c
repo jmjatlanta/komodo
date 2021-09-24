@@ -68,6 +68,8 @@ int32_t decode_hex(uint8_t *bytes, int32_t n,const char *in)
     // copy the input to manipulate it
     size_t len = strlen(in);
     char *str = (char*) malloc(len + 2); // space for terminator and adding a leading zero if necessary
+    if (str == NULL)
+        return 0;
     strcpy(str, in);
     // concentrate only on characters we will process
     if (len > n * 2)
