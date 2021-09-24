@@ -946,7 +946,7 @@ bool CCDiceContract_info::validate(Eval *eval,const CTransaction &tx, uint32_t n
                     if ( (iswin= DiceIsWinner(entropy,entropyvout,txid,tx,vinTx,hash,sbits,minbet,maxbet,maxodds,timeoutblocks,fundingtxid)) != 0 )
                     {
                         // will only happen for fundingPubKey
-                        if ( KOMODO_INSYNC != 0 && IS_KOMODO_DEALERNODE != 0 )
+                        if ( KOMODO_INSYNC != 0 && IS_KOMODO_DEALERNODE )
                             DiceQueue(iswin,sbits,fundingtxid,txid,tx,entropyvout);
                     }
                     else
@@ -1831,8 +1831,7 @@ double DiceStatus(uint64_t txfee,char *planstr,uint256 fundingtxid,uint256 bettx
                 {
                     if ( myGetTransaction(betTx.vin[0].prevout.hash,entropyTx,hashBlock) != 0 )
                     {
-                        flag = IS_KOMODO_DEALERNODE != 0;
-                        if ( IS_KOMODO_DEALERNODE != 0 && scriptPubKey == fundingPubKey )
+                        if ( IS_KOMODO_DEALERNODE && scriptPubKey == fundingPubKey )
                         {
                             bettorentropy = DiceGetEntropy(betTx,'B');
                             if ( (iswin= DiceIsWinner(hentropyproof,entropyvout,txid,betTx,entropyTx,bettorentropy,sbits,minbet,maxbet,maxodds,timeoutblocks,fundingtxid)) != 0 )
@@ -1861,7 +1860,7 @@ double DiceStatus(uint64_t txfee,char *planstr,uint256 fundingtxid,uint256 bettx
                 }
             }
         }
-        if ( didinit == 0 && IS_KOMODO_DEALERNODE == 0 && scriptPubKey == fundingPubKey )
+        if ( didinit == 0 && !IS_KOMODO_DEALERNODE && scriptPubKey == fundingPubKey )
         {
             strcpy(_planstr,planstr);
             dealer0_fundingtxid = fundingtxid;

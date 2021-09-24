@@ -27,7 +27,6 @@
 #include "CCOracles.h"
 #include "CCPrices.h"
 #include "CCPegs.h"
-#include "CCMarmara.h"
 #include "CCPayments.h"
 #include "CCGateways.h"
 #include "CCtokens.h"
@@ -87,8 +86,6 @@ std::shared_ptr<CCcontract_info> CCinit(uint8_t evalcode)
             return std::make_shared<CCPricesContract_info>();
         case EVAL_PEGS:
             return std::make_shared<CCPegsContract_info>();
-        case EVAL_MARMARA:
-            return std::make_shared<CCMaramaContract_info>();
         case EVAL_PAYMENTS:
             return std::make_shared<CCPaymentsContract_info>();
         case EVAL_GATEWAYS:
