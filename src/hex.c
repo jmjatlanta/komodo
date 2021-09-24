@@ -1,5 +1,7 @@
-#include <string.h>
 #include "hex.h"
+
+#include <string.h>
+#include <stdlib.h>
 
 /***
  * turn a char into its hex value
@@ -53,31 +55,47 @@ unsigned char _decode_hex(const char *hex)
 }
 
 /***
- * Turn a hex string into bytes
- * NOTE: If there is 1 extra character in a null-terminated str, treat the first char as a full byte
+ * @brief Turn a hex string into bytes
+ * NOTE: If there is an odd number of characters in a null-terminated str, treat the first char as a "0"
  * 
- * @param bytes where to store the output (will be cleared if hex has invalid chars)
- * @param n number of bytes to process
- * @param hex the input (will ignore CR/LF)
- * @returns the number of bytes processed
+ * @param[out] bytes where to store the output (will be cleared if hex has invalid chars)
+ * @param[in] n number of bytes to process
+ * @param[in] in the input string (will ignore CR/LF)
+ * @returns the number of bytes processed (i.e. strlen(in)/2)
  */
-int32_t decode_hex(uint8_t *bytes, int32_t n,const char *str)
+int32_t decode_hex(uint8_t *bytes, int32_t n,const char *in)
 {
-    uint8_t extra = 0;
+    // copy the input to manipulate it
+    size_t len = strlen(in);
+    char *str = (char*) malloc(len + 2); // space for terminator and adding a leading zero if necessary
+    strcpy(str, in);
+    // concentrate only on characters we will process
+    if (len > n * 2)
+        str[n * 2] = 0;
+    // check for cr/lf
+    char *pos = strchr(str, '\r');
+    if (pos != NULL)
+        pos[0] = 0;
+    pos = strchr(str, '\n');
+    if (pos != NULL)
+        pos[0] = 0;
+    // check for odd number of characters
+    len = strlen(str);
+    if (len % 2 == 1)
+    {
+        // append a zero to the front
+        for(size_t i = len + 1; i > 0; --i)
+            str[i] = str[i-1];
+        str[0] = '0';
+        len++;
+    }
+
     // check validity of input
-    if ( is_hexstr(str,n) <= 0 )
+    if ( is_hexstr(str,len) <= 0 )
     {
         memset(bytes,0,n); // give no results
+        free(str);
         return 0;
-    }
-    if (strlen(str) % 2 == 1)
-    {
-        // special case: odd number of char, then null terminator
-        // treat first char as a whole byte
-        bytes[0] = unhex(str[0]);
-        extra = 1;
-        bytes++;
-        str++;
     }
     if ( n > 0 )
     {
@@ -88,7 +106,8 @@ int32_t decode_hex(uint8_t *bytes, int32_t n,const char *str)
             bytes[i] = _decode_hex(&str[i*2]);
         }
     }
-    return n + extra;
+    free(str);
+    return n;
 }
 
 /***
