@@ -37,6 +37,7 @@
 #define ASSETCHAINS_STAKED_BLOCK_FUTURE_HALF 27
 #define ASSETCHAINS_STAKED_MIN_POW_DIFF 536900000 // 537000000 537300000
 #define _COINBASE_MATURITY 100
+#define _ASSETCHAINS_TIMELOCKOFF 0xffffffffffffffff
 
 // KMD Notary Seasons 
 // 1: May 1st 2018 1530921600
@@ -500,7 +501,7 @@ extern const char *ASSETCHAINS_ALGORITHMS[];
 extern int32_t VERUS_MIN_STAKEAGE;
 extern uint32_t ASSETCHAINS_VERUSHASH, ASSETCHAINS_VERUSHASHV1_1, ASSETCHAINS_NONCESHIFT[], ASSETCHAINS_HASHESPERROUND[];
 extern std::string NOTARY_PUBKEY,ASSETCHAINS_OVERRIDE_PUBKEY,ASSETCHAINS_SCRIPTPUB;
-extern uint8_t NOTARY_PUBKEY33[33],ASSETCHAINS_OVERRIDE_PUBKEY33[33],ASSETCHAINS_MARMARA;
+extern uint8_t NOTARY_PUBKEY33[33],ASSETCHAINS_OVERRIDE_PUBKEY33[33];
 extern std::vector<std::string> ASSETCHAINS_PRICES,ASSETCHAINS_STOCKS;
 
 extern int32_t VERUS_BLOCK_POSUNITS, VERUS_CONSECUTIVE_POS_THRESHOLD, VERUS_NOPOS_THRESHHOLD;
@@ -537,8 +538,6 @@ int32_t getkmdseason(int32_t height);
 #define KOMODO_KVBINARY 2
 #define PRICES_SMOOTHWIDTH 1
 #define PRICES_MAXDATAPOINTS 8
-uint64_t komodo_paxprice(uint64_t *seedp,int32_t height,const char *base,const char *rel,uint64_t basevolume);
-int32_t komodo_paxprices(int32_t *heights,uint64_t *prices,int32_t max,char *base,char *rel);
 int32_t komodo_notaries(uint8_t pubkeys[64][33],int32_t height,uint32_t timestamp);
 char *bitcoin_address(char *coinaddr,uint8_t addrtype,uint8_t *pubkey_or_rmd160,int32_t len);
 int32_t komodo_minerids(uint8_t *minerids,int32_t height,int32_t width);
