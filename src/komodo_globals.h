@@ -18,6 +18,10 @@
  * Please think twice before adding to this list. Can it be done with a better scope?
  * @note more global externs are in komodo_defs.h
  */
+#pragma once
+#include <mutex>
+#include "komodo_defs.h"
+#include "komodo_hardfork.h"
 #include "komodo_structs.h"
 #include <mutex>
 #include <cstdint>
