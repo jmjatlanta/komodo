@@ -48,8 +48,8 @@ TEST(CheckBlock, BlockSproutRejectsBadVersion) {
     mtx.vout[0].scriptPubKey = CScript() << OP_TRUE;
     mtx.vout[0].nValue = 0;
     mtx.vout.push_back(CTxOut(
-        GetBlockSubsidy(1, Params().GetConsensus())/5,
-        Params().GetFoundersRewardScriptAtHeight(1)));
+        GetBlockSubsidy(1, chain.Params().GetConsensus())/5,
+        chain.Params().GetFoundersRewardScriptAtHeight(1)));
     mtx.fOverwintered = false;
     mtx.nVersion = -1;
     mtx.nVersionGroupId = 0;
@@ -59,7 +59,7 @@ TEST(CheckBlock, BlockSproutRejectsBadVersion) {
     block.vtx.push_back(tx);
 
     MockCValidationState state;
-    CBlockIndex indexPrev {Params().GenesisBlock()};
+    CBlockIndex indexPrev {chain.Params().GenesisBlock()};
 
     auto verifier = libzcash::ProofVerifier::Strict();
 
@@ -98,8 +98,8 @@ protected:
 
         // Give it a Founder's Reward vout for height 1.
         mtx.vout.push_back(CTxOut(
-                    GetBlockSubsidy(1, Params().GetConsensus())/5,
-                    Params().GetFoundersRewardScriptAtHeight(1)));
+                    GetBlockSubsidy(1, chain.Params().GetConsensus())/5,
+                    chain.Params().GetFoundersRewardScriptAtHeight(1)));
 
         return mtx;
     }
@@ -114,7 +114,7 @@ protected:
         block.vtx.push_back(tx);
 
         // Set the previous block index to the genesis block.
-        CBlockIndex indexPrev {Params().GenesisBlock()};
+        CBlockIndex indexPrev {chain.Params().GenesisBlock()};
 
         // We now expect this to be a valid block.
         MockCValidationState state;
@@ -131,7 +131,7 @@ protected:
         block.vtx.push_back(tx);
 
         // Set the previous block index to the genesis block.
-        CBlockIndex indexPrev {Params().GenesisBlock()};
+        CBlockIndex indexPrev {chain.Params().GenesisBlock()};
 
         // We now expect this to be an invalid block, for the given reason.
         MockCValidationState state;
@@ -157,8 +157,8 @@ TEST_F(ContextualCheckBlockTest, BadCoinbaseHeight) {
 
     // Give the transaction a Founder's Reward vout
     mtx.vout.push_back(CTxOut(
-                GetBlockSubsidy(1, Params().GetConsensus())/5,
-                Params().GetFoundersRewardScriptAtHeight(1)));
+                GetBlockSubsidy(1, chain.Params().GetConsensus())/5,
+                chain.Params().GetFoundersRewardScriptAtHeight(1)));
 
     // Treating block as non-genesis should fail
     CTransaction tx2 {mtx};

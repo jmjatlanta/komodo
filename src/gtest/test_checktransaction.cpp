@@ -888,7 +888,7 @@ TEST(checktransaction_tests, OverwinterInvalidSoftForkVersion) {
 // Test CreateNewContextualCMutableTransaction sets default values based on height
 TEST(checktransaction_tests, OverwinteredContextualCreateTx) {
     SelectParams(CBaseChainParams::REGTEST);
-    const Consensus::Params& consensusParams = Params().GetConsensus();
+    const Consensus::Params& consensusParams = chain.Params().GetConsensus();
     int activationHeight = 5;
     int saplingActivationHeight = 30;
     UpdateNetworkUpgradeParameters(Consensus::UPGRADE_OVERWINTER, activationHeight);

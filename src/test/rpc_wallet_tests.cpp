@@ -961,7 +961,7 @@ BOOST_AUTO_TEST_CASE(rpc_z_sendmany_parameters)
     // Mutable tx containing contextual information we need to build tx
     UniValue retValue = CallRPC("getblockcount");
     int nHeight = retValue.get_int();
-    CMutableTransaction mtx = CreateNewContextualCMutableTransaction(Params().GetConsensus(), nHeight + 1);
+    CMutableTransaction mtx = CreateNewContextualCMutableTransaction(chain.Params().GetConsensus(), nHeight + 1);
     if (mtx.nVersion == 1) {
         mtx.nVersion = 2;
     }
@@ -1023,7 +1023,7 @@ BOOST_AUTO_TEST_CASE(rpc_z_sendmany_internals)
     // Mutable tx containing contextual information we need to build tx
     retValue = CallRPC("getblockcount");
     int nHeight = retValue.get_int();
-    CMutableTransaction mtx = CreateNewContextualCMutableTransaction(Params().GetConsensus(), nHeight + 1);
+    CMutableTransaction mtx = CreateNewContextualCMutableTransaction(chain.Params().GetConsensus(), nHeight + 1);
     if (mtx.nVersion == 1) {
         mtx.nVersion = 2;
     }
@@ -1266,7 +1266,7 @@ BOOST_AUTO_TEST_CASE(rpc_z_sendmany_taddr_to_sapling)
     auto pa = pwalletMain->GenerateNewSaplingZKey();
     std::string zaddr1 = EncodePaymentAddress(pa);
 
-    auto consensusParams = Params().GetConsensus();
+    auto consensusParams = chain.Params().GetConsensus();
     retValue = CallRPC("getblockcount");
     int nextBlockHeight = retValue.get_int() + 1;
 
@@ -1564,7 +1564,7 @@ BOOST_AUTO_TEST_CASE(rpc_z_shieldcoinbase_parameters)
     // Mutable tx containing contextual information we need to build tx
     UniValue retValue = CallRPC("getblockcount");
     int nHeight = retValue.get_int();
-    CMutableTransaction mtx = CreateNewContextualCMutableTransaction(Params().GetConsensus(), nHeight + 1);
+    CMutableTransaction mtx = CreateNewContextualCMutableTransaction(chain.Params().GetConsensus(), nHeight + 1);
     if (mtx.nVersion == 1) {
         mtx.nVersion = 2;
     }
@@ -1606,7 +1606,7 @@ BOOST_AUTO_TEST_CASE(rpc_z_shieldcoinbase_internals)
     // Mutable tx containing contextual information we need to build tx
     UniValue retValue = CallRPC("getblockcount");
     int nHeight = retValue.get_int();
-    CMutableTransaction mtx = CreateNewContextualCMutableTransaction(Params().GetConsensus(), nHeight + 1);
+    CMutableTransaction mtx = CreateNewContextualCMutableTransaction(chain.Params().GetConsensus(), nHeight + 1);
     if (mtx.nVersion == 1) {
         mtx.nVersion = 2;
     }
@@ -1748,7 +1748,7 @@ BOOST_AUTO_TEST_CASE(rpc_z_mergetoaddress_parameters)
     // Mutable tx containing contextual information we need to build tx
     UniValue retValue = CallRPC("getblockcount");
     int nHeight = retValue.get_int();
-    CMutableTransaction mtx = CreateNewContextualCMutableTransaction(Params().GetConsensus(), nHeight + 1);
+    CMutableTransaction mtx = CreateNewContextualCMutableTransaction(chain.Params().GetConsensus(), nHeight + 1);
 
     // Test constructor of AsyncRPCOperation_mergetoaddress
     MergeToAddressRecipient testnetzaddr(
@@ -1803,7 +1803,7 @@ BOOST_AUTO_TEST_CASE(rpc_z_mergetoaddress_internals)
     // Mutable tx containing contextual information we need to build tx
     UniValue retValue = CallRPC("getblockcount");
     int nHeight = retValue.get_int();
-    CMutableTransaction mtx = CreateNewContextualCMutableTransaction(Params().GetConsensus(), nHeight + 1);
+    CMutableTransaction mtx = CreateNewContextualCMutableTransaction(chain.Params().GetConsensus(), nHeight + 1);
 
     // Test that option -mempooltxinputlimit is respected.
     mapArgs["-mempooltxinputlimit"] = "1";

@@ -254,7 +254,7 @@ int printStats(bool mining)
     auto localsolps = GetLocalSolPS();
 
     if (IsInitialBlockDownload()) {
-        int netheight = EstimateNetHeight(height, tipmediantime, Params());
+        int netheight = EstimateNetHeight(height, tipmediantime, chain.Params());
         int downloadPercent = height * 100 / netheight;
         std::cout << "     " << _("Downloading blocks") << " | " << height << " / ~" << netheight << " (" << downloadPercent << "%)" << std::endl;
     } else {
@@ -357,7 +357,7 @@ int printMetrics(size_t cols, bool mining)
         {
             LOCK2(cs_main, cs_metrics);
             boost::strict_lock_ptr<std::list<uint256>> u = trackedBlocks.synchronize();
-            auto consensusParams = Params().GetConsensus();
+            auto consensusParams = chain.Params().GetConsensus();
             auto tipHeight = chainActive.Height();
 
             // Update orphans and calculate subsidies
@@ -389,7 +389,7 @@ int printMetrics(size_t cols, bool mining)
         }
 
         if (mined > 0) {
-            std::string units = Params().CurrencyUnits();
+            std::string units = chain.Params().CurrencyUnits();
             std::cout << "- " << strprintf(_("You have mined %d blocks!"), mined) << std::endl;
             std::cout << "  "
                       << strprintf(_("Orphaned: %d blocks, Immature: %u %s, Mature: %u %s"),

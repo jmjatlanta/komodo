@@ -139,10 +139,10 @@ int RaiseFileDescriptorLimit(int nMinFD);
 void AllocateFileRange(FILE *file, unsigned int offset, unsigned int length);
 bool RenameOver(boost::filesystem::path src, boost::filesystem::path dest);
 bool TryCreateDirectory(const boost::filesystem::path& p);
-boost::filesystem::path GetDefaultDataDir();
+boost::filesystem::path GetDefaultDataDir(const std::string& symbol);
 const boost::filesystem::path &GetDataDir(bool fNetSpecific = true);
 void ClearDatadirCache();
-boost::filesystem::path GetConfigFile();
+boost::filesystem::path GetConfigFile(const std::string& symbol);
 #ifndef _WIN32
 boost::filesystem::path GetPidFile();
 void CreatePidFile(const boost::filesystem::path &path, pid_t pid);
@@ -151,7 +151,15 @@ class missing_zcash_conf : public std::runtime_error {
 public:
     missing_zcash_conf() : std::runtime_error("Missing komodo.conf") { }
 };
-void ReadConfigFile(std::map<std::string, std::string>& mapSettingsRet, std::map<std::string, std::vector<std::string> >& mapMultiSettingsRet);
+/****
+ * @brief Read config file
+ * @param mapSettingsRet
+ * @param mapMultiSettingsRet
+ * @param symbol
+ */
+void ReadConfigFile(std::map<std::string, std::string>& mapSettingsRet, 
+        std::map<std::string, std::vector<std::string> >& mapMultiSettingsRet,
+        const std::string& symbol);
 #ifdef _WIN32
 boost::filesystem::path GetSpecialFolderPath(int nFolder, bool fCreate = true);
 #endif

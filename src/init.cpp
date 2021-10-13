@@ -977,7 +977,7 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
     std::set_new_handler(new_handler_terminate);
 
     // ********************************************************* Step 2: parameter interactions
-    const CChainParams& chainparams = Params();
+    const CChainParams& chainparams = chain.Params();
 
     // Set this early so that experimental features are correctly enabled/disabled
     fExperimentalMode = GetBoolArg("-experimentalfeatures", true);
@@ -1285,7 +1285,7 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
 
     if (!mapMultiArgs["-nuparams"].empty()) {
         // Allow overriding network upgrade parameters for testing
-        if (Params().NetworkIDString() != "regtest") {
+        if (chain.Params().NetworkIDString() != "regtest") {
             return InitError("Network upgrade parameters may only be overridden on regtest.");
         }
         const vector<string>& deployments = mapMultiArgs["-nuparams"];
@@ -1304,7 +1304,7 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
             for (auto i = Consensus::BASE_SPROUT + 1; i < Consensus::MAX_NETWORK_UPGRADES; ++i)
             {
                 if (vDeploymentParams[0].compare(HexInt(NetworkUpgradeInfo[i].nBranchId)) == 0) {
-                    UpdateNetworkUpgradeParameters(Consensus::UpgradeIndex(i), nActivationHeight);
+                    chain.UpdateNetworkUpgradeParameters(Consensus::UpgradeIndex(i), nActivationHeight);
                     found = true;
                     LogPrintf("Setting network upgrade activation parameters for %s to height=%d\n", vDeploymentParams[0], nActivationHeight);
                     break;
@@ -1383,9 +1383,9 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
 #endif
     if (!fLogTimestamps)
         LogPrintf("Startup time: %s\n", DateTimeStrFormat("%Y-%m-%d %H:%M:%S", GetTime()));
-    LogPrintf("Default data directory %s\n", GetDefaultDataDir().string());
+    LogPrintf("Default data directory %s\n", GetDefaultDataDir(chain.symbol()).string());
     LogPrintf("Using data directory %s\n", strDataDir);
-    LogPrintf("Using config file %s\n", GetConfigFile().string());
+    LogPrintf("Using config file %s\n", GetConfigFile(chain.symbol()).string());
     LogPrintf("Using at most %i connections (%i file descriptors available)\n", nMaxConnections, nFD);
     std::ostringstream strErrors;
 

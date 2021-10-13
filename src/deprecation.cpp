@@ -32,7 +32,7 @@ static const std::string CLIENT_VERSION_STR = FormatVersion(CLIENT_VERSION);
 void EnforceNodeDeprecation(int nHeight, bool forceLogging, bool fThread) {
 
     // Do not enforce deprecation in regtest or on testnet
-    std::string networkID = Params().NetworkIDString();
+    std::string networkID = chain.Params().NetworkIDString();
     std::string msg;
 
     if (networkID != "main" || !chain.isKMD() ) 

@@ -69,7 +69,7 @@ static int AppInitRawTx(int argc, char* argv[])
     ParseParameters(argc, argv);
 
     // Check for -testnet or -regtest parameter (Params() calls are only valid after this clause)
-    if (!SelectParamsFromCommandLine()) {
+    if (!chain.SelectParamsFromCommandLine()) {
         fprintf(stderr, "Error: Invalid combination of -regtest and -testnet.\n");
         return false;
     }
@@ -273,7 +273,7 @@ static void MutateTxAddInput(CMutableTransaction& tx, const std::string& strInpu
     uint256 txid(uint256S(strTxid));
 
     static const unsigned int minTxOutSz = 9;
-    static const unsigned int maxVout = MAX_BLOCK_SIZE(0) / minTxOutSz;
+    static const unsigned int maxVout = chain.Params().MaxBlockSize(0) / minTxOutSz;
 
     // extract and validate vout
     std::string strVout = vStrInputParts[1];
@@ -532,7 +532,7 @@ static void MutateTxSign(CMutableTransaction& tx, const std::string& strInput)
     bool fHashSingle = ((nHashType & ~SIGHASH_ANYONECANPAY) == SIGHASH_SINGLE);
 
     // Grab the consensus branch ID for the given height
-    auto consensusBranchId = CurrentEpochBranchId(nHeight, Params().GetConsensus());
+    auto consensusBranchId = CurrentEpochBranchId(nHeight, chain.Params().GetConsensus());
 
     // Sign what we can:
     for (unsigned int i = 0; i < mergedTx.vin.size(); i++) {

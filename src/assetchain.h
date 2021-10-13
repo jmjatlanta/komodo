@@ -13,6 +13,7 @@
  * Removal or modification of this copyright notice is prohibited.            *
  *                                                                            *
  ******************************************************************************/
+#include "chainparams.h"
 #include <string>
 
 class assetchain
@@ -24,6 +25,11 @@ public:
         if (symbol_.size() > 64)
             symbol_ = symbol_.substr(0, 64);
     }
+
+    /******
+     * Assetchain Symbol
+     */
+
     /*****
      * @returns true if the chain is Komodo
      */
@@ -47,6 +53,69 @@ public:
         return symbol_; 
     }
     bool SymbolStartsWith(const std::string& in) { return symbol_.find(in) == 0; }
+    
+    /******
+     * ChainParams
+     */
+
+    /****
+     * @note requires a previous call to SelectParams
+     * @returns the parameters for this chain
+     */
+    const CChainParams &Params() { return *pCurrentParams; }
+
+    /*****
+     * Sets the params returned by Params() to those for the given network.
+     * @param network the network to use as the default
+     */
+    void SelectParams(CBaseChainParams::Network network);
+
+    /***
+     * @brief Return parameters for a given network.
+     * @param network the network params to retrieve
+     * @returns the parameters
+     */
+    CChainParams &Params(CBaseChainParams::Network network);
+
+    /****
+     * @brief examine command line params and set appropriate CChainParams
+     * @returns true on success, false if command line param combination was invalid
+     */
+    bool SelectParamsFromCommandLine();
+    /*****
+     * @brief initialize chain parameters
+     * @param saplingActivationHeight from the command line
+     * @param overwinterActivationHeight from the command line
+     */
+    void InitChainParams(int64_t saplingActivationHeight, int64_t overwinterActivationHeight);
+
+    /****
+     * @brief set sapling and overwinter heights
+     * @param height
+     */
+    void SetActivation(int32_t height) { SetSaplingHeight(height); SetOverwinterHeight(height); }
+    void SetSaplingHeight(int32_t height) { pCurrentParams->SetSaplingHeight(height); }
+    void SetOverwinterHeight(int32_t height) { pCurrentParams->SetOverwinterHeight(height); }
+
+    /****
+     * @note only appicable to regtest
+     * @param idx
+     * @param nActivationHeight
+     */
+    void UpdateNetworkUpgradeParameters(Consensus::UpgradeIndex idx, int nActivationHeight)
+    {
+        regTestParams.UpdateNetworkUpgradeParameters(idx, nActivationHeight);
+    }
+
+    bool isInitialized() { return initialized; }
+
 private:
+    // symbol
     std::string symbol_;
+    // chainparams
+    CChainParams *pCurrentParams = nullptr;
+    CMainParams mainParams;
+    CTestNetParams testNetParams;
+    CRegTestParams regTestParams;
+    bool initialized = false;
 };

@@ -469,11 +469,12 @@ crypto_libverus_portable_crypto_a_SOURCES = \
 libbitcoin_common_a_CPPFLAGS = -fPIC $(AM_CPPFLAGS) $(BITCOIN_INCLUDES)
 libbitcoin_common_a_CXXFLAGS = -fPIC $(AM_CXXFLAGS) $(PIE_FLAGS)
 libbitcoin_common_a_SOURCES = \
-  amount.cpp \
+  assetchain.cpp \
+  chainparams.cpp \
   arith_uint256.cpp \
+  amount.cpp \
   base58.cpp \
   bech32.cpp \
-  chainparams.cpp \
   coins.cpp \
   compressor.cpp \
   consensus/upgrades.cpp \

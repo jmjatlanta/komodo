@@ -377,7 +377,7 @@ UniValue getaddednodeinfo(const UniValue& params, bool fHelp, const CPubKey& myp
     list<pair<string, vector<CService> > > laddedAddreses(0);
     BOOST_FOREACH(const std::string& strAddNode, laddedNodes) {
         vector<CService> vservNode(0);
-        if(Lookup(strAddNode.c_str(), vservNode, Params().GetDefaultPort(), fNameLookup, 0))
+        if(Lookup(strAddNode.c_str(), vservNode, chain.Params().GetDefaultPort(), fNameLookup, 0))
             laddedAddreses.push_back(make_pair(strAddNode, vservNode));
         else
         {
@@ -470,7 +470,7 @@ static UniValue GetNetworksInfo()
 
 UniValue getdeprecationinfo(const UniValue& params, bool fHelp, const CPubKey& mypk)
 {
-    const CChainParams& chainparams = Params();
+    const CChainParams& chainparams = chain.Params();
     if (fHelp || params.size() != 0 || chainparams.NetworkIDString() != "main")
         throw runtime_error(
             "getdeprecationinfo\n"

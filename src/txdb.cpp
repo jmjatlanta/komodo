@@ -730,7 +730,7 @@ bool CBlockTreeDB::LoadBlockIndexGuts()
                 {
                     uint8_t pubkey33[33];
                     komodo_index2pubkey33(pubkey33,pindexNew,pindexNew->GetHeight());
-                    if (!CheckProofOfWork(header,pubkey33,pindexNew->GetHeight(),Params().GetConsensus()))
+                    if (!CheckProofOfWork(header,pubkey33,pindexNew->GetHeight(),chain.Params().GetConsensus()))
                         return error("LoadBlockIndex(): CheckProofOfWork failed: %s", pindexNew->ToString());
                 }
                 pcursor->Next();

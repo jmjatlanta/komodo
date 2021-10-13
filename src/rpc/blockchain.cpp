@@ -72,13 +72,13 @@ double GetDifficultyINTERNAL(const CBlockIndex* blockindex, bool networkDifficul
 
     uint32_t bits;
     if (networkDifficulty) {
-        bits = GetNextWorkRequired(blockindex, nullptr, Params().GetConsensus());
+        bits = GetNextWorkRequired(blockindex, nullptr, chain.Params().GetConsensus());
     } else {
         bits = blockindex->nBits;
     }
 
     uint32_t powLimit =
-        UintToArith256(Params().GetConsensus().powLimit).GetCompact();
+        UintToArith256(chain.Params().GetConsensus().powLimit).GetCompact();
     int nShift = (bits >> 24) & 0xff;
     int nShiftAmount = (powLimit >> 24) & 0xff;
 
@@ -1676,13 +1676,13 @@ UniValue getblockchaininfo(const UniValue& params, bool fHelp, const CPubKey& my
     LOCK(cs_main);
     double progress;
     if ( chain.isKMD() ) {
-        progress = Checkpoints::GuessVerificationProgress(Params().Checkpoints(), chainActive.LastTip());
+        progress = Checkpoints::GuessVerificationProgress(chain.Params().Checkpoints(), chainActive.LastTip());
     } else {
         int32_t longestchain = KOMODO_LONGESTCHAIN;
 	    progress = (longestchain > 0 ) ? (double) chainActive.Height() / longestchain : 1.0;
     }
     UniValue obj(UniValue::VOBJ);
-    obj.push_back(Pair("chain",                 Params().NetworkIDString()));
+    obj.push_back(Pair("chain",                 chain.Params().NetworkIDString()));
     obj.push_back(Pair("blocks",                (int)chainActive.Height()));
     obj.push_back(Pair("synced",                KOMODO_INSYNC!=0));
     obj.push_back(Pair("headers",               pindexBestHeader ? pindexBestHeader->GetHeight() : -1));
@@ -1706,7 +1706,7 @@ UniValue getblockchaininfo(const UniValue& params, bool fHelp, const CPubKey& my
     valuePools.push_back(ValuePoolDesc("sapling", tip->nChainSaplingValue, boost::none));
     obj.push_back(Pair("valuePools",            valuePools));
 
-    const Consensus::Params& consensusParams = Params().GetConsensus();
+    const Consensus::Params& consensusParams = chain.Params().GetConsensus();
     UniValue softforks(UniValue::VARR);
     softforks.push_back(SoftForkDesc("bip34", 2, tip, consensusParams));
     softforks.push_back(SoftForkDesc("bip66", 3, tip, consensusParams));
@@ -1869,7 +1869,7 @@ UniValue mempoolInfoToJSON()
     ret.push_back(Pair("bytes", (int64_t) mempool.GetTotalTxSize()));
     ret.push_back(Pair("usage", (int64_t) mempool.DynamicMemoryUsage()));
 
-    if (Params().NetworkIDString() == "regtest") {
+    if (chain.Params().NetworkIDString() == "regtest") {
         ret.push_back(Pair("fullyNotified", mempool.IsFullyNotified()));
     }
     
@@ -1928,7 +1928,7 @@ UniValue getchaintxstats(const UniValue& params, bool fHelp, const CPubKey& mypk
         );
 
     const CBlockIndex* pindex;
-    int blockcount = 30 * 24 * 60 * 60 / Params().GetConsensus().nPowTargetSpacing; // By default: 1 month
+    int blockcount = 30 * 24 * 60 * 60 / chain.Params().GetConsensus().nPowTargetSpacing; // By default: 1 month
 
     if (params[1].isNull()) {
         LOCK(cs_main);

@@ -438,7 +438,7 @@ UniValue importwallet_impl(const UniValue& params, bool fHelp, bool fImportZKeys
             boost::optional<std::string> seedFpStr = (vstr.size() > 3) ? boost::optional<std::string>(vstr[3]) : boost::none;
             if (IsValidSpendingKey(spendingkey)) {
                 auto addResult = boost::apply_visitor(
-                    AddSpendingKeyToWallet(pwalletMain, Params().GetConsensus(), nTime, hdKeypath, seedFpStr, true), spendingkey);
+                    AddSpendingKeyToWallet(pwalletMain, chain.Params().GetConsensus(), nTime, hdKeypath, seedFpStr, true), spendingkey);
                 if (addResult == KeyAlreadyExists){
                     LogPrint("zrpc", "Skipping import of zaddr (key already present)\n");
                 } else if (addResult == KeyNotAdded) {
@@ -778,7 +778,7 @@ UniValue z_importkey(const UniValue& params, bool fHelp, const CPubKey& mypk)
     }
 
     // Sapling support
-    auto addResult = boost::apply_visitor(AddSpendingKeyToWallet(pwalletMain, Params().GetConsensus()), spendingkey);
+    auto addResult = boost::apply_visitor(AddSpendingKeyToWallet(pwalletMain, chain.Params().GetConsensus()), spendingkey);
     if (addResult == KeyAlreadyExists && fIgnoreExistingKey) {
         return NullUniValue;
     }

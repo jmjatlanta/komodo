@@ -767,7 +767,7 @@ bool CheckEquihashSolution(const CBlockHeader *pblock, const CChainParams& param
     unsigned int n = params.EquihashN();
     unsigned int k = params.EquihashK();
 
-    if ( Params().NetworkIDString() == "regtest" )
+    if ( chain.Params().NetworkIDString() == "regtest" )
         return(true);
     // Hash state
     crypto_generichash_blake2b_state state;
@@ -874,7 +874,7 @@ bool CheckProofOfWork(const CBlockHeader &blkHeader, uint8_t *pubkey33, int32_t 
         if ( !chain.isKMD() || height > 792000 )
         {
             //if ( 0 && height > 792000 )
-            if ( Params().NetworkIDString() != "regtest" )
+            if ( chain.Params().NetworkIDString() != "regtest" )
             {
                 for (i=31; i>=0; i--)
                     fprintf(stderr,"%02x",((uint8_t *)&hash)[i]);

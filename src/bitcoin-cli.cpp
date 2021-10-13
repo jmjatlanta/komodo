@@ -31,10 +31,9 @@
 #include <event2/buffer.h>
 #include <event2/keyvalq_struct.h>
 #include "support/events.h"
-#include "assetchain.h"
 
 uint16_t BITCOIND_RPCPORT = 7771;
-assetchain chain;
+std::string ac_name;
 
 #include <univalue.h>
 
@@ -97,9 +96,7 @@ static int AppInitRPC(int argc, char* argv[])
     // Parameters
     //
     ParseParameters(argc, argv);
-    std:string name = GetArg("-ac_name","");
-    if ( !name.empty() )
-        chain = assetchain(name);
+    ac_name = GetArg("-ac_name","");
 
     if (argc<2 || mapArgs.count("-?") || mapArgs.count("-h") || mapArgs.count("-help") || mapArgs.count("-version")) {
         std::string strUsage = _("Komodo RPC client version") + " " + FormatFullVersion() + "\n" + PrivacyInfo();
@@ -126,7 +123,7 @@ static int AppInitRPC(int argc, char* argv[])
         return EXIT_FAILURE;
     }
     try {
-        ReadConfigFile(mapArgs, mapMultiArgs);
+        ReadConfigFile(mapArgs, mapMultiArgs, ac_name);
     } catch (const std::exception& e) {
         fprintf(stderr,"Error reading configuration file: %s\n", e.what());
         return EXIT_FAILURE;
@@ -238,7 +235,7 @@ UniValue CallRPC(const std::string& strMethod, const UniValue& params)
             throw std::runtime_error(strprintf(
                 _("Could not locate RPC credentials. No authentication cookie could be found,\n"
                   "and no rpcpassword is set in the configuration file (%s)."),
-                    GetConfigFile().string().c_str()));
+                    GetConfigFile(ac_name).string().c_str()));
 
         }
     } else {

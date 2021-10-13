@@ -206,7 +206,7 @@ bool AsyncRPCOperation_shieldcoinbase::main_impl() {
     size_t limit = (size_t)GetArg("-mempooltxinputlimit", 0);
     {
         LOCK(cs_main);
-        if (NetworkUpgradeActive(chainActive.Height() + 1, Params().GetConsensus(), Consensus::UPGRADE_OVERWINTER)) {
+        if (NetworkUpgradeActive(chainActive.Height() + 1, chain.Params().GetConsensus(), Consensus::UPGRADE_OVERWINTER)) {
             limit = 0;
         }
     }
@@ -411,7 +411,7 @@ UniValue AsyncRPCOperation_shieldcoinbase::perform_joinsplit(ShieldCoinbaseJSInf
     uint256 anchor;
     {
         LOCK(cs_main);
-        consensusBranchId = CurrentEpochBranchId(chainActive.Height() + 1, Params().GetConsensus());
+        consensusBranchId = CurrentEpochBranchId(chainActive.Height() + 1, chain.Params().GetConsensus());
         anchor = pcoinsTip->GetBestAnchor(SPROUT);
     }
 

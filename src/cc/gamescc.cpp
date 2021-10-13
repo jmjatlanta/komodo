@@ -1115,7 +1115,7 @@ void games_gameplayerinfo(struct CCcontract_info *cp,UniValue &obj,uint256 gamet
 
 UniValue games_newgame(uint64_t txfee,struct CCcontract_info *cp,cJSON *params)
 {
-    CMutableTransaction mtx = CreateNewContextualCMutableTransaction(Params().GetConsensus(), komodo_nextheight());
+    CMutableTransaction mtx = CreateNewContextualCMutableTransaction(chain.Params().GetConsensus(), komodo_nextheight());
     UniValue result(UniValue::VOBJ); std::string rawtx; CPubKey gamespk,mypk; char *jsonstr; uint64_t inputsum,change,required,buyin=0; int32_t i,n,maxplayers = 1;
     if ( txfee == 0 )
         txfee = 10000;
@@ -1227,7 +1227,7 @@ UniValue games_register(uint64_t txfee,struct CCcontract_info *cp,cJSON *params)
     // vin2 -> original creation TCBOO playerdata used
     // vin3+ -> buyin
     // vout0 -> keystrokes/completion baton
-    CMutableTransaction mtx = CreateNewContextualCMutableTransaction(Params().GetConsensus(), komodo_nextheight());
+    CMutableTransaction mtx = CreateNewContextualCMutableTransaction(chain.Params().GetConsensus(), komodo_nextheight());
     UniValue result(UniValue::VOBJ); char destaddr[64],coinaddr[64]; uint256 tokenid,gametxid,origplayergame,playertxid,hashBlock; int32_t err,maxplayers,gameheight,n,numvouts,vout=1; int64_t inputsum,buyin,CCchange=0; CPubKey pk,mypk,gamespk,burnpk; CTransaction tx,playertx; std::vector<uint8_t> playerdata; std::string rawtx,symbol,pname; bits256 t;
     
     if ( txfee == 0 )
@@ -1315,7 +1315,7 @@ UniValue games_keystrokes(uint64_t txfee,struct CCcontract_info *cp,cJSON *param
     // being killed should auto broadcast (possible to be suppressed?)
     // respawn to be prevented by including timestamps
     int32_t nextheight = komodo_nextheight();
-    CMutableTransaction mtx = CreateNewContextualCMutableTransaction(Params().GetConsensus(),nextheight);
+    CMutableTransaction mtx = CreateNewContextualCMutableTransaction(chain.Params().GetConsensus(),nextheight);
     UniValue result(UniValue::VOBJ); CPubKey gamespk,mypk; uint256 gametxid,playertxid,batontxid; int64_t batonvalue,buyin; std::vector<uint8_t> keystrokes,playerdata; int32_t numplayers,regslot,numkeys,batonht,batonvout,n,elapsed,gameheight,maxplayers; CTransaction tx; CTxOut txout; char *keystrokestr,destaddr[64]; std::string rawtx,symbol,pname; bits256 t; uint8_t mypriv[32];
     // if ( txfee == 0 )
     txfee = 1000; // smaller than normal on purpose
@@ -1511,7 +1511,7 @@ UniValue games_finish(uint64_t txfee,struct CCcontract_info *cp,cJSON *params,ch
     // vout0 -> playerdata marker
     // vout0 -> 1% ingame gold
     // get any playerdata, get all keystrokes, replay game and compare final state
-    CMutableTransaction mtx = CreateNewContextualCMutableTransaction(Params().GetConsensus(), komodo_nextheight());
+    CMutableTransaction mtx = CreateNewContextualCMutableTransaction(chain.Params().GetConsensus(), komodo_nextheight());
     UniValue result(UniValue::VOBJ); std::string rawtx,symbol,pname; CTransaction gametx; uint64_t seed; int64_t buyin,batonvalue,inputsum,cashout=0,CCchange=0; int32_t i,err,gameheight,tmp,numplayers,regslot,n,num,numkeys,maxplayers,batonht,batonvout; char mygamesaddr[64],str[512]; gamesevent *keystrokes = 0; std::vector<uint8_t> playerdata,newdata,nodata; uint256 batontxid,playertxid,gametxid; CPubKey mypk,gamespk; uint8_t player[10000],mypriv[32],funcid;
     struct CCcontract_info *cpTokens, tokensC;
     
@@ -1720,7 +1720,7 @@ UniValue games_setname(uint64_t txfee,struct CCcontract_info *cp,cJSON *params)
 
 UniValue games_fund(uint64_t txfee,struct CCcontract_info *cp,cJSON *params)
 {
-    CMutableTransaction mtx = CreateNewContextualCMutableTransaction(Params().GetConsensus(), komodo_nextheight());
+    CMutableTransaction mtx = CreateNewContextualCMutableTransaction(chain.Params().GetConsensus(), komodo_nextheight());
     UniValue result(UniValue::VOBJ); std::string rawtx; int64_t amount,inputsum; CPubKey gamespk,mypk; CScript opret;
     if ( params != 0 && cJSON_GetArraySize(params) == 1 )
     {

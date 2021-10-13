@@ -643,7 +643,7 @@ uint256 komodo_calcmerkleroot(CBlock *pblock, uint256 prevBlockHash, int32_t nHe
 {
     std::vector<uint256> vLeaves;
     // rereate coinbase tx
-    CMutableTransaction txNew = CreateNewContextualCMutableTransaction(Params().GetConsensus(), nHeight);
+    CMutableTransaction txNew = CreateNewContextualCMutableTransaction(chain.Params().GetConsensus(), nHeight);
     txNew.vin.resize(1);
     txNew.vin[0].prevout.SetNull();
     txNew.vin[0].scriptSig = fNew ? (CScript() << nHeight << CScriptNum(1)) + COINBASE_FLAGS : pblock->vtx[0].vin[0].scriptSig;
@@ -1147,7 +1147,7 @@ uint64_t komodo_commission(const CBlock *pblock,int32_t height)
     int32_t i,j,n=0,txn_count; int64_t nSubsidy; uint64_t commission,total = 0;
     if ( ASSETCHAINS_FOUNDERS != 0 )
     {
-        nSubsidy = GetBlockSubsidy(height,Params().GetConsensus());
+        nSubsidy = GetBlockSubsidy(height,chain.Params().GetConsensus());
         //fprintf(stderr,"ht.%d nSubsidy %.8f prod %llu\n",height,(double)nSubsidy/COIN,(long long)(nSubsidy * ASSETCHAINS_COMMISSION));
         commission = ((nSubsidy * ASSETCHAINS_COMMISSION) / COIN);
 
@@ -1700,7 +1700,7 @@ bool verusCheckPOSBlock(int32_t slowflag, CBlock *pblock, int32_t height)
                             else
                             {
                                 arith_uint256 cTarget;
-                                uint32_t nBits = lwmaGetNextPOSRequired(previndex, Params().GetConsensus());
+                                uint32_t nBits = lwmaGetNextPOSRequired(previndex, chain.Params().GetConsensus());
                                 cTarget.SetCompact(nBits);
                                 bool nonceOK = true;
 
@@ -1896,7 +1896,7 @@ uint64_t komodo_checknotarypay(CBlock *pblock,int32_t height)
         fprintf(stderr, "Possible notarisation is signed multiple times by same notary. It is invalid.\n");
         return(0);
     }
-    const CChainParams& chainparams = Params();
+    const CChainParams& chainparams = chain.Params();
     const Consensus::Params &consensusParams = chainparams.GetConsensus();
     uint64_t totalsats = 0;
     CMutableTransaction txNew = CreateNewContextualCMutableTransaction(consensusParams, height);
@@ -2101,9 +2101,9 @@ bool KOMODO_TEST_ASSETCHAIN_SKIP_POW = 0;
 int32_t komodo_checkPOW(int64_t stakeTxValue, int32_t slowflag,CBlock *pblock,int32_t height)
 {
     uint256 hash,merkleroot; arith_uint256 bnTarget,bhash; bool fNegative,fOverflow; uint8_t *script,pubkey33[33],pubkeys[64][33]; int32_t i,scriptlen,possible,PoSperc,is_PoSblock=0,n,failed = 0,notaryid = -1; int64_t checktoshis,value; CBlockIndex *pprev;
-    if ( KOMODO_TEST_ASSETCHAIN_SKIP_POW == 0 && Params().NetworkIDString() == "regtest" )
+    if ( KOMODO_TEST_ASSETCHAIN_SKIP_POW == 0 && chain.Params().NetworkIDString() == "regtest" )
         KOMODO_TEST_ASSETCHAIN_SKIP_POW = 1;
-    if ( !CheckEquihashSolution(pblock, Params()) )
+    if ( !CheckEquihashSolution(pblock, chain.Params()) )
     {
         fprintf(stderr,"komodo_checkPOW slowflag.%d ht.%d CheckEquihashSolution failed\n",slowflag,height);
         return(-1);
@@ -2557,7 +2557,7 @@ int32_t komodo_staked(CMutableTransaction &txNew,uint32_t nBits,uint32_t *blockt
     if ( earliest != 0 )
     {
         bool signSuccess; SignatureData sigdata; uint64_t txfee; uint8_t *ptr; uint256 revtxid,utxotxid;
-        auto consensusBranchId = CurrentEpochBranchId(chainActive.Height() + 1, Params().GetConsensus());
+        auto consensusBranchId = CurrentEpochBranchId(chainActive.Height() + 1, chain.Params().GetConsensus());
         const CKeyStore& keystore = *pwalletMain;
         txNew.vin.resize(1);
         txNew.vout.resize(1);

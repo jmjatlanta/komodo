@@ -139,7 +139,7 @@ SaplingPaymentAddress CWallet::GenerateNewSaplingZKey()
         throw std::runtime_error("CWallet::GenerateNewSaplingZKey(): HD seed not found");
 
     auto m = libzcash::SaplingExtendedSpendingKey::Master(seed);
-    uint32_t bip44CoinType = Params().BIP44CoinType();
+    uint32_t bip44CoinType = chain.Params().BIP44CoinType();
 
     // We use a fixed keypath scheme of m/32'/coin_type'/account'
     // Derive m/32'
@@ -1397,7 +1397,7 @@ int32_t CWallet::VerusStakeTransaction(CBlock *pBlock, CMutableTransaction &txNe
 
     pk = CPubKey();
 
-    bnTarget = lwmaGetNextPOSRequired(tipindex, Params().GetConsensus());
+    bnTarget = lwmaGetNextPOSRequired(tipindex, chain.Params().GetConsensus());
 
     if (!VerusSelectStakeOutput(pBlock, hashResult, stakeSource, voutNum, tipindex->GetHeight() + 1, bnTarget) ||
         !Solver(stakeSource.vout[voutNum].scriptPubKey, whichType, vSolutions))
@@ -1409,7 +1409,7 @@ int32_t CWallet::VerusStakeTransaction(CBlock *pBlock, CMutableTransaction &txNe
     bool signSuccess;
     SignatureData sigdata;
     uint64_t txfee;
-    auto consensusBranchId = CurrentEpochBranchId(stakeHeight, Params().GetConsensus());
+    auto consensusBranchId = CurrentEpochBranchId(stakeHeight, chain.Params().GetConsensus());
 
     const CKeyStore& keystore = *pwalletMain;
     txNew.vin.resize(1);
@@ -2873,7 +2873,7 @@ int CWallet::ScanForWalletTransactions(CBlockIndex* pindexStart, bool fUpdate)
 {
     int ret = 0;
     int64_t nNow = GetTime();
-    const CChainParams& chainParams = Params();
+    const CChainParams& chainParams = chain.Params();
 
     CBlockIndex* pindex = pindexStart;
 
@@ -2911,7 +2911,7 @@ int CWallet::ScanForWalletTransactions(CBlockIndex* pindexStart, bool fUpdate)
             // state on the path to the tip of our chain
             assert(pcoinsTip->GetSproutAnchorAt(pindex->hashSproutAnchor, sproutTree));
             if (pindex->pprev) {
-                if (NetworkUpgradeActive(pindex->pprev->GetHeight(), Params().GetConsensus(), Consensus::UPGRADE_SAPLING)) {
+                if (NetworkUpgradeActive(pindex->pprev->GetHeight(), chain.Params().GetConsensus(), Consensus::UPGRADE_SAPLING)) {
                     assert(pcoinsTip->GetSaplingAnchorAt(pindex->pprev->hashFinalSaplingRoot, saplingTree));
                 }
             }
@@ -3621,7 +3621,7 @@ bool CWallet::SelectCoins(const CAmount& nTargetValue, set<pair<const CWalletTx*
     fOnlyCoinbaseCoinsRet = vCoinsNoCoinbase.size() == 0 && vCoinsWithCoinbase.size() > 0;
 
     // If coinbase utxos can only be sent to zaddrs, exclude any coinbase utxos from coin selection.
-    bool fProtectCoinbase = Params().GetConsensus().fCoinbaseMustBeProtected;
+    bool fProtectCoinbase = chain.Params().GetConsensus().fCoinbaseMustBeProtected;
     vector<COutput> vCoins = (fProtectCoinbase) ? vCoinsNoCoinbase : vCoinsWithCoinbase;
 
     // Output parameter fNeedCoinbaseCoinsRet is set to true if coinbase utxos need to be spent to meet target amount
@@ -3777,7 +3777,7 @@ bool CWallet::CreateTransaction(const vector<CRecipient>& vecSend, CWalletTx& wt
     wtxNew.fTimeReceivedIsTxTime = true;
     wtxNew.BindWallet(this);
     int nextBlockHeight = chainActive.Height() + 1;
-    CMutableTransaction txNew = CreateNewContextualCMutableTransaction(Params().GetConsensus(), nextBlockHeight);
+    CMutableTransaction txNew = CreateNewContextualCMutableTransaction(chain.Params().GetConsensus(), nextBlockHeight);
     
     //if ((uint32_t)chainActive.LastTip()->nTime < ASSETCHAINS_STAKED_HF_TIMESTAMP)
     if ( !komodo_hardfork_active((uint32_t)chainActive.LastTip()->nTime) )
@@ -3786,7 +3786,7 @@ bool CWallet::CreateTransaction(const vector<CRecipient>& vecSend, CWalletTx& wt
         txNew.nLockTime = (uint32_t)chainActive.Tip()->GetMedianTimePast();
 
     // Activates after Overwinter network upgrade
-    if (NetworkUpgradeActive(nextBlockHeight, Params().GetConsensus(), Consensus::UPGRADE_OVERWINTER)) {
+    if (NetworkUpgradeActive(nextBlockHeight, chain.Params().GetConsensus(), Consensus::UPGRADE_OVERWINTER)) {
         if (txNew.nExpiryHeight >= TX_EXPIRY_HEIGHT_THRESHOLD){
             strFailReason = _("nExpiryHeight must be less than TX_EXPIRY_HEIGHT_THRESHOLD.");
             return false;
@@ -3794,7 +3794,7 @@ bool CWallet::CreateTransaction(const vector<CRecipient>& vecSend, CWalletTx& wt
     }
 
     unsigned int max_tx_size = MAX_TX_SIZE_AFTER_SAPLING;
-    if (!NetworkUpgradeActive(nextBlockHeight, Params().GetConsensus(), Consensus::UPGRADE_SAPLING)) {
+    if (!NetworkUpgradeActive(nextBlockHeight, chain.Params().GetConsensus(), Consensus::UPGRADE_SAPLING)) {
         max_tx_size = MAX_TX_SIZE_BEFORE_SAPLING;
     }
 /*
@@ -3877,7 +3877,7 @@ bool CWallet::CreateTransaction(const vector<CRecipient>& vecSend, CWalletTx& wt
                 interest2 = 0;
                 if (!SelectCoins(nTotalValue, setCoins, nValueIn, fOnlyCoinbaseCoins, fNeedCoinbaseCoins, coinControl))
                 {
-                    if (fOnlyCoinbaseCoins && Params().GetConsensus().fCoinbaseMustBeProtected) {
+                    if (fOnlyCoinbaseCoins && chain.Params().GetConsensus().fCoinbaseMustBeProtected) {
                         strFailReason = _("Coinbase funds can only be sent to a zaddr");
                     } else if (fNeedCoinbaseCoins) {
                         strFailReason = _("Insufficient funds, coinbase funds can only be spent after they have been sent to a zaddr");
@@ -4006,7 +4006,7 @@ bool CWallet::CreateTransaction(const vector<CRecipient>& vecSend, CWalletTx& wt
                 size_t limit = (size_t)GetArg("-mempooltxinputlimit", 0);
                 {
                     LOCK(cs_main);
-                    if (NetworkUpgradeActive(chainActive.Height() + 1, Params().GetConsensus(), Consensus::UPGRADE_OVERWINTER)) {
+                    if (NetworkUpgradeActive(chainActive.Height() + 1, chain.Params().GetConsensus(), Consensus::UPGRADE_OVERWINTER)) {
                         limit = 0;
                     }
                 }
@@ -4019,7 +4019,7 @@ bool CWallet::CreateTransaction(const vector<CRecipient>& vecSend, CWalletTx& wt
                 }
 
                 // Grab the current consensus branch ID
-                auto consensusBranchId = CurrentEpochBranchId(chainActive.Height() + 1, Params().GetConsensus());
+                auto consensusBranchId = CurrentEpochBranchId(chainActive.Height() + 1, chain.Params().GetConsensus());
 
                 // Sign
                 int nIn = 0;

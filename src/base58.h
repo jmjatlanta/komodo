@@ -36,6 +36,7 @@
 #include "script/standard.h"
 #include "support/allocators/zeroafterfree.h"
 #include "zcash/Address.hpp"
+#include "komodo_globals.h"
 
 #include <string>
 #include <vector>
@@ -198,7 +199,7 @@ public:
     void SetKey(const K &key) {
         unsigned char vch[Size];
         key.Encode(vch);
-        SetData(Params().Base58Prefix(Type), vch, vch+Size);
+        SetData(chain.Params().Base58Prefix(Type), vch, vch+Size);
     }
 
     K GetKey() {
@@ -215,7 +216,7 @@ public:
     }
 
     CBitcoinExtKeyBase(const std::string& strBase58c) {
-        SetString(strBase58c.c_str(), Params().Base58Prefix(Type).size());
+        SetString(strBase58c.c_str(), chain.Params().Base58Prefix(Type).size());
     }
 
     CBitcoinExtKeyBase() {}

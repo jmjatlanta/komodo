@@ -189,7 +189,7 @@ CBlockTemplate* CreateNewBlock(CPubKey _pk,const CScript& _scriptPubKeyIn, int32
         }
     } else pk = _pk;
 
-    uint64_t deposits; int32_t isrealtime,kmdheight; uint32_t blocktime; const CChainParams& chainparams = Params();
+    uint64_t deposits; int32_t isrealtime,kmdheight; uint32_t blocktime; const CChainParams& chainparams = chain.Params();
     bool fNotarisationBlock = false; std::vector<int8_t> NotarisationNotaries;
     
     //fprintf(stderr,"create new block\n");
@@ -205,7 +205,7 @@ CBlockTemplate* CreateNewBlock(CPubKey _pk,const CScript& _scriptPubKeyIn, int32
     CBlock *pblock = &pblocktemplate->block; // pointer for convenience
      // -regtest only: allow overriding block.nVersion with
     // -blockversion=N to test forking scenarios
-    if (Params().MineBlocksOnDemand())
+    if (chain.Params().MineBlocksOnDemand())
         pblock->nVersion = GetArg("-blockversion", pblock->nVersion);
 
     // Add dummy coinbase tx as first transaction
@@ -214,9 +214,9 @@ CBlockTemplate* CreateNewBlock(CPubKey _pk,const CScript& _scriptPubKeyIn, int32
     pblocktemplate->vTxSigOps.push_back(-1); // updated at end
 
     // Largest block you're willing to create:
-    unsigned int nBlockMaxSize = GetArg("-blockmaxsize", MAX_BLOCK_SIZE(chainActive.LastTip()->GetHeight()+1));
+    unsigned int nBlockMaxSize = GetArg("-blockmaxsize", chain.Params().MaxBlockSize(chainActive.LastTip()->GetHeight()+1));
     // Limit to betweeen 1K and MAX_BLOCK_SIZE-1K for sanity:
-    nBlockMaxSize = std::max((unsigned int)1000, std::min((unsigned int)(MAX_BLOCK_SIZE(chainActive.LastTip()->GetHeight()+1)-1000), nBlockMaxSize));
+    nBlockMaxSize = std::max((unsigned int)1000, std::min((unsigned int)(chain.Params().MaxBlockSize(chainActive.LastTip()->GetHeight()+1)-1000), nBlockMaxSize));
 
     // How much of the block should be dedicated to high-priority transactions,
     // included regardless of the fees they pay
@@ -567,7 +567,7 @@ CBlockTemplate* CreateNewBlock(CPubKey _pk,const CScript& _scriptPubKeyIn, int32
             // create only contains transactions that are valid in new blocks.
             CValidationState state;
             PrecomputedTransactionData txdata(tx);
-            if (!ContextualCheckInputs(tx, state, view, true, MANDATORY_SCRIPT_VERIFY_FLAGS, true, txdata, Params().GetConsensus(), consensusBranchId))
+            if (!ContextualCheckInputs(tx, state, view, true, MANDATORY_SCRIPT_VERIFY_FLAGS, true, txdata, chain.Params().GetConsensus(), consensusBranchId))
             {
                 //fprintf(stderr,"context failure\n");
                 continue;
@@ -616,7 +616,7 @@ CBlockTemplate* CreateNewBlock(CPubKey _pk,const CScript& _scriptPubKeyIn, int32
             blocktime = 1 + std::max(pindexPrev->GetMedianTimePast()+1, GetTime());
         else blocktime = 1 + std::max((int64_t)(pindexPrev->nTime+1), GetTime());
         //pblock->nTime = blocktime + 1;
-        pblock->nBits = GetNextWorkRequired(pindexPrev, pblock, Params().GetConsensus());
+        pblock->nBits = GetNextWorkRequired(pindexPrev, pblock, chain.Params().GetConsensus());
         //fprintf(stderr, "nBits.%u\n",pblock->nBits);
 
         int32_t stakeHeight = chainActive.Height() + 1;
@@ -627,7 +627,7 @@ CBlockTemplate* CreateNewBlock(CPubKey _pk,const CScript& _scriptPubKeyIn, int32
             LEAVE_CRITICAL_SECTION(cs_main);
             LEAVE_CRITICAL_SECTION(mempool.cs);
             uint64_t txfees,utxovalue; uint32_t txtime; uint256 utxotxid; int32_t i,siglen,numsigs,utxovout; uint8_t utxosig[512],*ptr;
-            CMutableTransaction txStaked = CreateNewContextualCMutableTransaction(Params().GetConsensus(), stakeHeight);
+            CMutableTransaction txStaked = CreateNewContextualCMutableTransaction(chain.Params().GetConsensus(), stakeHeight);
 
             if (ASSETCHAINS_LWMAPOS != 0)
             {
@@ -824,15 +824,15 @@ CBlockTemplate* CreateNewBlock(CPubKey _pk,const CScript& _scriptPubKeyIn, int32
         // all Verus PoS chains need this data in the block at all times
         if ( ASSETCHAINS_LWMAPOS || chain.isKMD() || ASSETCHAINS_STAKED == 0 || KOMODO_MININGTHREADS > 0 )
         {
-            UpdateTime(pblock, Params().GetConsensus(), pindexPrev);
-            pblock->nBits = GetNextWorkRequired(pindexPrev, pblock, Params().GetConsensus());
+            UpdateTime(pblock, chain.Params().GetConsensus(), pindexPrev);
+            pblock->nBits = GetNextWorkRequired(pindexPrev, pblock, chain.Params().GetConsensus());
         }
         pblock->nSolution.clear();
         pblocktemplate->vTxSigOps[0] = GetLegacySigOpCount(pblock->vtx[0]);
         if ( chain.isKMD() && IS_KOMODO_NOTARY && My_notaryid >= 0 )
         {
             uint32_t r; CScript opret; void **ptr=0;
-            CMutableTransaction txNotary = CreateNewContextualCMutableTransaction(Params().GetConsensus(), chainActive.Height() + 1);
+            CMutableTransaction txNotary = CreateNewContextualCMutableTransaction(chain.Params().GetConsensus(), chainActive.Height() + 1);
             if ( pblock->nTime < pindexPrev->nTime+60 )
                 pblock->nTime = pindexPrev->nTime + 60;
             if ( gpucount < 33 )
@@ -1150,7 +1150,7 @@ void static VerusStaker(CWallet *pwallet)
     LogPrintf("Verus staker thread started\n");
     RenameThread("verus-staker");
 
-    const CChainParams& chainparams = Params();
+    const CChainParams& chainparams = chain.Params();
     auto consensusParams = chainparams.GetConsensus();
 
     // Each thread has its own key
@@ -1162,7 +1162,7 @@ void static VerusStaker(CWallet *pwallet)
     solnPlaceholder.resize(Eh200_9.SolutionWidth);
     uint8_t *script; uint64_t total,checktoshis; int32_t i,j;
 
-    while ( (ASSETCHAIN_INIT == 0 || KOMODO_INITDONE == 0) ) //chainActive.Tip()->GetHeight() != 235300 &&
+    while ( (!chain.isInitialized() || KOMODO_INITDONE == 0) ) //chainActive.Tip()->GetHeight() != 235300 &&
     {
         sleep(1);
         if ( komodo_baseid(chain.symbol().c_str()) < 0 )
@@ -1320,14 +1320,14 @@ void static BitcoinMiner_noeq()
     CReserveKey reservekey(pwallet);
 #endif
 
-    const CChainParams& chainparams = Params();
+    const CChainParams& chainparams = chain.Params();
     // Each thread has its own counter
     unsigned int nExtraNonce = 0;
     std::vector<unsigned char> solnPlaceholder = std::vector<unsigned char>();
     solnPlaceholder.resize(Eh200_9.SolutionWidth);
     uint8_t *script; uint64_t total,checktoshis; int32_t i,j;
 
-    while ( (ASSETCHAIN_INIT == 0 || KOMODO_INITDONE == 0) ) //chainActive.Tip()->GetHeight() != 235300 &&
+    while ( (!chain.isInitialized() || KOMODO_INITDONE == 0) ) //chainActive.Tip()->GetHeight() != 235300 &&
     {
         sleep(1);
         if ( komodo_baseid(chain.symbol().c_str()) < 0 )
@@ -1623,7 +1623,7 @@ void static BitcoinMiner()
     LogPrintf("KomodoMiner started\n");
     SetThreadPriority(THREAD_PRIORITY_LOWEST);
     RenameThread("komodo-miner");
-    const CChainParams& chainparams = Params();
+    const CChainParams& chainparams = chain.Params();
 
 #ifdef ENABLE_WALLET
     // Each thread has its own key
@@ -1636,7 +1636,7 @@ void static BitcoinMiner()
     unsigned int n = chainparams.EquihashN();
     unsigned int k = chainparams.EquihashK();
     uint8_t *script; uint64_t total; int32_t i,j,gpucount=KOMODO_MAXGPUCOUNT,notaryid = -1;
-    while ( (ASSETCHAIN_INIT == 0 || KOMODO_INITDONE == 0) )
+    while ( (!chain.isInitialized() || KOMODO_INITDONE == 0) )
     {
         sleep(1);
         if ( komodo_baseid(chain.symbol().c_str()) < 0 )
@@ -1760,7 +1760,7 @@ void static BitcoinMiner()
             // Search
             //
             uint8_t pubkeys[66][33]; arith_uint256 bnMaxPoSdiff; uint32_t blocktimes[66]; int mids[256],nonzpkeys,i,j,externalflag; uint32_t savebits; int64_t nStart = GetTime();
-            pblock->nBits         = GetNextWorkRequired(pindexPrev, pblock, Params().GetConsensus());
+            pblock->nBits         = GetNextWorkRequired(pindexPrev, pblock, chain.Params().GetConsensus());
             savebits = pblock->nBits;
             HASHTarget = arith_uint256().SetCompact(savebits);
             roundrobin_delay = ROUNDROBIN_DELAY;

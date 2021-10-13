@@ -528,7 +528,7 @@ void PrintExceptionContinue(const std::exception* pex, const char* pszThread)
     strMiscWarning = message;
 }
 
-boost::filesystem::path GetDefaultDataDir()
+boost::filesystem::path GetDefaultDataDir(const std::string& symbol)
 {
     namespace fs = boost::filesystem;
     // Windows < Vista: C:\Documents and Settings\Username\Application Data\Zcash
@@ -537,9 +537,9 @@ boost::filesystem::path GetDefaultDataDir()
     // Unix: ~/.zcash
 #ifdef _WIN32
     // Windows
-    if ( chain.isKMD() )
+    if ( symbol.empty() )
         return GetSpecialFolderPath(CSIDL_APPDATA) / "Komodo";
-    else return GetSpecialFolderPath(CSIDL_APPDATA) / "Komodo" / chain.symbol().c_str();
+    else return GetSpecialFolderPath(CSIDL_APPDATA) / "Komodo" / symbol.c_str();
 #else
     fs::path pathRet;
     char* pszHome = getenv("HOME");
@@ -551,19 +551,19 @@ boost::filesystem::path GetDefaultDataDir()
     // Mac
     pathRet /= "Library/Application Support";
     TryCreateDirectory(pathRet);
-    if ( chain.isKMD() )
+    if ( symbol.empty() )
         return pathRet / "Komodo";
     else
     {
         pathRet /= "Komodo";
         TryCreateDirectory(pathRet);
-        return pathRet / chain.symbol().c_str();
+        return pathRet / symbol.c_str();
     }
 #else
     // Unix
-    if ( chain.isKMD() )
+    if ( symbol.empty() )
         return pathRet / ".komodo";
-    return pathRet / ".komodo" / chain.symbol().c_str();
+    return pathRet / ".komodo" / symbol.c_str();
 #endif
 #endif
 }
@@ -662,7 +662,7 @@ const boost::filesystem::path &GetDataDir(bool fNetSpecific)
             return path;
         }
     } else {
-        path = GetDefaultDataDir();
+        path = GetDefaultDataDir( GetArg("-ac_name", "") );
     }
     if (fNetSpecific)
         path /= BaseParams().DataDir();
@@ -679,11 +679,11 @@ void ClearDatadirCache()
     pathCachedNetSpecific = boost::filesystem::path();
 }
 
-boost::filesystem::path GetConfigFile()
+boost::filesystem::path GetConfigFile(const std::string& symbol)
 {
     char confname[512];
-    if ( !mapArgs.count("-conf") && !chain.isKMD() ){
-        sprintf(confname,"%s.conf",chain.symbol().c_str());
+    if ( !mapArgs.count("-conf") && !symbol.empty() ){
+        sprintf(confname,"%s.conf", symbol.c_str());
     }
     else
     {
@@ -703,10 +703,10 @@ boost::filesystem::path GetConfigFile()
 }
 
 void ReadConfigFile(map<string, string>& mapSettingsRet,
-                    map<string, vector<string> >& mapMultiSettingsRet)
+                    map<string, vector<string> >& mapMultiSettingsRet, const std::string& symbol)
 {
 
-    boost::filesystem::ifstream streamConfig(GetConfigFile());
+    boost::filesystem::ifstream streamConfig(GetConfigFile(symbol));
     if (!streamConfig.good())
         throw missing_zcash_conf();
     set<string> setOptions;

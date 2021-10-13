@@ -233,7 +233,7 @@ BOOST_AUTO_TEST_CASE(zs_address_test)
         auto sk = m.Derive(i);
         {
             std::string sk_string = EncodeSpendingKey(sk);
-            BOOST_CHECK(sk_string.compare(0, 27, Params().Bech32HRP(CChainParams::SAPLING_EXTENDED_SPEND_KEY)) == 0);
+            BOOST_CHECK(sk_string.compare(0, 27, chain.Params().Bech32HRP(CChainParams::SAPLING_EXTENDED_SPEND_KEY)) == 0);
 
             auto spendingkey2 = DecodeSpendingKey(sk_string);
             BOOST_CHECK(IsValidSpendingKey(spendingkey2));
@@ -246,7 +246,7 @@ BOOST_AUTO_TEST_CASE(zs_address_test)
             auto addr = sk.DefaultAddress();
 
             std::string addr_string = EncodePaymentAddress(addr);
-            BOOST_CHECK(addr_string.compare(0, 15, Params().Bech32HRP(CChainParams::SAPLING_PAYMENT_ADDRESS)) == 0);
+            BOOST_CHECK(addr_string.compare(0, 15, chain.Params().Bech32HRP(CChainParams::SAPLING_PAYMENT_ADDRESS)) == 0);
 
             auto paymentaddr2 = DecodePaymentAddress(addr_string);
             BOOST_CHECK(IsValidPaymentAddress(paymentaddr2));

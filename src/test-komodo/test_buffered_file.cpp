@@ -414,7 +414,7 @@ namespace TestBufferedFile {
             }
         rewind(fileIn);
 
-        CBufferedFile blkdat(fileIn, 2*MAX_BLOCK_SIZE(10000000), MAX_BLOCK_SIZE(10000000)+8, SER_DISK, CLIENT_VERSION);
+        CBufferedFile blkdat(fileIn, 2*chain.Params().MaxBlockSize(10000000), chain.Params().MaxBlockSize(10000000)+8, SER_DISK, CLIENT_VERSION);
         blkdat.SetLimit(); // remove former limit
 
         blkdat.SetPos(0);
@@ -427,7 +427,7 @@ namespace TestBufferedFile {
                 ASSERT_TRUE(*(uint32_t *)buf == 0x8DE4EEF9);
                 // read size
                 blkdat >> nSize;
-                ASSERT_FALSE(nSize < 80 || nSize > MAX_BLOCK_SIZE(10000000));
+                ASSERT_FALSE(nSize < 80 || nSize > chain.Params().MaxBlockSize(10000000));
             } catch (const std::exception&) {
                 ASSERT_TRUE(false);
             }

@@ -669,7 +669,7 @@ void CTxMemPool::check(const CCoinsViewCache *pcoins) const
         else {
             CValidationState state;
             bool fCheckResult = tx.IsCoinBase() ||
-                Consensus::CheckTxInputs(tx, state, mempoolDuplicate, nSpendHeight, Params().GetConsensus());
+                Consensus::CheckTxInputs(tx, state, mempoolDuplicate, nSpendHeight, chain.Params().GetConsensus());
             assert(fCheckResult);
             UpdateCoins(tx, mempoolDuplicate, 1000000);
         }
@@ -685,7 +685,7 @@ void CTxMemPool::check(const CCoinsViewCache *pcoins) const
             assert(stepsSinceLastRemove < waitingOnDependants.size());
         } else {
             bool fCheckResult = entry->GetTx().IsCoinBase() ||
-                Consensus::CheckTxInputs(entry->GetTx(), state, mempoolDuplicate, nSpendHeight, Params().GetConsensus());
+                Consensus::CheckTxInputs(entry->GetTx(), state, mempoolDuplicate, nSpendHeight, chain.Params().GetConsensus());
             assert(fCheckResult);
             UpdateCoins(entry->GetTx(), mempoolDuplicate, 1000000);
             stepsSinceLastRemove = 0;
@@ -874,14 +874,14 @@ void CTxMemPool::NotifyRecentlyAdded()
 
     // Update the notified sequence number. We only need this in regtest mode,
     // and should not lock on cs after calling SyncWithWallets otherwise.
-    if (Params().NetworkIDString() == "regtest") {
+    if (chain.Params().NetworkIDString() == "regtest") {
         LOCK(cs);
         nNotifiedSequence = recentlyAddedSequence;
     }
 }
 
 bool CTxMemPool::IsFullyNotified() {
-    assert(Params().NetworkIDString() == "regtest");
+    assert(chain.Params().NetworkIDString() == "regtest");
     LOCK(cs);
     return nRecentlyAddedSequence == nNotifiedSequence;
 }

@@ -1011,7 +1011,7 @@ void komodo_configfile(const char *symbol,uint16_t rpcport)
 #else
         sprintf(fname,"%s/%s",GetDataDir(false).string().c_str(),buf);
 #endif
-        if(mapArgs.count("-conf")) sprintf(fname, "%s", GetConfigFile().string().c_str());
+        if(mapArgs.count("-conf")) sprintf(fname, "%s", GetConfigFile(symbol).string().c_str());
         if ( (fp= fopen(fname,"rb")) == 0 )
         {
 #ifndef FROM_CLI
@@ -1743,15 +1743,9 @@ void komodo_args(char *argv0)
         {
             ASSETCHAINS_LWMAPOS = 50;
         }
-        ASSETCHAINS_SAPLING = GetArg("-ac_sapling", -1);
-        if (ASSETCHAINS_SAPLING == -1)
-        {
-            ASSETCHAINS_OVERWINTER = GetArg("-ac_overwinter", -1);
-        }
-        else
-        {
-            ASSETCHAINS_OVERWINTER = GetArg("-ac_overwinter", ASSETCHAINS_SAPLING);
-        }
+        int64_t sapling = GetArg("-ac_sapling", -1);
+        int64_t overwinter = GetArg("-ac_overwinter", sapling);
+        chain.InitChainParams( sapling, overwinter );
         if ( strlen(ASSETCHAINS_OVERRIDE_PUBKEY.c_str()) == 66 || ASSETCHAINS_SCRIPTPUB.size() > 1 )
         {
             if ( ASSETCHAINS_SUPPLY > 10000000000 )

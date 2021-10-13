@@ -32,6 +32,7 @@
 #include "komodo_gateway.h"
 #include "komodo_bitcoind.h"
 #include "komodo_gateway.h"
+#include "komodo_utils.h"
 
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/filesystem.hpp>
@@ -140,14 +141,11 @@ bool AppInit(int argc, char* argv[])
     try
     {
         // Check for -testnet or -regtest parameter (Params() calls are only valid after this clause)
-        if (!SelectParamsFromCommandLine()) {
+        if (!chain.SelectParamsFromCommandLine()) {
             fprintf(stderr, "Error: Invalid combination of -regtest and -testnet.\n");
             return false;
         }
-        void komodo_args(char *argv0);
         komodo_args(argv[0]);
-        void chainparams_commandline();
-        chainparams_commandline();
 
         fprintf(stderr,"call komodo_args.(%s) NOTARY_PUBKEY.(%s)\n",argv[0],NOTARY_PUBKEY.c_str());
         printf("initialized %s at %u\n",chain.symbol().c_str(),(uint32_t)time(NULL));
@@ -158,7 +156,7 @@ bool AppInit(int argc, char* argv[])
         }
         try
         {
-            ReadConfigFile(mapArgs, mapMultiArgs);
+            ReadConfigFile(mapArgs, mapMultiArgs, chain.symbol());
         } catch (const missing_zcash_conf& e) {
             fprintf(stderr,
                 (_("Before starting komodod, you need to create a configuration file:\n"
@@ -173,7 +171,7 @@ bool AppInit(int argc, char* argv[])
                    "depending on how you installed Komodo:\n") +
                  _("- Source code:  %s\n"
                    "- .deb package: %s\n")).c_str(),
-                GetConfigFile().string().c_str(),
+                GetConfigFile(chain.symbol()).string().c_str(),
                 "contrib/debian/examples/komodo.conf",
                 "/usr/share/doc/komodo/examples/komodo.conf");
             return false;

@@ -237,20 +237,20 @@ public:
 
 bool CBitcoinAddress::Set(const CKeyID& id)
 {
-    SetData(Params().Base58Prefix(CChainParams::PUBKEY_ADDRESS), &id, 20);
+    SetData(chain.Params().Base58Prefix(CChainParams::PUBKEY_ADDRESS), &id, 20);
     return true;
 }
 
 bool CBitcoinAddress::Set(const CPubKey& key)
 {
     CKeyID id = key.GetID();
-    SetData(Params().Base58Prefix(CChainParams::PUBKEY_ADDRESS), &id, 20);
+    SetData(chain.Params().Base58Prefix(CChainParams::PUBKEY_ADDRESS), &id, 20);
     return true;
 }
 
 bool CBitcoinAddress::Set(const CScriptID& id)
 {
-    SetData(Params().Base58Prefix(CChainParams::SCRIPT_ADDRESS), &id, 20);
+    SetData(chain.Params().Base58Prefix(CChainParams::SCRIPT_ADDRESS), &id, 20);
     return true;
 }
 
@@ -261,7 +261,7 @@ bool CBitcoinAddress::Set(const CTxDestination& dest)
 
 bool CBitcoinAddress::IsValid() const
 {
-    return IsValid(Params());
+    return IsValid(chain.Params());
 }
 
 bool CBitcoinAddress::IsValid(const CChainParams& params) const
@@ -288,9 +288,9 @@ CTxDestination CBitcoinAddress::Get() const
         return CNoDestination();
     uint160 id;
     memcpy(&id, &vchData[0], 20);
-    if (vchVersion == Params().Base58Prefix(CChainParams::PUBKEY_ADDRESS))
+    if (vchVersion == chain.Params().Base58Prefix(CChainParams::PUBKEY_ADDRESS))
         return CKeyID(id);
-    else if (vchVersion == Params().Base58Prefix(CChainParams::SCRIPT_ADDRESS))
+    else if (vchVersion == chain.Params().Base58Prefix(CChainParams::SCRIPT_ADDRESS))
         return CScriptID(id);
     else
         return CNoDestination();
@@ -300,11 +300,11 @@ bool CBitcoinAddress::GetIndexKey(uint160& hashBytes, int& type, bool ccflag) co
 {
     if (!IsValid()) {
         return false;
-    } else if (vchVersion == Params().Base58Prefix(CChainParams::PUBKEY_ADDRESS)) {
+    } else if (vchVersion == chain.Params().Base58Prefix(CChainParams::PUBKEY_ADDRESS)) {
         memcpy(&hashBytes, &vchData[0], 20);
         ccflag ? type = 3 : type = 1;
         return true;
-    } else if (vchVersion == Params().Base58Prefix(CChainParams::SCRIPT_ADDRESS)) {
+    } else if (vchVersion == chain.Params().Base58Prefix(CChainParams::SCRIPT_ADDRESS)) {
         memcpy(&hashBytes, &vchData[0], 20);
         type = 2;
         return true;
@@ -315,7 +315,7 @@ bool CBitcoinAddress::GetIndexKey(uint160& hashBytes, int& type, bool ccflag) co
 
 bool CBitcoinAddress::GetKeyID(CKeyID& keyID) const
 {
-    if (!IsValid() || vchVersion != Params().Base58Prefix(CChainParams::PUBKEY_ADDRESS))
+    if (!IsValid() || vchVersion != chain.Params().Base58Prefix(CChainParams::PUBKEY_ADDRESS))
         return false;
     uint160 id;
     memcpy(&id, &vchData[0], 20);
@@ -333,7 +333,7 @@ bool CBitcoinAddress::GetKeyID_NoCheck(CKeyID& keyID) const
 
 bool CBitcoinAddress::IsScript() const
 {
-    return IsValid() && vchVersion == Params().Base58Prefix(CChainParams::SCRIPT_ADDRESS);
+    return IsValid() && vchVersion == chain.Params().Base58Prefix(CChainParams::SCRIPT_ADDRESS);
 }
 
 bool CCustomBitcoinAddress::Set(const CKeyID& id)
@@ -417,7 +417,7 @@ bool CCustomBitcoinAddress::IsScript() const
 void CBitcoinSecret::SetKey(const CKey& vchSecret)
 {
     assert(vchSecret.IsValid());
-    SetData(Params().Base58Prefix(CChainParams::SECRET_KEY), vchSecret.begin(), vchSecret.size());
+    SetData(chain.Params().Base58Prefix(CChainParams::SECRET_KEY), vchSecret.begin(), vchSecret.size());
     if (vchSecret.IsCompressed())
         vchData.push_back(1);
 }
@@ -433,7 +433,7 @@ CKey CBitcoinSecret::GetKey()
 bool CBitcoinSecret::IsValid() const
 {
     bool fExpectedFormat = vchData.size() == 32 || (vchData.size() == 33 && vchData[32] == 1);
-    bool fCorrectVersion = vchVersion == Params().Base58Prefix(CChainParams::SECRET_KEY);
+    bool fCorrectVersion = vchVersion == chain.Params().Base58Prefix(CChainParams::SECRET_KEY);
     return fExpectedFormat && fCorrectVersion;
 }
 
@@ -454,7 +454,7 @@ bool CZCEncoding<DATA_TYPE, PREFIX, SER_SIZE>::Set(const DATA_TYPE& addr)
     ss << addr;
     std::vector<unsigned char> addrSerialized(ss.begin(), ss.end());
     assert(addrSerialized.size() == SER_SIZE);
-    SetData(Params().Base58Prefix(PREFIX), &addrSerialized[0], SER_SIZE);
+    SetData(chain.Params().Base58Prefix(PREFIX), &addrSerialized[0], SER_SIZE);
     return true;
 }
 
@@ -467,7 +467,7 @@ DATA_TYPE CZCEncoding<DATA_TYPE, PREFIX, SER_SIZE>::Get() const
         );
     }
 
-    if (vchVersion != Params().Base58Prefix(PREFIX)) {
+    if (vchVersion != chain.Params().Base58Prefix(PREFIX)) {
         throw std::runtime_error(
             PrependName(" is for wrong network type")
         );

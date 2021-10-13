@@ -20,7 +20,7 @@ TEST(Keys, EncodeAndDecodeSapling)
             std::string sk_string = EncodeSpendingKey(sk);
             EXPECT_EQ(
                 sk_string.substr(0, 24),
-                Params().Bech32HRP(CChainParams::SAPLING_EXTENDED_SPEND_KEY));
+                chain.Params().Bech32HRP(CChainParams::SAPLING_EXTENDED_SPEND_KEY));
 
             auto spendingkey2 = DecodeSpendingKey(sk_string);
             EXPECT_TRUE(IsValidSpendingKey(spendingkey2));
@@ -35,7 +35,7 @@ TEST(Keys, EncodeAndDecodeSapling)
             std::string addr_string = EncodePaymentAddress(addr);
             EXPECT_EQ(
                 addr_string.substr(0, 2),
-                Params().Bech32HRP(CChainParams::SAPLING_PAYMENT_ADDRESS));
+                chain.Params().Bech32HRP(CChainParams::SAPLING_PAYMENT_ADDRESS));
 
             auto paymentaddr2 = DecodePaymentAddress(addr_string);
             EXPECT_TRUE(IsValidPaymentAddress(paymentaddr2, SAPLING_BRANCH_ID));
@@ -49,7 +49,7 @@ TEST(Keys, EncodeAndDecodeSapling)
             std::string ivk_string = EncodeViewingKey(ivk);
             EXPECT_EQ(
                 ivk_string.substr(0, 5),
-                Params().Bech32HRP(CChainParams::SAPLING_INCOMING_VIEWING_KEY));
+                chain.Params().Bech32HRP(CChainParams::SAPLING_INCOMING_VIEWING_KEY));
 
             auto viewing_key = DecodeViewingKey(ivk_string);
             EXPECT_TRUE(IsValidViewingKey(viewing_key));

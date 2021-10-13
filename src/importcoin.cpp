@@ -33,7 +33,7 @@ CTransaction MakeImportCoinTransaction(const ImportProof proof, const CTransacti
     //std::vector<uint8_t> payload = E_MARSHAL(ss << EVAL_IMPORTCOIN);
     CScript scriptSig;
 
-    CMutableTransaction mtx = CreateNewContextualCMutableTransaction(Params().GetConsensus(), komodo_nextheight());
+    CMutableTransaction mtx = CreateNewContextualCMutableTransaction(chain.Params().GetConsensus(), komodo_nextheight());
     if (mtx.fOverwintered) 
         mtx.nExpiryHeight = 0;
     mtx.vout = payouts;

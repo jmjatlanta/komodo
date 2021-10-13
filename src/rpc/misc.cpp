@@ -265,12 +265,12 @@ UniValue getinfo(const UniValue& params, bool fHelp, const CPubKey& mypk)
             obj.push_back(Pair("unlocked_until", nWalletUnlockTime));
         obj.push_back(Pair("paytxfee",      ValueFromAmount(payTxFee.GetFeePerK())));
 #endif
-        obj.push_back(Pair("sapling", ASSETCHAINS_SAPLING));
+        obj.push_back(Pair("sapling", chain.Params().consensus.GetSaplingHeight()));
     }
     obj.push_back(Pair("timeoffset",    0));
     obj.push_back(Pair("connections",   (int)vNodes.size()));
     obj.push_back(Pair("proxy",         (proxy.IsValid() ? proxy.proxy.ToStringIPPort() : string())));
-    obj.push_back(Pair("testnet",       Params().TestnetToBeDeprecatedFieldRPC()));
+    obj.push_back(Pair("testnet",       chain.Params().TestnetToBeDeprecatedFieldRPC()));
     obj.push_back(Pair("relayfee",      ValueFromAmount(::minRelayTxFee.GetFeePerK())));
     obj.push_back(Pair("errors",        GetWarnings("statusbar")));
      if ( NOTARY_PUBKEY33[0] != 0 ) {
@@ -833,7 +833,7 @@ UniValue setmocktime(const UniValue& params, bool fHelp, const CPubKey& mypk)
             "   Pass 0 to go back to using the system time."
         );
 
-    if (!Params().MineBlocksOnDemand())
+    if (!chain.Params().MineBlocksOnDemand())
         throw runtime_error("setmocktime for regression testing (-regtest mode) only");
 
     // cs_vNodes is locked and node send/receive times are updated

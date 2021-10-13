@@ -64,7 +64,7 @@ the bad alert.
 #include "chainparams.h"
 
 #include "alertkeys.h"
-
+#include "komodo_globals.h"
 
 static const int64_t DAYS = 24 * 60 * 60;
 
@@ -118,7 +118,7 @@ void ThreadSendAlert()
     assert(alert.strRPCError.length() <= 256);
 
     // Sign
-    const CChainParams& chainparams = Params();
+    const CChainParams& chainparams = chain.Params();
     std::string networkID = chainparams.NetworkIDString();
     bool fIsTestNet = networkID.compare("test") == 0;
     std::vector<unsigned char> vchTmp(ParseHex(fIsTestNet ? pszTestNetPrivKey : pszPrivKey));

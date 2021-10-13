@@ -3345,18 +3345,18 @@ UniValue zc_benchmark(const UniValue& params, bool fHelp, const CPubKey& mypk)
             int nTxs = params[2].get_int();
             sample_times.push_back(benchmark_increment_note_witnesses(nTxs));
         } else if (benchmarktype == "connectblockslow") {
-            if (Params().NetworkIDString() != "regtest") {
+            if (chain.Params().NetworkIDString() != "regtest") {
                 throw JSONRPCError(RPC_TYPE_ERROR, "Benchmark must be run in regtest mode");
             }
             sample_times.push_back(benchmark_connectblock_slow());
         } else if (benchmarktype == "sendtoaddress") {
-            if (Params().NetworkIDString() != "regtest") {
+            if (chain.Params().NetworkIDString() != "regtest") {
                 throw JSONRPCError(RPC_TYPE_ERROR, "Benchmark must be run in regtest mode");
             }
             auto amount = AmountFromValue(params[2]);
             sample_times.push_back(benchmark_sendtoaddress(amount));
         } else if (benchmarktype == "loadwallet") {
-            if (Params().NetworkIDString() != "regtest") {
+            if (chain.Params().NetworkIDString() != "regtest") {
                 throw JSONRPCError(RPC_TYPE_ERROR, "Benchmark must be run in regtest mode");
             }
             sample_times.push_back(benchmark_loadwallet());
@@ -3623,7 +3623,7 @@ UniValue zc_raw_joinsplit(const UniValue& params, bool fHelp, const CPubKey& myp
     // Empty output script.
     CScript scriptCode;
     CTransaction signTx(mtx);
-    auto consensusBranchId = CurrentEpochBranchId(chainActive.Height() + 1, Params().GetConsensus());
+    auto consensusBranchId = CurrentEpochBranchId(chainActive.Height() + 1, chain.Params().GetConsensus());
     uint256 dataToBeSigned = SignatureHash(scriptCode, signTx, NOT_AN_INPUT, SIGHASH_ALL, 0, consensusBranchId);
 
     // Add the signature
@@ -3708,7 +3708,7 @@ UniValue z_getnewaddress(const UniValue& params, bool fHelp, const CPubKey& mypk
     if (!EnsureWalletIsAvailable(fHelp))
         return NullUniValue;
 
-    bool allowSapling = (Params().GetConsensus().vUpgrades[Consensus::UPGRADE_SAPLING].nActivationHeight <= chainActive.LastTip()->GetHeight());
+    bool allowSapling = (chain.Params().GetConsensus().vUpgrades[Consensus::UPGRADE_SAPLING].nActivationHeight <= chainActive.LastTip()->GetHeight());
 
     std::string defaultType;
     if ( GetTime() < KOMODO_SAPLING_ACTIVATION )
@@ -4476,7 +4476,7 @@ UniValue z_sendmany(const UniValue& params, bool fHelp, const CPubKey& mypk)
     bool fromTaddr = false;
     bool fromSapling = false;
 
-    uint32_t branchId = CurrentEpochBranchId(chainActive.Height(), Params().GetConsensus());
+    uint32_t branchId = CurrentEpochBranchId(chainActive.Height(), chain.Params().GetConsensus());
 
     CTxDestination taddr = DecodeDestination(fromaddress);
     fromTaddr = IsValidDestination(taddr);
@@ -4610,8 +4610,8 @@ UniValue z_sendmany(const UniValue& params, bool fHelp, const CPubKey& mypk)
     mtx.nVersionGroupId = SAPLING_VERSION_GROUP_ID;
     mtx.nVersion = SAPLING_TX_VERSION;
     unsigned int max_tx_size = MAX_TX_SIZE_AFTER_SAPLING;
-    if (!NetworkUpgradeActive(nextBlockHeight, Params().GetConsensus(), Consensus::UPGRADE_SAPLING)) {
-        if (NetworkUpgradeActive(nextBlockHeight, Params().GetConsensus(), Consensus::UPGRADE_OVERWINTER)) {
+    if (!NetworkUpgradeActive(nextBlockHeight, chain.Params().GetConsensus(), Consensus::UPGRADE_SAPLING)) {
+        if (NetworkUpgradeActive(nextBlockHeight, chain.Params().GetConsensus(), Consensus::UPGRADE_OVERWINTER)) {
             mtx.nVersionGroupId = OVERWINTER_VERSION_GROUP_ID;
             mtx.nVersion = OVERWINTER_TX_VERSION;
         } else {
@@ -4628,7 +4628,7 @@ UniValue z_sendmany(const UniValue& params, bool fHelp, const CPubKey& mypk)
     }
 
     // If Sapling is not active, do not allow sending from or sending to Sapling addresses.
-    if (!NetworkUpgradeActive(nextBlockHeight, Params().GetConsensus(), Consensus::UPGRADE_SAPLING)) {
+    if (!NetworkUpgradeActive(nextBlockHeight, chain.Params().GetConsensus(), Consensus::UPGRADE_SAPLING)) {
         if (fromSapling || containsSaplingOutput) {
             throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid parameter, Sapling has not activated");
         }
@@ -4708,12 +4708,12 @@ UniValue z_sendmany(const UniValue& params, bool fHelp, const CPubKey& mypk)
     // Builder (used if Sapling addresses are involved)
     boost::optional<TransactionBuilder> builder;
     if (noSproutAddrs) {
-        builder = TransactionBuilder(Params().GetConsensus(), nextBlockHeight, pwalletMain);
+        builder = TransactionBuilder(chain.Params().GetConsensus(), nextBlockHeight, pwalletMain);
     }
 
     // Contextual transaction we will build on
     // (used if no Sapling addresses are involved)
-    CMutableTransaction contextualTx = CreateNewContextualCMutableTransaction(Params().GetConsensus(), nextBlockHeight);
+    CMutableTransaction contextualTx = CreateNewContextualCMutableTransaction(chain.Params().GetConsensus(), nextBlockHeight);
     bool isShielded = !fromTaddr || zaddrRecipients.size() > 0;
     if (contextualTx.nVersion == 1 && isShielded) {
         contextualTx.nVersion = 2; // Tx format should support vjoinsplits
@@ -4794,7 +4794,7 @@ UniValue z_shieldcoinbase(const UniValue& params, bool fHelp, const CPubKey& myp
 
     // Validate the destination address
     auto destaddress = params[1].get_str();
-    if (!IsValidPaymentAddressString(destaddress, CurrentEpochBranchId(chainActive.Height(), Params().GetConsensus()))) {
+    if (!IsValidPaymentAddressString(destaddress, CurrentEpochBranchId(chainActive.Height(), chain.Params().GetConsensus()))) {
         throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid parameter, unknown address format: ") + destaddress );
     }
 
@@ -4817,14 +4817,14 @@ UniValue z_shieldcoinbase(const UniValue& params, bool fHelp, const CPubKey& myp
     }
 
     int nextBlockHeight = chainActive.Height() + 1;
-    bool overwinterActive = NetworkUpgradeActive(nextBlockHeight, Params().GetConsensus(), Consensus::UPGRADE_OVERWINTER);
+    bool overwinterActive = NetworkUpgradeActive(nextBlockHeight, chain.Params().GetConsensus(), Consensus::UPGRADE_OVERWINTER);
     unsigned int max_tx_size = MAX_TX_SIZE_AFTER_SAPLING;
-    if (!NetworkUpgradeActive(nextBlockHeight, Params().GetConsensus(), Consensus::UPGRADE_SAPLING)) {
+    if (!NetworkUpgradeActive(nextBlockHeight, chain.Params().GetConsensus(), Consensus::UPGRADE_SAPLING)) {
         max_tx_size = MAX_TX_SIZE_BEFORE_SAPLING;
     }
 
     // If Sapling is not active, do not allow sending to a Sapling address.
-    if (!NetworkUpgradeActive(nextBlockHeight, Params().GetConsensus(), Consensus::UPGRADE_SAPLING)) {
+    if (!NetworkUpgradeActive(nextBlockHeight, chain.Params().GetConsensus(), Consensus::UPGRADE_SAPLING)) {
         auto res = DecodePaymentAddress(destaddress);
         if (IsValidPaymentAddress(res)) {
             bool toSapling = boost::get<libzcash::SaplingPaymentAddress>(&res) != nullptr;
@@ -4934,14 +4934,14 @@ UniValue z_shieldcoinbase(const UniValue& params, bool fHelp, const CPubKey& myp
 
     // Builder (used if Sapling addresses are involved)
     TransactionBuilder builder = TransactionBuilder(
-        Params().GetConsensus(), nextBlockHeight, pwalletMain);
+        chain.Params().GetConsensus(), nextBlockHeight, pwalletMain);
 
     // Contextual transaction we will build on
     int blockHeight = chainActive.LastTip()->GetHeight();
     nextBlockHeight = blockHeight + 1;
     // (used if no Sapling addresses are involved)
     CMutableTransaction contextualTx = CreateNewContextualCMutableTransaction(
-        Params().GetConsensus(), nextBlockHeight);
+        chain.Params().GetConsensus(), nextBlockHeight);
     contextualTx.nLockTime = chainActive.LastTip()->GetHeight();
 
     if (contextualTx.nVersion == 1) {
@@ -5094,8 +5094,8 @@ UniValue z_mergetoaddress(const UniValue& params, bool fHelp, const CPubKey& myp
     }
 
     const int nextBlockHeight = chainActive.Height() + 1;
-    const bool overwinterActive = NetworkUpgradeActive(nextBlockHeight, Params().GetConsensus(), Consensus::UPGRADE_OVERWINTER);
-    const bool saplingActive = NetworkUpgradeActive(nextBlockHeight, Params().GetConsensus(), Consensus::UPGRADE_SAPLING);
+    const bool overwinterActive = NetworkUpgradeActive(nextBlockHeight, chain.Params().GetConsensus(), Consensus::UPGRADE_OVERWINTER);
+    const bool saplingActive = NetworkUpgradeActive(nextBlockHeight, chain.Params().GetConsensus(), Consensus::UPGRADE_SAPLING);
 
     // Validate the destination address
     auto destaddress = params[1].get_str();
@@ -5364,7 +5364,7 @@ UniValue z_mergetoaddress(const UniValue& params, bool fHelp, const CPubKey& myp
 
     // Contextual transaction we will build on
     CMutableTransaction contextualTx = CreateNewContextualCMutableTransaction(
-                                                                              Params().GetConsensus(),
+                                                                              chain.Params().GetConsensus(),
                                                                               nextBlockHeight);
     bool isSproutShielded = sproutNoteInputs.size() > 0 || isToSproutZaddr;
     if (contextualTx.nVersion == 1 && isSproutShielded) {
@@ -5374,7 +5374,7 @@ UniValue z_mergetoaddress(const UniValue& params, bool fHelp, const CPubKey& myp
     // Builder (used if Sapling addresses are involved)
     boost::optional<TransactionBuilder> builder;
     if (isToSaplingZaddr || saplingNoteInputs.size() > 0) {
-        builder = TransactionBuilder(Params().GetConsensus(), nextBlockHeight, pwalletMain);
+        builder = TransactionBuilder(chain.Params().GetConsensus(), nextBlockHeight, pwalletMain);
     } else 
         contextualTx.nExpiryHeight = 0; // set non z-tx to have no expiry height.
 
@@ -5453,7 +5453,7 @@ int32_t komodo_notaryvin(CMutableTransaction &txNew,uint8_t *notarypub33, void *
 {
     set<CBitcoinAddress> setAddress; uint8_t *script,utxosig[128]; uint256 utxotxid; uint64_t utxovalue; int32_t i,siglen=0,nMinDepth = 0,nMaxDepth = 9999999; vector<COutput> vecOutputs; uint32_t utxovout,eligible,earliest = 0; CScript best_scriptPubKey; bool fNegative,fOverflow;
     bool signSuccess; SignatureData sigdata; uint64_t txfee; uint8_t *ptr;
-    auto consensusBranchId = CurrentEpochBranchId(chainActive.Height() + 1, Params().GetConsensus());
+    auto consensusBranchId = CurrentEpochBranchId(chainActive.Height() + 1, chain.Params().GetConsensus());
     if (!EnsureWalletIsAvailable(0))
         return 0;
 
@@ -8304,7 +8304,7 @@ UniValue opreturn_burn(const UniValue& params, bool fHelp, const CPubKey& mypk)
         throw JSONRPCError(RPC_TYPE_ERROR, "keypool error.");
     }
 
-	CMutableTransaction mtx = CreateNewContextualCMutableTransaction(Params().GetConsensus(), komodo_nextheight());
+	CMutableTransaction mtx = CreateNewContextualCMutableTransaction(chain.Params().GetConsensus(), komodo_nextheight());
 
 	int64_t normalInputs = AddNormalinputs(mtx, myPubkey, nAmount+txfee, 60);
 	if (normalInputs < nAmount)

@@ -776,7 +776,7 @@ UniValue createrawtransaction(const UniValue& params, bool fHelp, const CPubKey&
 
     int nextBlockHeight = chainActive.Height() + 1;
     CMutableTransaction rawTx = CreateNewContextualCMutableTransaction(
-        Params().GetConsensus(), nextBlockHeight);
+        chain.Params().GetConsensus(), nextBlockHeight);
 
     if (params.size() > 2 && !params[2].isNull()) {
         int64_t nLockTime = params[2].get_int64();
@@ -786,7 +786,7 @@ UniValue createrawtransaction(const UniValue& params, bool fHelp, const CPubKey&
     }
     
     if (params.size() > 3 && !params[3].isNull()) {
-        if (NetworkUpgradeActive(nextBlockHeight, Params().GetConsensus(), Consensus::UPGRADE_OVERWINTER)) {
+        if (NetworkUpgradeActive(nextBlockHeight, chain.Params().GetConsensus(), Consensus::UPGRADE_OVERWINTER)) {
             int64_t nExpiryHeight = params[3].get_int64();
             if (nExpiryHeight < 0 || nExpiryHeight >= TX_EXPIRY_HEIGHT_THRESHOLD) {
                 throw JSONRPCError(RPC_INVALID_PARAMETER, strprintf("Invalid parameter, expiryheight must be nonnegative and less than %d.", TX_EXPIRY_HEIGHT_THRESHOLD));
@@ -1242,7 +1242,7 @@ UniValue signrawtransaction(const UniValue& params, bool fHelp, const CPubKey& m
     int chainHeight = chainActive.Height() + 1;
 
     // Grab the current consensus branch ID
-    auto consensusBranchId = CurrentEpochBranchId(chainHeight, Params().GetConsensus());
+    auto consensusBranchId = CurrentEpochBranchId(chainHeight, chain.Params().GetConsensus());
 
     if (params.size() > 4 && !params[4].isNull()) {
         consensusBranchId = ParseHexToUInt32(params[4].get_str());

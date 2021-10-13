@@ -86,10 +86,10 @@ TEST(founders_reward_test, create_testnet_2of3multisig) {
 
 // Utility method to check the number of unique addresses from height 1 to maxHeight
 void checkNumberOfUniqueAddresses(int nUnique) {
-    int maxHeight = Params().GetConsensus().GetLastFoundersRewardBlockHeight();
+    int maxHeight = chain.Params().GetConsensus().GetLastFoundersRewardBlockHeight();
     std::set<std::string> addresses;
     for (int i = 1; i <= maxHeight; i++) {
-        addresses.insert(Params().GetFoundersRewardAddressAtHeight(i));
+        addresses.insert(chain.Params().GetFoundersRewardAddressAtHeight(i));
     }
     ASSERT_TRUE(addresses.size() == nUnique);
 }
@@ -98,7 +98,7 @@ void checkNumberOfUniqueAddresses(int nUnique) {
 TEST(founders_reward_test, general) {
     SelectParams(CBaseChainParams::TESTNET);
 
-    CChainParams params = Params();
+    CChainParams params = chain.Params();
     
     // Fourth testnet reward:
     // address = t2ENg7hHVqqs9JwU5cgjvSbxnT2a9USNfhy
@@ -150,7 +150,7 @@ TEST(founders_reward_test, regtest) {
 // On Mainnet, this would be 2,100,000 ZEC after 850,000 blocks (840,000 + 10,000).
 TEST(founders_reward_test, slow_start_subsidy) {
     SelectParams(CBaseChainParams::MAIN);
-    CChainParams params = Params();
+    CChainParams params = chain.Params();
 
     int maxHeight = params.GetConsensus().GetLastFoundersRewardBlockHeight();    
     CAmount totalSubsidy = 0;
@@ -166,7 +166,7 @@ TEST(founders_reward_test, slow_start_subsidy) {
 // For use with mainnet and testnet which each have 48 addresses.
 // Verify the number of rewards each individual address receives.
 void verifyNumberOfRewards() {
-    CChainParams params = Params();
+    CChainParams params = chain.Params();
     int maxHeight = params.GetConsensus().GetLastFoundersRewardBlockHeight();
     std::multiset<std::string> ms;
     for (int nHeight = 1; nHeight <= maxHeight; nHeight++) {

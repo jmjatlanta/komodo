@@ -122,11 +122,10 @@ public:
     void SetNValue(uint64_t n) { nEquihashN = n; }
     void SetKValue(uint64_t k) { nEquihashK = k; }
     void SetMiningRequiresPeers(bool flag) { fMiningRequiresPeers = flag; }
+    void SetSaplingHeight(int32_t height);
+    void SetOverwinterHeight(int32_t height);
+    int32_t MaxBlockSize(int32_t height) const;
 
-    //void setnonce(uint32_t nonce) { memcpy(&genesis.nNonce,&nonce,sizeof(nonce)); }
-    //void settimestamp(uint32_t timestamp) { genesis.nTime = timestamp; }
-    //void setgenesis(CBlock &block) { genesis = block; }
-    //void recalc_genesis(uint32_t nonce) { genesis = CreateGenesisBlock(ASSETCHAINS_TIMESTAMP, nonce, GENESIS_NBITS, 1, COIN); };
     CMessageHeader::MessageStartChars pchMessageStart; // jl777 moved
     Consensus::Params consensus;
 
@@ -158,30 +157,26 @@ protected:
     std::vector<std::string> vFoundersRewardAddress;
 };
 
-/**
- * Return the currently selected parameters. This won't change after app
- * startup, except for unit tests.
- */
-const CChainParams &Params();
-
-/** Return parameters for the given network. */
-CChainParams &Params(CBaseChainParams::Network network);
-
-/** Sets the params returned by Params() to those for the given network. */
-void SelectParams(CBaseChainParams::Network network);
+class CMainParams : public CChainParams {
+public:
+    CMainParams();
+};
 
 /**
- * Looks for -regtest or -testnet and then calls SelectParams as appropriate.
- * Returns false if an invalid combination is given.
+ * Testnet (v3)
  */
-bool SelectParamsFromCommandLine();
+class CTestNetParams : public CChainParams {
+public:
+    CTestNetParams();
+};
 
 /**
- * Allows modifying the network upgrade regtest parameters.
+ * Regression test
  */
-void UpdateNetworkUpgradeParameters(Consensus::UpgradeIndex idx, int nActivationHeight);
-
-void komodo_setactivation(int32_t height);
-int32_t MAX_BLOCK_SIZE(int32_t height);
+class CRegTestParams : public CChainParams {
+public:
+    CRegTestParams();
+    void UpdateNetworkUpgradeParameters(Consensus::UpgradeIndex idx, int nActivationHeight);
+};
 
 #endif // BITCOIN_CHAINPARAMS_H

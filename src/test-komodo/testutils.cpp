@@ -38,7 +38,7 @@ extern std::string NOTARY_PUBKEY;
 
 void setupChain()
 {
-    SelectParams(CBaseChainParams::REGTEST);
+    chain.SelectParams(CBaseChainParams::REGTEST);
 
     // Settings to get block reward
     NOTARY_PUBKEY = notaryPubkey;

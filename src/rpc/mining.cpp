@@ -66,7 +66,7 @@ int64_t GetNetworkHashPS(int lookup, int height)
 
     // If lookup is nonpositive, then use difficulty averaging window.
     if (lookup <= 0)
-        lookup = Params().GetConsensus().nPowAveragingWindow;
+        lookup = chain.Params().GetConsensus().nPowAveragingWindow;
 
     // If lookup is larger than chain, then set it to chain length.
     if (lookup > pb->GetHeight())
@@ -213,7 +213,7 @@ UniValue generate(const UniValue& params, bool fHelp, const CPubKey& mypk)
         throw JSONRPCError(RPC_METHOD_NOT_FOUND, "komodod compiled without wallet and -mineraddress not set");
 #endif
     }
-    if (!Params().MineBlocksOnDemand())
+    if (!chain.Params().MineBlocksOnDemand())
     {
         if ( params[0].get_int() == 1 )
         {
@@ -243,8 +243,8 @@ UniValue generate(const UniValue& params, bool fHelp, const CPubKey& mypk)
     }
     unsigned int nExtraNonce = 0;
     UniValue blockHashes(UniValue::VARR);
-    unsigned int n = Params().EquihashN();
-    unsigned int k = Params().EquihashK();
+    unsigned int n = chain.Params().EquihashN();
+    unsigned int k = chain.Params().EquihashK();
     uint64_t lastTime = 0;
     while (nHeight < nHeightEnd)
     {
@@ -296,7 +296,7 @@ UniValue generate(const UniValue& params, bool fHelp, const CPubKey& mypk)
                 LOCK(cs_main);
                 pblock->nSolution = soln;
                 solutionTargetChecks.increment();
-                return CheckProofOfWork(*pblock,NOTARY_PUBKEY33,chainActive.Height(),Params().GetConsensus());
+                return CheckProofOfWork(*pblock,NOTARY_PUBKEY33,chainActive.Height(),chain.Params().GetConsensus());
             };
             bool found = EhBasicSolveUncancellable(n, k, curr_state, validBlock);
             ehSolverRuns.increment();
@@ -348,7 +348,7 @@ UniValue setgenerate(const UniValue& params, bool fHelp, const CPubKey& mypk)
         throw JSONRPCError(RPC_METHOD_NOT_FOUND, "komodod compiled without wallet and -mineraddress not set");
 #endif
     }
-    if (Params().MineBlocksOnDemand())
+    if (chain.Params().MineBlocksOnDemand())
         throw JSONRPCError(RPC_METHOD_NOT_FOUND, "Use the generate method instead of setgenerate on this network");
 
     bool fGenerate = true;
@@ -487,8 +487,8 @@ UniValue getmininginfo(const UniValue& params, bool fHelp, const CPubKey& mypk)
     }
     obj.push_back(Pair("networkhashps",    getnetworksolps(params, false, mypk)));
     obj.push_back(Pair("pooledtx",         (uint64_t)mempool.size()));
-    obj.push_back(Pair("testnet",          Params().TestnetToBeDeprecatedFieldRPC()));
-    obj.push_back(Pair("chain",            Params().NetworkIDString()));
+    obj.push_back(Pair("testnet",          chain.Params().TestnetToBeDeprecatedFieldRPC()));
+    obj.push_back(Pair("chain",            chain.Params().NetworkIDString()));
 #ifdef ENABLE_MINING
     bool staking = VERUS_MINTBLOCKS;
     if ( ASSETCHAINS_STAKED != 0 && GetBoolArg("-gen", false) && GetBoolArg("-genproclimit", -1) == 0 )
@@ -696,7 +696,7 @@ UniValue getblocktemplate(const UniValue& params, bool fHelp, const CPubKey& myp
         fvNodesEmpty = vNodes.empty();
     }
 
-    if (Params().MiningRequiresPeers() && fvNodesEmpty)
+    if (chain.Params().MiningRequiresPeers() && fvNodesEmpty)
     {
         throw JSONRPCError(RPC_CLIENT_NOT_CONNECTED, "Komodo is not connected!");
     }
@@ -793,7 +793,7 @@ UniValue getblocktemplate(const UniValue& params, bool fHelp, const CPubKey& myp
     CBlock* pblock = &pblocktemplate->block; // pointer for convenience
 
     // Update nTime
-    UpdateTime(pblock, Params().GetConsensus(), pindexPrev);
+    UpdateTime(pblock, chain.Params().GetConsensus(), pindexPrev);
     pblock->nNonce = uint256();
 
     UniValue aCaps(UniValue::VARR); aCaps.push_back("proposal");
@@ -833,7 +833,7 @@ UniValue getblocktemplate(const UniValue& params, bool fHelp, const CPubKey& myp
                 // Correct this if GetBlockTemplate changes the order
                 entry.push_back(Pair("foundersreward", (int64_t)tx.vout[1].nValue));
             }
-            CAmount nReward = GetBlockSubsidy(chainActive.LastTip()->GetHeight()+1, Params().GetConsensus());
+            CAmount nReward = GetBlockSubsidy(chainActive.LastTip()->GetHeight()+1, chain.Params().GetConsensus());
             entry.push_back(Pair("coinbasevalue", nReward));
             entry.push_back(Pair("required", true));
             txCoinbase = entry;
@@ -883,7 +883,7 @@ UniValue getblocktemplate(const UniValue& params, bool fHelp, const CPubKey& myp
     result.push_back(Pair("mutable", aMutable));
     result.push_back(Pair("noncerange", "00000000ffffffff"));
     result.push_back(Pair("sigoplimit", (int64_t)MAX_BLOCK_SIGOPS));
-    result.push_back(Pair("sizelimit", (int64_t)MAX_BLOCK_SIZE(chainActive.LastTip()->GetHeight()+1)));
+    result.push_back(Pair("sizelimit", (int64_t)chain.Params().MaxBlockSize(chainActive.LastTip()->GetHeight()+1)));
     result.push_back(Pair("curtime", pblock->GetBlockTime()));
     result.push_back(Pair("bits", strprintf("%08x", pblock->nBits)));
     result.push_back(Pair("height", (int64_t)(pindexPrev->GetHeight()+1)));
@@ -1067,7 +1067,7 @@ UniValue getblocksubsidy(const UniValue& params, bool fHelp, const CPubKey& mypk
         throw JSONRPCError(RPC_INVALID_PARAMETER, "Block height out of range");
     
     CAmount nFoundersReward = 0;
-    CAmount nReward = GetBlockSubsidy(nHeight, Params().GetConsensus());
+    CAmount nReward = GetBlockSubsidy(nHeight, chain.Params().GetConsensus());
     UniValue result(UniValue::VOBJ);
     result.push_back(Pair("miner", ValueFromAmount(nReward)));
     

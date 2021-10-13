@@ -1456,7 +1456,7 @@ int64_t prices_enumaddedbets(uint256 &batontxid, std::vector<OneBetData> &bets, 
 UniValue PricesBet(int64_t txfee, int64_t amount, int16_t leverage, std::vector<std::string> synthetic)
 {
     int32_t nextheight = komodo_nextheight();
-    CMutableTransaction mtx = CreateNewContextualCMutableTransaction(Params().GetConsensus(), nextheight); UniValue result(UniValue::VOBJ);
+    CMutableTransaction mtx = CreateNewContextualCMutableTransaction(chain.Params().GetConsensus(), nextheight); UniValue result(UniValue::VOBJ);
     struct CCcontract_info *cp, C; 
     CPubKey pricespk, mypk; 
     int64_t betamount, firstprice = 0; 
@@ -1527,7 +1527,7 @@ UniValue PricesBet(int64_t txfee, int64_t amount, int16_t leverage, std::vector<
 UniValue PricesAddFunding(int64_t txfee, uint256 bettxid, int64_t amount)
 {
     int32_t nextheight = komodo_nextheight();
-    CMutableTransaction mtx = CreateNewContextualCMutableTransaction(Params().GetConsensus(), nextheight); UniValue result(UniValue::VOBJ);
+    CMutableTransaction mtx = CreateNewContextualCMutableTransaction(chain.Params().GetConsensus(), nextheight); UniValue result(UniValue::VOBJ);
     struct CCcontract_info *cp, C; 
     CTransaction bettx; 
     CPubKey pricespk, mypk, pk; 
@@ -1647,7 +1647,7 @@ int32_t prices_scanchain(std::vector<OneBetData> &bets, int16_t leverage, std::v
 UniValue PricesSetcostbasis(int64_t txfee, uint256 bettxid)
 {
     int32_t nextheight = komodo_nextheight();
-    CMutableTransaction mtx = CreateNewContextualCMutableTransaction(Params().GetConsensus(), nextheight);
+    CMutableTransaction mtx = CreateNewContextualCMutableTransaction(chain.Params().GetConsensus(), nextheight);
     UniValue result(UniValue::VOBJ);
     struct CCcontract_info *cp, C; CTransaction bettx; uint256 hashBlock, batontxid, tokenid;
     int64_t myfee, positionsize = 0, addedbets, firstprice = 0, lastprice, profits = 0, costbasis = 0, equity;
@@ -1719,7 +1719,7 @@ UniValue PricesSetcostbasis(int64_t txfee, uint256 bettxid)
 UniValue PricesRefillFund(int64_t amount)
 {
     int32_t nextheight = komodo_nextheight();
-    CMutableTransaction mtx = CreateNewContextualCMutableTransaction(Params().GetConsensus(), nextheight); UniValue result(UniValue::VOBJ);
+    CMutableTransaction mtx = CreateNewContextualCMutableTransaction(chain.Params().GetConsensus(), nextheight); UniValue result(UniValue::VOBJ);
     struct CCcontract_info *cp, C;
     CPubKey pricespk, mypk, pk;
     std::string rawtx;
@@ -1886,7 +1886,7 @@ int32_t prices_getbetinfo(uint256 bettxid, BetInfo &betinfo)
 UniValue PricesRekt(int64_t txfee, uint256 bettxid, int32_t rektheight)
 {
     int32_t nextheight = komodo_nextheight();
-    CMutableTransaction mtx = CreateNewContextualCMutableTransaction(Params().GetConsensus(), nextheight); UniValue result(UniValue::VOBJ);
+    CMutableTransaction mtx = CreateNewContextualCMutableTransaction(chain.Params().GetConsensus(), nextheight); UniValue result(UniValue::VOBJ);
     struct CCcontract_info *cp, C; 
     CTransaction bettx; 
     int64_t myfee = 0;
@@ -1990,7 +1990,7 @@ UniValue PricesRekt(int64_t txfee, uint256 bettxid, int32_t rektheight)
 UniValue PricesCashout(int64_t txfee, uint256 bettxid)
 {
     int32_t nextheight = komodo_nextheight();
-    CMutableTransaction mtx = CreateNewContextualCMutableTransaction(Params().GetConsensus(), nextheight); 
+    CMutableTransaction mtx = CreateNewContextualCMutableTransaction(chain.Params().GetConsensus(), nextheight); 
     UniValue result(UniValue::VOBJ);
     struct CCcontract_info *cp, C; char destaddr[64]; 
     int64_t CCchange = 0, inputsum;

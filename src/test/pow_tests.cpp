@@ -17,7 +17,7 @@ BOOST_FIXTURE_TEST_SUITE(pow_tests, BasicTestingSetup)
 BOOST_AUTO_TEST_CASE(get_next_work)
 {
     SelectParams(CBaseChainParams::MAIN);
-    const Consensus::Params& params = Params().GetConsensus();
+    const Consensus::Params& params = chain.Params().GetConsensus();
 
     int64_t nLastRetargetTime = 1262149169; // NOTE: Not an actual block time
     int64_t nThisTime = 1262152739;  // Block #32255 of Bitcoin
@@ -31,7 +31,7 @@ BOOST_AUTO_TEST_CASE(get_next_work)
 BOOST_AUTO_TEST_CASE(get_next_work_pow_limit)
 {
     SelectParams(CBaseChainParams::MAIN);
-    const Consensus::Params& params = Params().GetConsensus();
+    const Consensus::Params& params = chain.Params().GetConsensus();
 
     int64_t nLastRetargetTime = 1231006505; // Block #0 of Bitcoin
     int64_t nThisTime = 1233061996;  // Block #2015 of Bitcoin
@@ -46,7 +46,7 @@ BOOST_AUTO_TEST_CASE(get_next_work_pow_limit)
 BOOST_AUTO_TEST_CASE(get_next_work_lower_limit_actual)
 {
     SelectParams(CBaseChainParams::MAIN);
-    const Consensus::Params& params = Params().GetConsensus();
+    const Consensus::Params& params = chain.Params().GetConsensus();
 
     int64_t nLastRetargetTime = 1279296753; // NOTE: Not an actual block time
     int64_t nThisTime = 1279297671;  // Block #68543 of Bitcoin
@@ -60,7 +60,7 @@ BOOST_AUTO_TEST_CASE(get_next_work_lower_limit_actual)
 BOOST_AUTO_TEST_CASE(get_next_work_upper_limit_actual)
 {
     SelectParams(CBaseChainParams::MAIN);
-    const Consensus::Params& params = Params().GetConsensus();
+    const Consensus::Params& params = chain.Params().GetConsensus();
 
     int64_t nLastRetargetTime = 1269205629; // NOTE: Not an actual block time
     int64_t nThisTime = 1269211443;  // Block #46367 of Bitcoin
@@ -73,7 +73,7 @@ BOOST_AUTO_TEST_CASE(get_next_work_upper_limit_actual)
 BOOST_AUTO_TEST_CASE(GetBlockProofEquivalentTime_test)
 {
     SelectParams(CBaseChainParams::MAIN);
-    const Consensus::Params& params = Params().GetConsensus();
+    const Consensus::Params& params = chain.Params().GetConsensus();
 
     std::vector<CBlockIndex> blocks(10000);
     for (int i = 0; i < 10000; i++) {

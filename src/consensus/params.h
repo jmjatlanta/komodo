@@ -25,8 +25,6 @@
 
 #include <boost/optional.hpp>
 
-int32_t MAX_BLOCK_SIZE(int32_t height);
-
 namespace Consensus {
 
 /**
@@ -131,7 +129,9 @@ struct Params {
     int64_t MinActualTimespan() const { return (AveragingWindowTimespan() * (100 - nPowMaxAdjustUp  )) / 100; }
     int64_t MaxActualTimespan() const { return (AveragingWindowTimespan() * (100 + nPowMaxAdjustDown)) / 100; }
     void SetSaplingHeight(int32_t height) { vUpgrades[Consensus::UPGRADE_SAPLING].nActivationHeight = height; }
+    int32_t GetSaplingHeight() const { return vUpgrades[Consensus::UPGRADE_SAPLING].nActivationHeight; }
     void SetOverwinterHeight(int32_t height) { vUpgrades[Consensus::UPGRADE_OVERWINTER].nActivationHeight = height; }
+    int32_t GetOverwinterHeight() const { return vUpgrades[Consensus::UPGRADE_OVERWINTER].nActivationHeight; }
     uint256 nMinimumChainWork;
 };
 } // namespace Consensus

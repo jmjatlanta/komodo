@@ -159,7 +159,7 @@ int32_t NSPV_getaddressutxos(struct NSPV_utxosresp *ptr,char *coinaddr,bool isCC
     int64_t total = 0,interest=0; uint32_t locktime; int32_t ind=0,tipheight,maxlen,txheight,n = 0,len = 0;
     std::vector<std::pair<CAddressUnspentKey, CAddressUnspentValue> > unspentOutputs;
     SetCCunspents(unspentOutputs,coinaddr,isCC);
-    maxlen = MAX_BLOCK_SIZE(tipheight) - 512;
+    maxlen = chain.Params().MaxBlockSize(tipheight) - 512;
     maxlen /= sizeof(*ptr->utxos);
     strncpy(ptr->coinaddr,coinaddr,sizeof(ptr->coinaddr)-1);
     ptr->CCflag = isCC;
@@ -324,7 +324,7 @@ int32_t NSPV_getccmoduleutxos(struct NSPV_utxosresp *ptr, char *coinaddr, int64_
     std::vector<std::pair<CAddressUnspentKey, CAddressUnspentValue> > unspentOutputs;
     SetCCunspents(unspentOutputs, coinaddr, true);
 
-    maxlen = MAX_BLOCK_SIZE(tipheight) - 512;
+    maxlen = chain.Params().MaxBlockSize(tipheight) - 512;
     //maxlen /= sizeof(*ptr->utxos);  // TODO why was this? we need maxlen in bytes, don't we? 
     
     //ptr->numutxos = (uint16_t)unspentOutputs.size();
@@ -443,7 +443,7 @@ int32_t NSPV_getaddresstxids(struct NSPV_txidsresp *ptr,char *coinaddr,bool isCC
     std::vector<std::pair<CAddressIndexKey, CAmount> > txids;
     SetCCtxids(txids,coinaddr,isCC);
     ptr->nodeheight = chainActive.LastTip()->GetHeight();
-    maxlen = MAX_BLOCK_SIZE(ptr->nodeheight) - 512;
+    maxlen = chain.Params().MaxBlockSize(ptr->nodeheight) - 512;
     maxlen /= sizeof(*ptr->txids);
     strncpy(ptr->coinaddr,coinaddr,sizeof(ptr->coinaddr)-1);
     ptr->CCflag = isCC;

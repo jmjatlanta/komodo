@@ -17,7 +17,7 @@ TEST(TransactionBuilder, Invoke)
     SelectParams(CBaseChainParams::REGTEST);
     UpdateNetworkUpgradeParameters(Consensus::UPGRADE_OVERWINTER, Consensus::NetworkUpgrade::ALWAYS_ACTIVE);
     UpdateNetworkUpgradeParameters(Consensus::UPGRADE_SAPLING, Consensus::NetworkUpgrade::ALWAYS_ACTIVE);
-    auto consensusParams = Params().GetConsensus();
+    auto consensusParams = chain.Params().GetConsensus();
 
     CBasicKeyStore keystore;
     CKey tsk = DecodeSecret(tSecretRegtest);
@@ -95,7 +95,7 @@ TEST(TransactionBuilder, Invoke)
 
 TEST(TransactionBuilder, ThrowsOnTransparentInputWithoutKeyStore)
 {
-    auto consensusParams = Params().GetConsensus();
+    auto consensusParams = chain.Params().GetConsensus();
 
     auto builder = TransactionBuilder(consensusParams, 1);
     ASSERT_THROW(builder.AddTransparentInput(COutPoint(), CScript(), 1), std::runtime_error);
@@ -103,7 +103,7 @@ TEST(TransactionBuilder, ThrowsOnTransparentInputWithoutKeyStore)
 
 TEST(TransactionBuilder, RejectsInvalidTransparentOutput)
 {
-    auto consensusParams = Params().GetConsensus();
+    auto consensusParams = chain.Params().GetConsensus();
 
     // Default CTxDestination type is an invalid address
     CTxDestination taddr;
@@ -113,7 +113,7 @@ TEST(TransactionBuilder, RejectsInvalidTransparentOutput)
 
 TEST(TransactionBuilder, RejectsInvalidTransparentChangeAddress)
 {
-    auto consensusParams = Params().GetConsensus();
+    auto consensusParams = chain.Params().GetConsensus();
 
     // Default CTxDestination type is an invalid address
     CTxDestination taddr;
@@ -126,7 +126,7 @@ TEST(TransactionBuilder, FailsWithNegativeChange)
     SelectParams(CBaseChainParams::REGTEST);
     UpdateNetworkUpgradeParameters(Consensus::UPGRADE_OVERWINTER, Consensus::NetworkUpgrade::ALWAYS_ACTIVE);
     UpdateNetworkUpgradeParameters(Consensus::UPGRADE_SAPLING, Consensus::NetworkUpgrade::ALWAYS_ACTIVE);
-    auto consensusParams = Params().GetConsensus();
+    auto consensusParams = chain.Params().GetConsensus();
 
     // Generate dummy Sapling address
     auto sk = libzcash::SaplingSpendingKey::random();
@@ -181,7 +181,7 @@ TEST(TransactionBuilder, ChangeOutput)
     SelectParams(CBaseChainParams::REGTEST);
     UpdateNetworkUpgradeParameters(Consensus::UPGRADE_OVERWINTER, Consensus::NetworkUpgrade::ALWAYS_ACTIVE);
     UpdateNetworkUpgradeParameters(Consensus::UPGRADE_SAPLING, Consensus::NetworkUpgrade::ALWAYS_ACTIVE);
-    auto consensusParams = Params().GetConsensus();
+    auto consensusParams = chain.Params().GetConsensus();
 
     // Generate dummy Sapling address
     auto sk = libzcash::SaplingSpendingKey::random();
@@ -278,7 +278,7 @@ TEST(TransactionBuilder, SetFee)
     SelectParams(CBaseChainParams::REGTEST);
     UpdateNetworkUpgradeParameters(Consensus::UPGRADE_OVERWINTER, Consensus::NetworkUpgrade::ALWAYS_ACTIVE);
     UpdateNetworkUpgradeParameters(Consensus::UPGRADE_SAPLING, Consensus::NetworkUpgrade::ALWAYS_ACTIVE);
-    auto consensusParams = Params().GetConsensus();
+    auto consensusParams = chain.Params().GetConsensus();
 
     // Generate dummy Sapling address
     auto sk = libzcash::SaplingSpendingKey::random();
