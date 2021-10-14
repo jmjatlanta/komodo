@@ -1492,6 +1492,13 @@ void komodo_args(char *argv0)
         }
     }
     chain = assetchain(name);
+    // Check for -testnet or -regtest parameter (Params() calls are only valid after this clause)
+    if (!chain.SelectParamsFromCommandLine()) {
+        fprintf(stderr, "Error: Invalid combination of -regtest and -testnet.\n");
+        StartShutdown();
+        return;
+    }
+
     KOMODO_STOPAT = GetArg("-stopat",0);
     MAX_REORG_LENGTH = GetArg("-maxreorg",MAX_REORG_LENGTH);
     WITNESS_CACHE_SIZE = MAX_REORG_LENGTH+10;

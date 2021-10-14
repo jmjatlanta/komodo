@@ -140,11 +140,6 @@ bool AppInit(int argc, char* argv[])
 
     try
     {
-        // Check for -testnet or -regtest parameter (Params() calls are only valid after this clause)
-        if (!chain.SelectParamsFromCommandLine()) {
-            fprintf(stderr, "Error: Invalid combination of -regtest and -testnet.\n");
-            return false;
-        }
         komodo_args(argv[0]);
 
         fprintf(stderr,"call komodo_args.(%s) NOTARY_PUBKEY.(%s)\n",argv[0],NOTARY_PUBKEY.c_str());
