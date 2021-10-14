@@ -97,8 +97,8 @@ void assetchain::InitChainParams(int64_t saplingActivationHeight, int64_t overwi
         // only require coinbase protection on Verus from the Komodo family of coins
         if ( chain.isSymbol("VRSC") )
         {
-            pCurrentParams->consensus.vUpgrades[Consensus::UPGRADE_SAPLING].nActivationHeight = 227520;
-            pCurrentParams->consensus.vUpgrades[Consensus::UPGRADE_OVERWINTER].nActivationHeight = 227520;
+            pCurrentParams->SetSaplingHeight(227520);
+            pCurrentParams->SetOverwinterHeight(227520);
             pCurrentParams->consensus.fCoinbaseMustBeProtected = true;
             checkpointData = //(Checkpoints::CCheckpointData)
                     {
@@ -124,8 +124,8 @@ void assetchain::InitChainParams(int64_t saplingActivationHeight, int64_t overwi
             {
                 pCurrentParams->consensus.nMinimumChainWork = uint256S("0x0000000000000000000000000000000000000000000000000000000000001f7e");
             }
-            pCurrentParams->consensus.vUpgrades[Consensus::UPGRADE_SAPLING].nActivationHeight = saplingActivationHeight;
-            pCurrentParams->consensus.vUpgrades[Consensus::UPGRADE_OVERWINTER].nActivationHeight = overwinterActivationHeight;
+            pCurrentParams->SetSaplingHeight(saplingActivationHeight);
+            pCurrentParams->SetOverwinterHeight(overwinterActivationHeight);
             checkpointData = //(Checkpoints::CCheckpointData)
                     {
                             boost::assign::map_list_of

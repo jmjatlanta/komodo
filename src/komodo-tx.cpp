@@ -224,7 +224,7 @@ CMutableTransaction CreateNewContextualCMutableTransaction(const Consensus::Para
             mtx.nVersion = OVERWINTER_TX_VERSION;
             mtx.nExpiryHeight = std::min(
                                          mtx.nExpiryHeight,
-                                         static_cast<uint32_t>(consensusParams.vUpgrades[Consensus::UPGRADE_SAPLING].nActivationHeight - 1));
+                                         static_cast<uint32_t>(consensusParams.GetSaplingHeight() - 1));
         }
     }
     return mtx;

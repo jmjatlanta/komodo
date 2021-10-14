@@ -164,7 +164,7 @@ std::string CChainParams::GetFoundersRewardAddressAtIndex(int i) const {
 
 int32_t CChainParams::MaxBlockSize(int32_t height) const
 {
-    int32_t saplinght = consensus.vUpgrades[Consensus::UPGRADE_SAPLING].nActivationHeight;
+    int32_t saplinght = consensus.GetSaplingHeight();
     if ( height <= 0 || (saplinght > 0 && height >= saplinght) )
     {
         return(_MAX_BLOCK_SIZE);
@@ -179,7 +179,7 @@ void CChainParams::SetSaplingHeight(int32_t height)
 
 void CChainParams::SetOverwinterHeight(int32_t height)
 {
-    consensus.vUpgrades[Consensus::UPGRADE_SAPLING].nActivationHeight = height;
+    consensus.vUpgrades[Consensus::UPGRADE_OVERWINTER].nActivationHeight = height;
 }
 
 CMainParams::CMainParams()
@@ -211,9 +211,9 @@ CMainParams::CMainParams()
     consensus.vUpgrades[Consensus::UPGRADE_TESTDUMMY].nActivationHeight =
         Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
     consensus.vUpgrades[Consensus::UPGRADE_OVERWINTER].nProtocolVersion = 170005;
-    consensus.vUpgrades[Consensus::UPGRADE_OVERWINTER].nActivationHeight = Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
+    consensus.SetOverwinterHeight(Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT);
     consensus.vUpgrades[Consensus::UPGRADE_SAPLING].nProtocolVersion = 170007;
-    consensus.vUpgrades[Consensus::UPGRADE_SAPLING].nActivationHeight = Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
+    consensus.SetSaplingHeight(Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT);
 
     // The best chain should have at least this much work.
     consensus.nMinimumChainWork = uint256S("0x00000000000000000000000000000000000000000000000000281b32ff3198a1");
@@ -330,9 +330,9 @@ CTestNetParams::CTestNetParams()
     consensus.vUpgrades[Consensus::UPGRADE_TESTDUMMY].nActivationHeight =
         Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
     consensus.vUpgrades[Consensus::UPGRADE_OVERWINTER].nProtocolVersion = 170003;
-    consensus.vUpgrades[Consensus::UPGRADE_OVERWINTER].nActivationHeight = 207500;
+    consensus.SetOverwinterHeight(207500);
     consensus.vUpgrades[Consensus::UPGRADE_SAPLING].nProtocolVersion = 170007;
-    consensus.vUpgrades[Consensus::UPGRADE_SAPLING].nActivationHeight = 280000;
+    consensus.SetSaplingHeight(280000);
 
     // The best chain should have at least this much work.
     consensus.nMinimumChainWork = uint256S("0x00000000000000000000000000000000000000000000000000000001d0c4d9cd");
@@ -425,11 +425,9 @@ CRegTestParams::CRegTestParams()
     consensus.vUpgrades[Consensus::UPGRADE_TESTDUMMY].nActivationHeight =
         Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
     consensus.vUpgrades[Consensus::UPGRADE_OVERWINTER].nProtocolVersion = 170003;
-    consensus.vUpgrades[Consensus::UPGRADE_OVERWINTER].nActivationHeight =
-        Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
+    consensus.SetOverwinterHeight(Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT);
     consensus.vUpgrades[Consensus::UPGRADE_SAPLING].nProtocolVersion = 170006;
-    consensus.vUpgrades[Consensus::UPGRADE_SAPLING].nActivationHeight =
-        Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
+    consensus.SetSaplingHeight(Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT);
 
     // The best chain should have at least this much work.
     consensus.nMinimumChainWork = uint256S("0x00");
