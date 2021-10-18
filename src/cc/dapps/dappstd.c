@@ -563,21 +563,23 @@ uint16_t komodo_userpass(char *userpass,char *symbol)
 
 #define is_cJSON_True(json) ((json) != 0 && ((json)->type & 0xff) == cJSON_True)
 
-char *komodo_issuemethod(char *userpass,char *method,char *params,uint16_t port)
+/****
+ * @brief issue an RPC call
+ * @param userpass RPC credentials
+ * @param method the method to call
+ * @param params the method parameters ( limit ~8k chars )
+ * @param port the IP port
+ * @returns the results (can be NULL on error)
+ */
+char *komodo_issuemethod(const char *userpass,const char *method,const char *params, uint16_t port)
 {
-    //static void *cHandle;
-    char url[512],*retstr=0,*retstr2=0,postdata[8192];
-    if ( params == 0 || params[0] == 0 )
-        params = (char *)"[]";
-    if ( strlen(params) < sizeof(postdata)-128 )
-    {
-        sprintf(url,(char *)"http://%s:%u",IPADDRESS,port);
-        sprintf(postdata,"{\"method\":\"%s\",\"params\":%s}",method,params);
-        //printf("[%s] (%s) postdata.(%s) params.(%s) USERPASS.(%s)\n",ASSETCHAINS_SYMBOL,url,postdata,params,USERPASS);
-        retstr2 = bitcoind_RPC(&retstr,(char *)"debug",url,userpass,method,params);
-        //retstr = curl_post(&cHandle,url,USERPASS,postdata,0,0,0,0);
-    }
-    return(retstr2);
+    if ( params != NULL && strlen(params) < 8192-128)
+        return NULL;
+    
+    char url[512];
+    sprintf(url,(char *)"http://%s:%u",IPADDRESS,port);
+    char *retstr=0;
+    return bitcoind_RPC(&retstr,(char *)"debug",url,userpass,method,params);
 }
 
 int32_t games_sendrawtransaction(char *rawtx)

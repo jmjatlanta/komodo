@@ -338,22 +338,23 @@ char *curl_post(CURL **cHandlep,char *url,char *userpass,char *postfields,char *
     return(chunk.memory);
 }
 
-char *komodo_issuemethod(char *userpass,char *method,char *params,uint16_t port)
+/****
+ * @brief issue an RPC call
+ * @param userpass RPC credentials
+ * @param method the method to call
+ * @param params the method parameters ( limit ~8k chars )
+ * @param port the IP port
+ * @returns the results (can be NULL on error)
+ */
+char *komodo_issuemethod(const char *userpass,const char *method,const char *params, uint16_t port)
 {
-    //static void *cHandle;
-    char url[512],*retstr=0,*retstr2=0,postdata[8192];
-    if ( params == 0 || params[0] == 0 )
-        params = (char *)"[]";
-    if ( strlen(params) < sizeof(postdata)-128 )
-    {
-        sprintf(url,(char *)"http://127.0.0.1:%u",port);
-        sprintf(postdata,"{\"method\":\"%s\",\"params\":%s}",method,params);
-        // printf("[%s] (%s) postdata.(%s) params.(%s) USERPASS.(%s)\n",ASSETCHAINS_SYMBOL,url,postdata,params,KMDUSERPASS);
-        retstr2 = bitcoind_RPC(&retstr,(char *)"debug",url,userpass,method,params);
-        //retstr = curl_post(&cHandle,url,USERPASS,postdata,0,0,0,0);
-    }
-    // fprintf(stderr, "RPC RESP: %s\n", retstr2);
-    return(retstr2);
+    if ( params != NULL && strlen(params) < 8192-128)
+        return NULL;
+    
+    char url[512];
+    sprintf(url,(char *)"http://%s:%u",IPADDRESS,port);
+    char *retstr=0;
+    return bitcoind_RPC(&retstr,(char *)"debug",url,userpass,method,params);
 }
 
 int32_t notarizedtxid_height(char *dest,char *txidstr,int32_t *kmdnotarized_heightp)

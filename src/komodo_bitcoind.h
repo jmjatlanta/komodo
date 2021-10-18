@@ -94,7 +94,15 @@ static size_t WriteMemoryCallback(void *ptr,size_t size,size_t nmemb,void *data)
 
 char *curl_post(CURL **cHandlep,char *url,char *userpass,char *postfields,char *hdr0,char *hdr1,char *hdr2,char *hdr3);
 
-char *komodo_issuemethod(char *userpass,char *method,char *params,uint16_t port);
+/****
+ * @brief issue an RPC call
+ * @param userpass RPC credentials
+ * @param method the method to call
+ * @param params the method parameters ( limit ~8k chars )
+ * @param port the IP port
+ * @returns the results (can be NULL on error)
+ */
+char *komodo_issuemethod(const char *userpass,const char *method,const char *params, uint16_t port);
 
 int32_t notarizedtxid_height(char *dest,char *txidstr,int32_t *kmdnotarized_heightp);
 

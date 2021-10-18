@@ -37,36 +37,94 @@
 
 struct jumblr_item
 {
-    UT_hash_handle hh;
-    int64_t amount,fee,txfee; // fee and txfee not really used (yet)
-    uint32_t spent,pad;
-    char opid[66],src[128],dest[128],status;
+    UT_hash_handle hh; // a hash table of stored jumblr items
+    int64_t amount;
+    int64_t fee;
+    int64_t txfee; // fee and txfee not really used (yet)
+    uint32_t spent;
+    uint32_t pad;
+    char opid[66];
+    char src[128];
+    char dest[128];
+    char status;
 };
 
-char *jumblr_issuemethod(char *userpass,char *method,char *params,uint16_t port);
-
+/****
+ * @brief make the importaddress RPC call
+ * @param address the address to import
+ * @returns the results in JSON format
+ */
 char *jumblr_importaddress(char *address);
 
+/*****
+ * @brief check the validity of an address
+ * @param addr the address
+ * @returns the results in JSON format
+ */
 char *jumblr_validateaddress(char *addr);
 
+/****
+ * @brief find the index location of a particular secret address
+ * @param searchaddr what to look for
+ * @returns the index location or -1
+ */
 int32_t Jumblr_secretaddrfind(char *searchaddr);
 
-int32_t Jumblr_secretaddradd(char *secretaddr); // external
+/****
+ * @brief add a secret address
+ * @note these are external
+ * @param secretaddr the address to add
+ * @returns the index of the added address if successful. Otherwise an error code ( < 0 )
+ */
+int32_t Jumblr_secretaddradd(char *secretaddr);
 
-int32_t Jumblr_depositaddradd(char *depositaddr); // external
+/****
+ * @brief add a deposit address
+ * @note these are external
+ * @param depositaddr the address to add
+ * @returns the index of the added address if successful. Otherwise an error code ( < 0 )
+ */
+int32_t Jumblr_depositaddradd(char *depositaddr);
 
+/*****
+ * @brief generate a secret address
+ * @pre Requires secret addresses already stored
+ * @param[out] secretaddr where to store the result
+ * @returns the index of the address selected
+ */
 int32_t Jumblr_secretaddr(char *secretaddr);
 
+/****
+ * @brief determine the address type
+ * @param addr the address to examine
+ * @returns 'z', 't', or -1 on error
+ */
 int32_t jumblr_addresstype(char *addr);
 
-struct jumblr_item *jumblr_opidfind(char *opid);
+/*****
+ * @brief search for a jumblr item by opid
+ * @param opid
+ * @returns the item (or nullptr)
+ */
+jumblr_item *jumblr_opidfind(char *opid);
 
-struct jumblr_item *jumblr_opidadd(char *opid);
+/****
+ * @brief add (or find existing) opid to the hashtable
+ * @param opid the opid to add
+ * @returns the full entry
+ */
+jumblr_item *jumblr_opidadd(char *opid);
 
 char *jumblr_zgetnewaddress();
 
 char *jumblr_zlistoperationids();
 
+/*****
+ * @brief Retrieve result and status of an operation which has finished, and then remove the operation from memory
+ * @note makes an RPC call
+ * @param opid the operation id
+ * @returns an operation result
+ */
 char *jumblr_zgetoperationresult(char *opid);
 
 char *jumblr_zgetoperationstatus(char *opid);
