@@ -27,6 +27,10 @@
 #include "util.h"
 #include "httpserver.h"
 #include "httprpc.h"
+#include "komodo_defs.h"
+#include "komodo_utils.h"
+#include "komodo_jumblr.h"
+#include "komodo_extern_globals.h"
 
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/filesystem.hpp>
@@ -56,10 +60,10 @@
  */
 
 static bool fDaemon;
-#include "komodo_defs.h"
 extern char ASSETCHAINS_SYMBOL[KOMODO_ASSETCHAIN_MAXLEN];
 extern int32_t ASSETCHAINS_BLOCKTIME;
 extern uint64_t ASSETCHAINS_CBOPRET;
+extern std::shared_ptr<Jumblr> jumblr;
 void komodo_passport_iteration();
 uint64_t komodo_interestsum();
 int32_t komodo_longestchain();
@@ -155,8 +159,8 @@ bool AppInit(int argc, char* argv[])
             fprintf(stderr, "Error: Invalid combination of -regtest and -testnet.\n");
             return false;
         }
-        void komodo_args(char *argv0);
-        komodo_args(argv[0]);
+        int16_t bitcoind_rpcport;
+        komodo_args(argv[0], bitcoind_rpcport);
         void chainparams_commandline();
         chainparams_commandline();
 
@@ -170,6 +174,8 @@ bool AppInit(int argc, char* argv[])
         try
         {
             ReadConfigFile(mapArgs, mapMultiArgs);
+            bitcoind_rpcport = GetArg("-rpcport",bitcoind_rpcport); // let command line override config file
+            jumblr = std::make_shared<Jumblr>(KMDUSERPASS, bitcoind_rpcport);
         } catch (const missing_zcash_conf& e) {
             fprintf(stderr,
                 (_("Before starting komodod, you need to create a configuration file:\n"

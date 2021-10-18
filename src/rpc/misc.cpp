@@ -31,6 +31,7 @@
 #include "cc/eval.h"
 #include "cc/CCinclude.h"
 #include "hex.h"
+#include "komodo_jumblr.h"
 #ifdef ENABLE_WALLET
 #include "wallet/wallet.h"
 #include "wallet/walletdb.h"
@@ -43,6 +44,8 @@
 #include <univalue.h>
 
 #include "zcash/Address.hpp"
+
+#include <memory>
 
 using namespace std;
 
@@ -60,8 +63,6 @@ using namespace std;
  * Or alternatively, create a specific query method for the information.
  **/
 
-int32_t Jumblr_depositaddradd(char *depositaddr);
-int32_t Jumblr_secretaddradd(char *secretaddr);
 uint64_t komodo_interestsum();
 int32_t komodo_longestchain();
 int32_t komodo_notarized_height(int32_t *prevMoMheightp,uint256 *hashp,uint256 *txidp);
@@ -70,7 +71,7 @@ uint32_t komodo_chainactive_timestamp();
 int32_t komodo_whoami(char *pubkeystr,int32_t height,uint32_t timestamp);
 extern uint64_t KOMODO_INTERESTSUM,KOMODO_WALLETBALANCE;
 extern bool IS_KOMODO_NOTARY;
-extern int32_t KOMODO_LASTMINED,JUMBLR_PAUSE,KOMODO_LONGESTCHAIN,STAKED_NOTARY_ID,STAKED_ERA,KOMODO_INSYNC;
+extern int32_t KOMODO_LASTMINED,KOMODO_LONGESTCHAIN,STAKED_NOTARY_ID,STAKED_ERA,KOMODO_INSYNC;
 extern char ASSETCHAINS_SYMBOL[KOMODO_ASSETCHAIN_MAXLEN];
 uint32_t komodo_segid32(char *coinaddr);
 int64_t komodo_coinsupply(int64_t *zfundsp,int64_t *sproutfundsp,int32_t height);
@@ -88,6 +89,8 @@ extern uint64_t ASSETCHAINS_COMMISSION,ASSETCHAINS_SUPPLY;
 extern int32_t ASSETCHAINS_LWMAPOS,ASSETCHAINS_SAPLING,ASSETCHAINS_STAKED;
 extern uint64_t ASSETCHAINS_ENDSUBSIDY[],ASSETCHAINS_REWARD[],ASSETCHAINS_HALVING[],ASSETCHAINS_DECAY[],ASSETCHAINS_NOTARY_PAY[];
 extern std::string NOTARY_PUBKEY,NOTARY_ADDRESS; extern uint8_t NOTARY_PUBKEY33[];
+extern std::shared_ptr<Jumblr> jumblr;
+
 
 int32_t getera(int timestamp)
 {
@@ -493,10 +496,10 @@ UniValue jumblr_deposit(const UniValue& params, bool fHelp, const CPubKey& mypk)
     if ( isValid != 0 )
     {
         string addr = params[0].get_str();
-        if ( (retval= Jumblr_depositaddradd((char *)addr.c_str())) >= 0 )
+        if ( (retval= jumblr->depositaddradd((char *)addr.c_str())) >= 0 )
         {
             result.push_back(Pair("result", retval));
-            JUMBLR_PAUSE = 0;
+            jumblr->pause = false;
         }
         else result.push_back(Pair("error", retval));
     } else result.push_back(Pair("error", "invalid address"));
@@ -513,10 +516,10 @@ UniValue jumblr_secret(const UniValue& params, bool fHelp, const CPubKey& mypk)
     if ( isValid != 0 )
     {
         string addr = params[0].get_str();
-        retval = Jumblr_secretaddradd((char *)addr.c_str());
+        retval = jumblr->secretaddradd((char *)addr.c_str());
         result.push_back(Pair("result", "success"));
         result.push_back(Pair("num", retval));
-        JUMBLR_PAUSE = 0;
+        jumblr->pause = false;
     } else result.push_back(Pair("error", "invalid address"));
     return(result);
 }
@@ -526,7 +529,7 @@ UniValue jumblr_pause(const UniValue& params, bool fHelp, const CPubKey& mypk)
     int32_t retval; UniValue result(UniValue::VOBJ);
     if (fHelp )
         throw runtime_error("jumblr_pause\n");
-    JUMBLR_PAUSE = 1;
+    jumblr->pause = true;
     result.push_back(Pair("result", "paused"));
     return(result);
 }
@@ -536,7 +539,7 @@ UniValue jumblr_resume(const UniValue& params, bool fHelp, const CPubKey& mypk)
     int32_t retval; UniValue result(UniValue::VOBJ);
     if (fHelp )
         throw runtime_error("jumblr_resume\n");
-    JUMBLR_PAUSE = 0;
+    jumblr->pause = false;
     result.push_back(Pair("result", "resumed"));
     return(result);
 }

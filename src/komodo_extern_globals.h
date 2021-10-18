@@ -18,8 +18,12 @@
  * Please think twice before adding to this list. Can it be done with a better scope?
  */
 #include "komodo_structs.h"
+#include "komodo_jumblr.h"
 #include <mutex>
 #include <cstdint>
+#include <memory>
+
+extern std::shared_ptr<Jumblr> jumblr;
 
 extern bool IS_KOMODO_NOTARY;
 extern bool IS_KOMODO_DEALERNODE;
@@ -34,7 +38,6 @@ extern uint8_t ASSETCHAINS_PUBLIC;
 extern uint8_t ASSETCHAINS_PRIVATE;
 extern uint8_t ASSETCHAINS_TXPOW;
 extern uint16_t KMD_PORT;
-extern uint16_t BITCOIND_RPCPORT;
 extern uint16_t DEST_PORT;
 extern uint16_t ASSETCHAINS_P2PPORT;
 extern uint16_t ASSETCHAINS_RPCPORT;
@@ -44,7 +47,6 @@ extern int32_t KOMODO_INSYNC;
 extern int32_t KOMODO_LASTMINED;
 extern int32_t prevKOMODO_LASTMINED;
 extern int32_t KOMODO_CCACTIVATE;
-extern int32_t JUMBLR_PAUSE;
 extern int32_t NUM_PRICES; 
 extern int32_t KOMODO_MININGTHREADS;
 extern int32_t STAKED_NOTARY_ID;

@@ -262,7 +262,7 @@ size_t accumulatebytes(void *ptr,size_t size,size_t nmemb,struct return_string *
  *
  ************************************************************************/
 
-char *post_process_bitcoind_RPC(char *debugstr,char *command,char *rpcstr,char *params)
+char *post_process_bitcoind_RPC(const char *debugstr,const char *command,char *rpcstr,const char *params)
 {
     long i,j,len; char *retstr = 0; cJSON *json,*result,*error;
     //printf("<<<<<<<<<<< bitcoind_RPC: %s post_process_bitcoind_RPC.%s.[%s]\n",debugstr,command,rpcstr);
@@ -314,12 +314,17 @@ char *post_process_bitcoind_RPC(char *debugstr,char *command,char *rpcstr,char *
 #endif
 
 /************************************************************************
- *
- * perform the query
- *
+ * @brief perform an RPC call
+ * @param retstrp where the results are put
+ * @param debugstr
+ * @param url
+ * @param userpass
+ * @param command
+ * @param params
+ * @returns
  ************************************************************************/
-
-char *bitcoind_RPC(char **retstrp,char *debugstr,char *url,char *userpass,char *command,char *params)
+char *bitcoind_RPC(char **retstrp,const char *debugstr,const char *url,const char *userpass,
+        const char *command,const char *params)
 {
     static int didinit,count,count2; static double elapsedsum,elapsedsum2;
     struct curl_slist *headers = NULL; struct return_string s; CURLcode res; CURL *curl_handle;

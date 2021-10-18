@@ -902,6 +902,13 @@ void iguana_initQ(queue_t *Q,char *name)
         free(item);
 }
 
+/***
+ * @brief read the config file for username/password/port
+ * @param username where to store the username
+ * @param password where to store the password
+ * @param fp pointer to FILE
+ * @returns the port
+ */
 uint16_t _komodo_userpass(char *username,char *password,FILE *fp)
 {
     char *rpcuser,*rpcpassword,*str,line[8192]; uint16_t port = 0;
@@ -927,7 +934,6 @@ uint16_t _komodo_userpass(char *username,char *password,FILE *fp)
         strcpy(username,rpcuser);
         strcpy(password,rpcpassword);
     }
-    //printf("rpcuser.(%s) rpcpassword.(%s) KMDUSERPASS.(%s) %u\n",rpcuser,rpcpassword,KMDUSERPASS,port);
     if ( rpcuser != 0 )
         free(rpcuser);
     if ( rpcpassword != 0 )
@@ -974,10 +980,16 @@ void komodo_statefname(char *fname,char *symbol,char *str)
     //printf("test.(%s) -> [%s] statename.(%s) %s\n",test,ASSETCHAINS_SYMBOL,symbol,fname);
 }
 
+/***
+ * @brief read config file of symbol
+ * @param symbol the symbol of the config file to look for
+ * @param rpcport the default port
+ */
 void komodo_configfile(char *symbol,uint16_t rpcport)
 {
     static char myusername[512],mypassword[8192];
-    FILE *fp; uint16_t kmdport; uint8_t buf2[33]; char fname[512],buf[128],username[512],password[8192]; uint32_t crc,r,r2,i;
+    FILE *fp; uint16_t kmdport; uint8_t buf2[33]; char fname[512],buf[128],username[512],password[8192]; 
+    uint32_t crc,r,r2,i;
     if ( symbol != 0 && rpcport != 0 )
     {
         r = (uint32_t)time(NULL);
@@ -995,7 +1007,6 @@ void komodo_configfile(char *symbol,uint16_t rpcport)
             sprintf(&password[i*2],"%02x",buf2[i]);
         password[i*2] = 0;
         sprintf(buf,"%s.conf",symbol);
-        BITCOIND_RPCPORT = rpcport;
 #ifdef _WIN32
         sprintf(fname,"%s\\%s",GetDataDir(false).string().c_str(),buf);
 #else
@@ -1042,10 +1053,15 @@ void komodo_configfile(char *symbol,uint16_t rpcport)
             KMD_PORT = kmdport;
         sprintf(KMDUSERPASS,"%s:%s",username,password);
         fclose(fp);
-//printf("KOMODO.(%s) -> userpass.(%s)\n",fname,KMDUSERPASS);
-    } //else printf("couldnt open.(%s)\n",fname);
+    }
 }
 
+/****
+ * @brief read config file to get username/password/port information
+ * @param userpass where to store the username/password
+ * @param symbol the chain symbol
+ * @returns the port
+ */
 uint16_t komodo_userpass(char *userpass,char *symbol)
 {
     FILE *fp; uint16_t port = 0; char fname[512],username[512],password[512],confname[KOMODO_ASSETCHAIN_MAXLEN];
@@ -1274,7 +1290,7 @@ int8_t equihash_params_possible(uint64_t n, uint64_t k)
     return(-1);
 }
 
-void komodo_args(char *argv0)
+void komodo_args(char *argv0, int16_t &bitcoind_rpcport)
 {
     std::string name,addn,hexstr,symbol; char *dirname,fname[512],arg0str[64],magicstr[9]; uint8_t magic[4],extrabuf[32756],disablebits[32],*extraptr=0;
     FILE *fp; uint64_t val; uint16_t port, dest_rpc_port; int32_t i,nonz=0,baseid,len,n,extralen = 0; uint64_t ccenables[256], ccEnablesHeight[512] = {0}; CTransaction earlytx; uint256 hashBlock;
@@ -1379,7 +1395,7 @@ void komodo_args(char *argv0)
     }
     KOMODO_EARLYTXID = Parseuint256(GetArg("-earlytxid","0").c_str());    
     ASSETCHAINS_EARLYTXIDCONTRACT = GetArg("-ac_earlytxidcontract",0);
-    if ( name.c_str()[0] != 0 )
+    if ( !name.empty() )
     {
         std::string selectedAlgo = GetArg("-ac_algo", std::string(ASSETCHAINS_ALGORITHMS[0]));
 
@@ -1846,7 +1862,10 @@ void komodo_args(char *argv0)
             }
             if ( (port= komodo_userpass(ASSETCHAINS_USERPASS,ASSETCHAINS_SYMBOL)) != 0 )
                 ASSETCHAINS_RPCPORT = port;
-            else komodo_configfile(ASSETCHAINS_SYMBOL,ASSETCHAINS_P2PPORT + 1);
+            else 
+            {
+                komodo_configfile(ASSETCHAINS_SYMBOL,ASSETCHAINS_P2PPORT + 1);
+            }
 
             if (ASSETCHAINS_CBMATURITY != 0)
                 COINBASE_MATURITY = ASSETCHAINS_CBMATURITY;
@@ -1893,7 +1912,7 @@ void komodo_args(char *argv0)
             }
         }
     }
-    else
+    else // name is empty (KMD chain)
     {
         char fname[512],username[512],password[4096]; int32_t iter; FILE *fp;
         ASSETCHAINS_P2PPORT = 7770;
@@ -1934,8 +1953,7 @@ void komodo_args(char *argv0)
     int32_t dpowconfs = KOMODO_DPOWCONFS;
     if ( ASSETCHAINS_SYMBOL[0] != 0 )
     {
-        BITCOIND_RPCPORT = GetArg("-rpcport", ASSETCHAINS_RPCPORT);
-        //fprintf(stderr,"(%s) port.%u chain params initialized\n",ASSETCHAINS_SYMBOL,BITCOIND_RPCPORT);
+        bitcoind_rpcport = GetArg("-rpcport", ASSETCHAINS_RPCPORT);
         if ( strcmp("PIRATE",ASSETCHAINS_SYMBOL) == 0 && ASSETCHAINS_HALVING[0] == 77777 )
         {
             ASSETCHAINS_HALVING[0] *= 5;
@@ -2010,7 +2028,9 @@ void komodo_args(char *argv0)
             CCENABLE(EVAL_DICE);
             CCENABLE(EVAL_ORACLES);
         }
-    } else BITCOIND_RPCPORT = GetArg("-rpcport", BaseParams().RPCPort());
+    } 
+    else 
+        bitcoind_rpcport = GetArg("-rpcport", BaseParams().RPCPort());
     KOMODO_DPOWCONFS = GetArg("-dpowconfs",dpowconfs);
     if ( ASSETCHAINS_SYMBOL[0] == 0 || strcmp(ASSETCHAINS_SYMBOL,"SUPERNET") == 0 || strcmp(ASSETCHAINS_SYMBOL,"DEX") == 0 || strcmp(ASSETCHAINS_SYMBOL,"COQUI") == 0 || strcmp(ASSETCHAINS_SYMBOL,"PIRATE") == 0 || strcmp(ASSETCHAINS_SYMBOL,"KMDICE") == 0 )
         KOMODO_EXTRASATOSHI = 1;

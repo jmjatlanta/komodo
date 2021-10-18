@@ -49,122 +49,138 @@ struct jumblr_item
     char status;
 };
 
-/****
- * @brief make the importaddress RPC call
- * @param address the address to import
- * @returns the results in JSON format
- */
-char *jumblr_importaddress(char *address);
+class Jumblr
+{
+public:
+    Jumblr(const std::string& userpass, int port) : userpass(userpass), port(port) {}
+    bool pause = true;
 
-/*****
- * @brief check the validity of an address
- * @param addr the address
- * @returns the results in JSON format
- */
-char *jumblr_validateaddress(char *addr);
+private:
+    std::string userpass;
+    uint16_t port;
 
-/****
- * @brief find the index location of a particular secret address
- * @param searchaddr what to look for
- * @returns the index location or -1
- */
-int32_t Jumblr_secretaddrfind(char *searchaddr);
+public:
+    /****
+     * @brief add a secret address
+     * @note these are external
+     * @param secretaddr the address to add
+     * @returns the index of the added address if successful. Otherwise an error code ( < 0 )
+     */
+    int32_t secretaddradd(char *secretaddr);
+    /****
+     * @brief add a deposit address
+     * @note these are external
+     * @param depositaddr the address to add
+     * @returns the index of the added address if successful. Otherwise an error code ( < 0 )
+     */
+    int32_t depositaddradd(char *depositaddr);
 
-/****
- * @brief add a secret address
- * @note these are external
- * @param secretaddr the address to add
- * @returns the index of the added address if successful. Otherwise an error code ( < 0 )
- */
-int32_t Jumblr_secretaddradd(char *secretaddr);
+    void iteration();
 
-/****
- * @brief add a deposit address
- * @note these are external
- * @param depositaddr the address to add
- * @returns the index of the added address if successful. Otherwise an error code ( < 0 )
- */
-int32_t Jumblr_depositaddradd(char *depositaddr);
+private:
+    /****
+     * @brief make the importaddress RPC call
+     * @param address the address to import
+     * @returns the results in JSON format
+     */
+    char *importaddress(char *address);
+    /*****
+     * @brief check the validity of an address
+     * @param addr the address
+     * @returns the results in JSON format
+     */
+    char *validateaddress(char *addr);
+    /****
+     * @brief find the index location of a particular secret address
+     * @param searchaddr what to look for
+     * @returns the index location or -1
+     */
+    int32_t secretaddrfind(char *searchaddr);
+    /*****
+     * @brief generate a secret address
+     * @pre Requires secret addresses already stored
+     * @param[out] secretaddr where to store the result
+     * @returns the index of the address selected
+     */
+    int32_t secretaddr(char *secretaddr);
+    /****
+     * @brief determine the address type
+     * @param addr the address to examine
+     * @returns 'z', 't', or -1 on error
+     */
+    int32_t addresstype(char *addr);
+    /*****
+     * @brief search for a jumblr item by opid
+     * @param opid
+     * @returns the item (or nullptr)
+     */
+    jumblr_item *opidfind(char *opid);
+    /****
+     * @brief add (or find existing) opid to the hashtable
+     * @param opid the opid to add
+     * @returns the full entry
+     */
+    jumblr_item *opidadd(char *opid);
 
-/*****
- * @brief generate a secret address
- * @pre Requires secret addresses already stored
- * @param[out] secretaddr where to store the result
- * @returns the index of the address selected
- */
-int32_t Jumblr_secretaddr(char *secretaddr);
+    char *zgetnewaddress();
 
-/****
- * @brief determine the address type
- * @param addr the address to examine
- * @returns 'z', 't', or -1 on error
- */
-int32_t jumblr_addresstype(char *addr);
+    char *zlistoperationids();
 
-/*****
- * @brief search for a jumblr item by opid
- * @param opid
- * @returns the item (or nullptr)
- */
-jumblr_item *jumblr_opidfind(char *opid);
+    /*****
+     * @brief Retrieve result and status of an operation which has finished, and then remove the operation from memory
+     * @note makes an RPC call
+     * @param opid the operation id
+     * @returns an operation result
+     */
+    char *zgetoperationresult(char *opid);
 
-/****
- * @brief add (or find existing) opid to the hashtable
- * @param opid the opid to add
- * @returns the full entry
- */
-jumblr_item *jumblr_opidadd(char *opid);
+    char *zgetoperationstatus(char *opid);
 
-char *jumblr_zgetnewaddress();
+    char *sendt_to_z(char *taddr,char *zaddr,double amount);
 
-char *jumblr_zlistoperationids();
+    char *sendz_to_z(char *zaddrS,char *zaddrD,double amount);
 
-/*****
- * @brief Retrieve result and status of an operation which has finished, and then remove the operation from memory
- * @note makes an RPC call
- * @param opid the operation id
- * @returns an operation result
- */
-char *jumblr_zgetoperationresult(char *opid);
+    char *sendz_to_t(char *zaddr,char *taddr,double amount);
 
-char *jumblr_zgetoperationstatus(char *opid);
+    char *zlistaddresses();
 
-char *jumblr_sendt_to_z(char *taddr,char *zaddr,double amount);
+    char *zlistreceivedbyaddress(char *addr);
 
-char *jumblr_sendz_to_z(char *zaddrS,char *zaddrD,double amount);
+    char *getreceivedbyaddress(char *addr);
 
-char *jumblr_sendz_to_t(char *zaddr,char *taddr,double amount);
+    char *importprivkey(char *wifstr);
 
-char *jumblr_zlistaddresses();
+    char *zgetbalance(char *addr);
 
-char *jumblr_zlistreceivedbyaddress(char *addr);
+    char *listunspent(char *coinaddr);
 
-char *jumblr_getreceivedbyaddress(char *addr);
+    char *gettransaction(char *txidstr);
 
-char *jumblr_importprivkey(char *wifstr);
+    int32_t numvins(bits256 txid);
 
-char *jumblr_zgetbalance(char *addr);
+    int64_t receivedby(char *addr);
 
-char *jumblr_listunspent(char *coinaddr);
+    int64_t balance(char *addr);
 
-char *jumblr_gettransaction(char *txidstr);
+    int32_t itemset(jumblr_item *ptr,cJSON *item,char *status);
 
-int32_t jumblr_numvins(bits256 txid);
+    void opidupdate(jumblr_item *ptr);
 
-int64_t jumblr_receivedby(char *addr);
+    void prune(jumblr_item *ptr);
 
-int64_t jumblr_balance(char *addr);
+    void zaddrinit(char *zaddr);
 
-int32_t jumblr_itemset(struct jumblr_item *ptr,cJSON *item,char *status);
+    void opidsupdate();
 
-void jumblr_opidupdate(struct jumblr_item *ptr);
+    uint64_t increment(uint8_t r,int32_t height,uint64_t total,uint64_t biggest,uint64_t medium, uint64_t smallest);
 
-void jumblr_prune(struct jumblr_item *ptr);
+    /*****
+     * @brief make an RPC style method call
+     * @param method the method to call
+     * @param params the method parameters (nullptr ok)
+     * @returns the results in JSON format
+     */
+    char *issuemethod(const std::string& method, const std::string& params);
 
-void jumblr_zaddrinit(char *zaddr);
+};
 
-void jumblr_opidsupdate();
-
-uint64_t jumblr_increment(uint8_t r,int32_t height,uint64_t total,uint64_t biggest,uint64_t medium, uint64_t smallest);
-
-void jumblr_iteration();

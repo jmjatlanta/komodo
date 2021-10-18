@@ -91,7 +91,7 @@ size_t accumulatebytes(void *ptr,size_t size,size_t nmemb,struct return_string *
  *
  ************************************************************************/
 
-char *post_process_bitcoind_RPC(char *debugstr,char *command,char *rpcstr,char *params)
+char *post_process_bitcoind_RPC(const char *debugstr,const char *command,char *rpcstr,const char *params)
 {
     long i,j,len; char *retstr = 0; cJSON *json,*result,*error;
     //printf("<<<<<<<<<<< bitcoind_RPC: %s post_process_bitcoind_RPC.%s.[%s]\n",debugstr,command,rpcstr);
@@ -137,12 +137,17 @@ char *post_process_bitcoind_RPC(char *debugstr,char *command,char *rpcstr,char *
 #endif
 
 /************************************************************************
- *
- * perform the query
- *
+ * @brief perform an RPC call
+ * @param retstrp where the results are put
+ * @param debugstr
+ * @param url
+ * @param userpass
+ * @param command
+ * @param params
+ * @returns
  ************************************************************************/
-
-char *bitcoind_RPC(char **retstrp,char *debugstr,char *url,char *userpass,char *command,char *params)
+char *bitcoind_RPC(char **retstrp,const char *debugstr,const char *url,const char *userpass,
+        const char *command,const char *params)
 {
     static int didinit,count,count2; static double elapsedsum,elapsedsum2;
     struct curl_slist *headers = NULL; struct return_string s; CURLcode res; CURL *curl_handle;
@@ -155,9 +160,8 @@ char *bitcoind_RPC(char **retstrp,char *debugstr,char *url,char *userpass,char *
     numretries = 0;
     if ( debugstr != 0 && strcmp(debugstr,"BTCD") == 0 && command != 0 && strcmp(command,"SuperNET") ==  0 )
         specialcase = 1;
-    else specialcase = 0;
-    if ( url[0] == 0 )
-        strcpy(url,"http://127.0.0.1:7876/nxt");
+    else 
+        specialcase = 0;
     if ( specialcase != 0 && 0 )
         printf("<<<<<<<<<<< bitcoind_RPC: debug.(%s) url.(%s) command.(%s) params.(%s)\n",debugstr,url,command,params);
 try_again:
@@ -352,7 +356,7 @@ char *komodo_issuemethod(const char *userpass,const char *method,const char *par
         return NULL;
     
     char url[512];
-    sprintf(url,(char *)"http://%s:%u",IPADDRESS,port);
+    sprintf(url,(char *)"http://127.0.0.1:%u",port);
     char *retstr=0;
     return bitcoind_RPC(&retstr,(char *)"debug",url,userpass,method,params);
 }
@@ -478,9 +482,8 @@ int32_t komodo_verifynotarization(char *symbol,char *dest,int32_t height,int32_t
             if ( ASSETCHAINS_SYMBOL[0] != 0 )
             {
                 jsonstr = komodo_issuemethod(KMDUSERPASS,(char *)"getrawtransaction",params,KMD_PORT);
-                //printf("userpass.(%s) got (%s)\n",KMDUSERPASS,jsonstr);
             }
-        }//else jsonstr = _dex_getrawtransaction();
+        }
         else return(0); // need universal way to issue DEX* API, since notaries mine most blocks, this ok
     }
     else if ( strcmp(dest,"BTC") == 0 )
@@ -489,7 +492,6 @@ int32_t komodo_verifynotarization(char *symbol,char *dest,int32_t height,int32_t
         {
             jsonstr = komodo_issuemethod(BTCUSERPASS,(char *)"getrawtransaction",params,DEST_PORT);
         }
-        //else jsonstr = _dex_getrawtransaction();
         else return(0);
     }
     else

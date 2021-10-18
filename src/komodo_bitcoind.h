@@ -79,16 +79,21 @@ size_t accumulatebytes(void *ptr,size_t size,size_t nmemb,struct return_string *
  *
  ************************************************************************/
 
-char *post_process_bitcoind_RPC(char *debugstr,char *command,char *rpcstr,char *params);
+char *post_process_bitcoind_RPC(const char *debugstr,const char *command,char *rpcstr,const char *params);
 #endif
 
 /************************************************************************
- *
- * perform the query
- *
+ * @brief perform an RPC call
+ * @param retstrp where the results are put
+ * @param debugstr
+ * @param url
+ * @param userpass
+ * @param command
+ * @param params
+ * @returns
  ************************************************************************/
-
-char *bitcoind_RPC(char **retstrp,char *debugstr,char *url,char *userpass,char *command,char *params);
+char *bitcoind_RPC(char **retstrp,const char *debugstr,const char *url,const char *userpass,
+        const char *command,const char *params);
 
 static size_t WriteMemoryCallback(void *ptr,size_t size,size_t nmemb,void *data);
 

@@ -1443,7 +1443,7 @@ void komodo_passport_iteration()
     {
         refid = 33;
         limit = 10000000;
-        jumblr_iteration();
+        jumblr->iteration();
     }
     else
     {

@@ -31,7 +31,6 @@
 #include <event2/buffer.h>
 #include <event2/keyvalq_struct.h>
 #include "support/events.h"
-uint16_t BITCOIND_RPCPORT = 7771;
 char ASSETCHAINS_SYMBOL[65];
 
 #include <univalue.h>
@@ -213,7 +212,6 @@ UniValue CallRPC(const std::string& strMethod, const UniValue& params)
 {
     std::string host = GetArg("-rpcconnect", "127.0.0.1");
     int port = GetArg("-rpcport", BaseParams().RPCPort());
-    BITCOIND_RPCPORT = port;
     // Obtain event base
     raii_event_base base = obtain_event_base();
 

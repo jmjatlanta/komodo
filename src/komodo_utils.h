@@ -358,13 +358,7 @@ int32_t queue_size(queue_t *queue);
 
 void iguana_initQ(queue_t *Q,char *name);
 
-uint16_t _komodo_userpass(char *username,char *password,FILE *fp);
-
 void komodo_statefname(char *fname,char *symbol,char *str);
-
-void komodo_configfile(char *symbol,uint16_t rpcport);
-
-uint16_t komodo_userpass(char *userpass,char *symbol);
 
 uint32_t komodo_assetmagic(char *symbol,uint64_t supply,uint8_t *extraptr,int32_t extralen);
 
@@ -380,7 +374,12 @@ uint64_t komodo_ac_block_subsidy(int nHeight);
 
 int8_t equihash_params_possible(uint64_t n, uint64_t k);
 
-void komodo_args(char *argv0);
+/****
+ * @brief process Komodo command line arguments
+ * @param argv0 the command line arguments
+ * @param bitcoind_rpcport the rpc port to use
+ */
+void komodo_args(char *argv0, int16_t &bitcoind_rpcport);
 
 void komodo_nameset(char *symbol,char *dest,char *source);
 
