@@ -17,6 +17,9 @@
 #include "komodo_cJSON.h"
 #include "komodo_defs.h"
 
+#include <string>
+#include <atomic>
+
 #ifdef _WIN32
 #include <wincrypt.h>
 #endif
@@ -53,7 +56,7 @@ class Jumblr
 {
 public:
     Jumblr(const std::string& userpass, int port) : userpass(userpass), port(port) {}
-    bool pause = true;
+    std::atomic<bool> pause{true};
 
 private:
     std::string userpass;
@@ -83,13 +86,13 @@ private:
      * @param address the address to import
      * @returns the results in JSON format
      */
-    char *importaddress(char *address);
+    std::string importaddress(char *address);
     /*****
      * @brief check the validity of an address
      * @param addr the address
      * @returns the results in JSON format
      */
-    char *validateaddress(char *addr);
+    std::string validateaddress(char *addr);
     /****
      * @brief find the index location of a particular secret address
      * @param searchaddr what to look for
@@ -108,7 +111,7 @@ private:
      * @param addr the address to examine
      * @returns 'z', 't', or -1 on error
      */
-    int32_t addresstype(char *addr);
+    int32_t addresstype(const std::string& addr);
     /*****
      * @brief search for a jumblr item by opid
      * @param opid
@@ -122,9 +125,19 @@ private:
      */
     jumblr_item *opidadd(char *opid);
 
-    char *zgetnewaddress();
+    /*****
+     * @brief get a new address
+     * @note makes an RPC call
+     * @returns the new address
+     */
+    std::string zgetnewaddress();
 
-    char *zlistoperationids();
+    /*****
+     * @brief get a list of operation ids
+     * @note makes an RPC call
+     * @returns a list of operation ids
+     */
+    std::string zlistoperationids();
 
     /*****
      * @brief Retrieve result and status of an operation which has finished, and then remove the operation from memory
@@ -132,38 +145,120 @@ private:
      * @param opid the operation id
      * @returns an operation result
      */
-    char *zgetoperationresult(char *opid);
+    std::string zgetoperationresult(char *opid);
 
-    char *zgetoperationstatus(char *opid);
+    /*****
+     * @brief get a status of an op id
+     * @note makes an RPC call
+     * @returns the status
+     */
+    std::string zgetoperationstatus(char *opid);
 
-    char *sendt_to_z(char *taddr,char *zaddr,double amount);
+    /****
+     * @brief send t -> z
+     * @param taddr the t address
+     * @param zaddr the z address
+     * @param amount the amount to send
+     * @returns the response
+     */
+    std::string sendt_to_z(const std::string& taddr,const std::string& zaddr,double amount);
 
-    char *sendz_to_z(char *zaddrS,char *zaddrD,double amount);
+    /******
+     * @brief send z -> z
+     * @param zaddrS the source address
+     * @param zaddrD the destination address
+     * @param amount the amount
+     * @returns the response
+     */
+    std::string sendz_to_z(const std::string& zaddrS,const std::string& zaddrD,double amount);
 
-    char *sendz_to_t(char *zaddr,char *taddr,double amount);
+    /******
+     * @brief send z -> t
+     * @param zaddr the source address
+     * @param taddr the destination address
+     * @param amount the amount
+     * @returns the response
+     */
+    std::string sendz_to_t(const std::string& zaddr,const std::string& taddr,double amount);
 
-    char *zlistaddresses();
+    /*******
+     * @brief list addresses
+     * @returns list of addresses
+     */
+    std::string zlistaddresses();
 
-    char *zlistreceivedbyaddress(char *addr);
+    /*******
+     * @brief list recceived by addresses
+     * @param addr the address to look for
+     * @returns list of addresses
+     */
+    std::string zlistreceivedbyaddress(char *addr);
 
-    char *getreceivedbyaddress(char *addr);
+    /*******
+     * @brief get the amount recceived by an address
+     * @param addr the address to look for
+     * @returns the amount
+     */
+    std::string getreceivedbyaddress(char *addr);
 
-    char *importprivkey(char *wifstr);
+    /*******
+     * @brief Import a private key
+     * @param wifstr the key in WIF format
+     * @returns the response
+     */
+    std::string importprivkey(char *wifstr);
 
-    char *zgetbalance(char *addr);
+    /*******
+     * @param addr the address to check
+     * @returns the balance
+     */
+    std::string zgetbalance(char *addr);
 
-    char *listunspent(char *coinaddr);
+    /*******
+     * @param coinaddr the address to check
+     * @returns the unspent UTXOs
+     */
+    std::string listunspent(char *coinaddr);
 
-    char *gettransaction(char *txidstr);
+    /*******
+     * @param txidstr the transaction id (as string)
+     * @returns the transaction details
+     */
+    std::string gettransaction(char *txidstr);
 
+    /*******
+     * @param txid the transaction id
+     * @returns the number of vIns within that transaction
+     */
     int32_t numvins(bits256 txid);
 
+    /*****
+     * @brief get the amount received by an address
+     * @param addr the address
+     * @returns the amount in SATOSHIs
+     */
     int64_t receivedby(char *addr);
 
+    /*****
+     * @param the address
+     * @returns the balance at the address
+     */
     int64_t balance(char *addr);
 
+    /*****
+     * @brief parse JSON into the jumblr_item struct
+     * @param[out] ptr the item
+     * @param[in] item jumblr_item as JSON
+     * @param status
+     * @returns 1
+     */
     int32_t itemset(jumblr_item *ptr,cJSON *item,char *status);
 
+    /*****
+     * @brief update the jumblr object
+     * @note jumblr_item.opid used for lookup
+     * @param ptr the object
+     */
     void opidupdate(jumblr_item *ptr);
 
     void prune(jumblr_item *ptr);
@@ -180,7 +275,7 @@ private:
      * @param params the method parameters (nullptr ok)
      * @returns the results in JSON format
      */
-    char *issuemethod(const std::string& method, const std::string& params);
+    std::string issuemethod(const std::string& method, const std::string& params);
 
 };
 

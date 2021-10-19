@@ -29,38 +29,54 @@ jumblr_item *Jumblrs;
  * @param params the method parameters (nullptr ok)
  * @returns the results in JSON format
  */
-char *Jumblr::issuemethod(const std::string& method, const std::string& params)
+std::string Jumblr::issuemethod(const std::string& method, const std::string& params)
 {
-    cJSON *retjson,*resjson = 0; char *retstr;
-    if ( (retstr= komodo_issuemethod(userpass.c_str(),method.c_str(),params.c_str(),port)) != 0 )
+    std::string retVal("{\"error\":\"unknown error\"}");
+
+    char *retstr = komodo_issuemethod(userpass.c_str(),method.c_str(),params.c_str(),port);
+    if ( retstr != nullptr )
     {
-        if ( (retjson= cJSON_Parse(retstr)) != 0 )
+        cJSON *retjson = cJSON_Parse(retstr);
+        free(retstr);
+        if ( retjson != nullptr )
         {
-            if ( jobj(retjson,(char *)"result") != 0 )
-                resjson = jduplicate(jobj(retjson,(char *)"result"));
-            else if ( jobj(retjson,(char *)"error") != 0 )
-                resjson = jduplicate(jobj(retjson,(char *)"error"));
+            cJSON *tmp = jobj(retjson, (char*)"result"); 
+            if ( tmp != nullptr )
+            {
+                char *res = jprint(tmp, 1);
+                if (res != nullptr)
+                {
+                    retVal = std::string(res);
+                    free(res);
+                }
+            }
             else
             {
-                resjson = cJSON_CreateObject();
-                jaddstr(resjson,(char *)"error",(char *)"cant parse return");
+                tmp = jobj(retjson,(char *)"error");
+                if ( tmp != nullptr )
+                {
+                    char *res = jprint(tmp, 1);
+                    retVal = std::string(res);
+                    free(res);
+                }
+                else
+                {
+                    retVal = "{\"error\":\"cant parse return\"}";
+                }
             }
             free_json(retjson);
         }
-        free(retstr);
     }
-    if ( resjson != 0 )
-        return(jprint(resjson,1));
-    else return(clonestr((char *)"{\"error\":\"unknown error\"}"));
+    return retVal;
 }
 
-char *Jumblr::importaddress(char *address)
+std::string Jumblr::importaddress(char *address)
 {
     std::string params = std::string("[\"") + address + "\", \"" + address + "\", false]";
     return issuemethod("importaddress",params);
 }
 
-char *Jumblr::validateaddress(char *addr)
+std::string Jumblr::validateaddress(char *addr)
 {
     std::string params = std::string("[\"") + addr + "\"]";
     return issuemethod("validateaddress",params);
@@ -116,10 +132,10 @@ int32_t Jumblr::depositaddradd(char *depositaddr)
 
     if ( secretaddrfind(depositaddr) < 0 )
     {
-        char *retstr = validateaddress(depositaddr);
-        if ( retstr != nullptr )
+        std::string retstr = validateaddress(depositaddr);
+        if ( !retstr.empty() )
         {
-            cJSON *retjson = cJSON_Parse(retstr);
+            cJSON *retjson = cJSON_Parse(retstr.c_str());
             if ( retjson != nullptr )
             {
                 cJSON *ismine = jobj(retjson,(char *)"ismine");
@@ -135,7 +151,6 @@ int32_t Jumblr::depositaddradd(char *depositaddr)
                 }
                 free_json(retjson);
             }
-            free(retstr);
         }
     }
     return retval;
@@ -176,18 +191,19 @@ int32_t Jumblr::secretaddr(char *secretaddr)
  * @param addr the address to examine
  * @returns 'z', 't', or -1 on error
  */
-int32_t Jumblr::addresstype(char *addr)
+int32_t Jumblr::addresstype(const std::string& in)
 {
+    std::string addr = in;
+
     // strip off double quotes
-    if ( addr[0] == '"' && addr[strlen(addr)-1] == '"' )
+    if ( addr[0] == '"' && addr[addr.size()-1] == '"' )
     {
-        addr[strlen(addr)-1] = 0;
-        addr++;
+        addr = addr.substr(1, addr.size()-2);
     }
 
-    if ( addr[0] == 'z' && addr[1] == 'c' && strlen(addr) >= 40 )
+    if ( addr[0] == 'z' && addr[1] == 'c' && addr.size() >= 40 )
         return 'z';
-    else if ( strlen(addr) < 40 )
+    else if ( addr.size() < 40 )
         return 't';
 
     return -1;
@@ -230,7 +246,7 @@ jumblr_item *Jumblr::opidadd(char *opid)
  * @note makes an RPC call
  * @returns the new address
  */
-char *Jumblr::zgetnewaddress()
+std::string Jumblr::zgetnewaddress()
 {
     return issuemethod("z_getnewaddress",nullptr);
 }
@@ -240,7 +256,7 @@ char *Jumblr::zgetnewaddress()
  * @note makes an RPC call
  * @returns a list of operation ids
  */
-char *Jumblr::zlistoperationids()
+std::string Jumblr::zlistoperationids()
 {
     return issuemethod("z_listoperationids",nullptr);
 }
@@ -251,7 +267,7 @@ char *Jumblr::zlistoperationids()
  * @param opid the operation id
  * @returns an operation result
  */
-char *Jumblr::zgetoperationresult(char *opid)
+std::string Jumblr::zgetoperationresult(char *opid)
 {
     std::string params = std::string("[[\"") + opid + "\"]]";
     return issuemethod("z_getoperationresult",params);
@@ -262,7 +278,7 @@ char *Jumblr::zgetoperationresult(char *opid)
  * @note makes an RPC call
  * @returns the status
  */
-char *Jumblr::zgetoperationstatus(char *opid)
+std::string Jumblr::zgetoperationstatus(char *opid)
 {
     std::string params = std::string("[[\"") + opid + "\"]]";
     return issuemethod("z_getoperationstatus",params);
@@ -286,7 +302,7 @@ std::string toFloatString(double amount)
  * @param amount the amount to send
  * @returns the response
  */
-char *Jumblr::sendt_to_z(char *taddr,char *zaddr,double amount)
+std::string Jumblr::sendt_to_z(const std::string& taddr, const std::string& zaddr, double amount)
 {
     if ( addresstype(zaddr) != 'z' || addresstype(taddr) != 't' )
         return clonestr((char *)"{\"error\":\"illegal address in t to z\"}");
@@ -310,7 +326,7 @@ char *Jumblr::sendt_to_z(char *taddr,char *zaddr,double amount)
  * @param amount the amount
  * @returns the response
  */
-char *Jumblr::sendz_to_z(char *zaddrS,char *zaddrD,double amount)
+std::string Jumblr::sendz_to_z(const std::string& zaddrS,const std::string& zaddrD,double amount)
 {
     if ( addresstype(zaddrS) != 'z' || addresstype(zaddrD) != 'z' )
         return clonestr((char *)"{\"error\":\"illegal address in z to z\"}");
@@ -332,7 +348,7 @@ char *Jumblr::sendz_to_z(char *zaddrS,char *zaddrD,double amount)
  * @param amount the amount
  * @returns the response
  */
-char *Jumblr::sendz_to_t(char *zaddr,char *taddr,double amount)
+std::string Jumblr::sendz_to_t(const std::string& zaddr, const std::string& taddr, double amount)
 {
     if ( addresstype(zaddr) != 'z' || addresstype(taddr) != 't' )
         return clonestr((char *)"{\"error\":\"illegal address in z to t\"}");
@@ -353,7 +369,7 @@ char *Jumblr::sendz_to_t(char *zaddr,char *taddr,double amount)
  * @brief list addresses
  * @returns list of addresses
  */
-char *Jumblr::zlistaddresses()
+std::string Jumblr::zlistaddresses()
 {
     return issuemethod("z_listaddresses",nullptr);
 }
@@ -363,7 +379,7 @@ char *Jumblr::zlistaddresses()
  * @param addr the address to look for
  * @returns list of addresses
  */
-char *Jumblr::zlistreceivedbyaddress(char *addr)
+std::string Jumblr::zlistreceivedbyaddress(char *addr)
 {
     std::string params = std::string("[\"") + addr + "\", 1]";
     return issuemethod("z_listreceivedbyaddress",params);
@@ -374,7 +390,7 @@ char *Jumblr::zlistreceivedbyaddress(char *addr)
  * @param addr the address to look for
  * @returns the amount
  */
-char *Jumblr::getreceivedbyaddress(char *addr)
+std::string Jumblr::getreceivedbyaddress(char *addr)
 {
     std::string params = std::string("[\"") + addr + "\", 1]";
     return issuemethod("getreceivedbyaddress",params);
@@ -385,7 +401,7 @@ char *Jumblr::getreceivedbyaddress(char *addr)
  * @param wifstr the key in WIF format
  * @returns the response
  */
-char *Jumblr::importprivkey(char *wifstr)
+std::string Jumblr::importprivkey(char *wifstr)
 {
     std::string params = std::string("[\"") + wifstr + "\", \"\", false]";
     return issuemethod("importprivkey",params);
@@ -395,7 +411,7 @@ char *Jumblr::importprivkey(char *wifstr)
  * @param addr the address to check
  * @returns the balance
  */
-char *Jumblr::zgetbalance(char *addr)
+std::string Jumblr::zgetbalance(char *addr)
 {
     std::string params = std::string("[\"") + addr + "\", 1]";
     return issuemethod("z_getbalance",params);
@@ -405,7 +421,7 @@ char *Jumblr::zgetbalance(char *addr)
  * @param coinaddr the address to check
  * @returns the unspent UTXOs
  */
-char *Jumblr::listunspent(char *coinaddr)
+std::string Jumblr::listunspent(char *coinaddr)
 {
     std::string params = std::string("[1, 99999999, [\"") + coinaddr + "\"]]";
     return issuemethod("listunspent",params);
@@ -415,7 +431,7 @@ char *Jumblr::listunspent(char *coinaddr)
  * @param txidstr the transaction id (as string)
  * @returns the transaction details
  */
-char *Jumblr::gettransaction(char *txidstr)
+std::string Jumblr::gettransaction(char *txidstr)
 {
     std::string params = std::string("[\"") + txidstr + "\", 1]";
     return issuemethod("getrawtransaction",params);
@@ -427,21 +443,26 @@ char *Jumblr::gettransaction(char *txidstr)
  */
 int32_t Jumblr::numvins(bits256 txid)
 {
-    char txidstr[65],params[1024],*retstr; cJSON *retjson,*vins; int32_t n,numvins = -1;
+    int32_t retVal = -1;
+
+    char txidstr[65]; 
     bits256_str(txidstr,txid);
-    if ( (retstr= gettransaction(txidstr)) != 0 )
+    std::string retstr = gettransaction(txidstr);
+    if ( !retstr.empty() )
     {
-        if ( (retjson= cJSON_Parse(retstr)) != 0 )
+        cJSON *retjson = cJSON_Parse(retstr.c_str());
+        if ( retjson != nullptr )
         {
-            if ( jobj(retjson,(char *)"vin") != 0 && ((vins= jarray(&n,retjson,(char *)"vin")) == 0 || n == 0) )
+            cJSON *vins;
+            int32_t n;
+            if ( jobj(retjson,(char *)"vin") != nullptr && ((vins= jarray(&n,retjson,(char *)"vin")) == 0 || n == 0) )
             {
-                numvins = n;
+                retVal = n;
             }
             free_json(retjson);
         }
-        free(retstr);
     }
-    return(numvins);
+    return retVal;
 }
 
 /*****
@@ -451,13 +472,7 @@ int32_t Jumblr::numvins(bits256 txid)
  */
 int64_t Jumblr::receivedby(char *addr)
 {
-    char *retstr; int64_t total = 0;
-    if ( (retstr= getreceivedbyaddress(addr)) != 0 )
-    {
-        total = atof(retstr) * SATOSHIDEN;
-        free(retstr);
-    }
-    return(total);
+    return atof(getreceivedbyaddress(addr).c_str()) * SATOSHIDEN;
 }
 
 /*****
@@ -466,14 +481,13 @@ int64_t Jumblr::receivedby(char *addr)
  */
 int64_t Jumblr::balance(char *addr)
 {
-    char *retstr = zgetbalance(addr);
-    if ( retstr != nullptr )
+    std::string retstr = zgetbalance(addr);
+    if ( !retstr.empty() )
     {
-        double val = atof(retstr);
+        double val = atof(retstr.c_str());
         int64_t balance = 0;
         if ( val > SMALLVAL )
             balance = val * SATOSHIDEN;
-        free(retstr);
         return balance;
     }
     return 0;
@@ -544,10 +558,10 @@ void Jumblr::opidupdate(jumblr_item *ptr)
 {
     if ( ptr->status == 0 )
     {
-        char *retstr = zgetoperationstatus(ptr->opid); 
-        if ( retstr != nullptr )
+        std::string retstr = zgetoperationstatus(ptr->opid); 
+        if ( !retstr.empty() )
         {
-            cJSON *retjson = cJSON_Parse(retstr);
+            cJSON *retjson = cJSON_Parse(retstr.c_str());
             if ( retjson != nullptr )
             {
                 if ( cJSON_GetArraySize(retjson) == 1 && cJSON_IsArray(retjson) != 0 )
@@ -567,7 +581,7 @@ void Jumblr::opidupdate(jumblr_item *ptr)
                                      && secretaddrfind(ptr->dest) < 0) )
                             {
                                 printf("a non-jumblr t->z pruned\n");
-                                free(zgetoperationresult(ptr->opid));
+                                zgetoperationresult(ptr->opid);
                                 ptr->status = -1;
                             }
 
@@ -575,20 +589,17 @@ void Jumblr::opidupdate(jumblr_item *ptr)
                         else if ( strcmp(status,(char *)"failed") == 0 )
                         {
                             printf("jumblr_opidupdate %s failed\n",ptr->opid);
-                            free(zgetoperationresult(ptr->opid));
+                            zgetoperationresult(ptr->opid);
                             ptr->status = -1;
                         }
                     }
                 }
                 free_json(retjson);
             }
-            free(retstr);
         }
     }
 }
 
-/*****
- */
 void Jumblr::prune(jumblr_item *ptr)
 {
     if ( is_hexstr(ptr->opid,0) == 64 )
@@ -596,7 +607,7 @@ void Jumblr::prune(jumblr_item *ptr)
     
     std::string oldsrc(ptr->src); // save the old src
 
-    free(zgetoperationresult(ptr->opid)); // updates object
+    zgetoperationresult(ptr->opid); // updates object
     jumblr_item *tmp;
     bool should_continue = true;
     while ( should_continue )
@@ -608,7 +619,7 @@ void Jumblr::prune(jumblr_item *ptr)
             {
                 if ( is_hexstr(ptr->opid,0) != 64 )
                 {
-                    free(zgetoperationresult(ptr->opid));
+                    zgetoperationresult(ptr->opid);
                     oldsrc = ptr->src;
                     should_continue = true;
                     break;
@@ -622,24 +633,30 @@ bits256 jbits256(cJSON *json,char *field);
 
 void Jumblr::zaddrinit(char *zaddr)
 {
-    struct jumblr_item *ptr; char *retstr,*totalstr; cJSON *item,*array; double total; bits256 txid; char txidstr[65],t_z,z_z;
-    if ( (totalstr= zgetbalance(zaddr)) != 0 )
+    std::string totalstr = zgetbalance(zaddr);
+    if ( !totalstr.empty() )
     {
-        if ( (total= atof(totalstr)) > SMALLVAL )
+        double total = atof(totalstr.c_str());
+        if ( total > SMALLVAL )
         {
-            if ( (retstr= zlistreceivedbyaddress(zaddr)) != 0 )
+            std::string retstr = zlistreceivedbyaddress(zaddr);
+            if ( !retstr.empty() )
             {
-                if ( (array= cJSON_Parse(retstr)) != 0 )
+                cJSON *array = cJSON_Parse(retstr.c_str());
+                if ( array != nullptr )
                 {
-                    t_z = z_z = 0;
+                    char t_z = 0;
+                    char z_z = 0;
                     if ( cJSON_GetArraySize(array) == 1 && cJSON_IsArray(array) != 0 )
                     {
-                        item = jitem(array,0);
+                        cJSON *item = jitem(array,0);
                         if ( (uint64_t)((total+0.0000000049) * SATOSHIDEN) == (uint64_t)((jdouble(item,(char *)"amount")+0.0000000049) * SATOSHIDEN) )
                         {
-                            txid = jbits256(item,(char *)"txid");
+                            bits256 txid = jbits256(item,(char *)"txid");
+                            char txidstr[65];
                             bits256_str(txidstr,txid);
-                            if ( (ptr= opidadd(txidstr)) != 0 )
+                            jumblr_item *ptr = opidadd(txidstr);
+                            if ( ptr != nullptr )
                             {
                                 ptr->amount = (total * SATOSHIDEN);
                                 ptr->status = 1;
@@ -665,29 +682,34 @@ void Jumblr::zaddrinit(char *zaddr)
                                 }
                                 printf("%s %s %.8f t_z.%d z_z.%d\n",zaddr,txidstr,total,t_z,z_z); // cant be z->t from spend
                             }
-                        } else printf("mismatched %s %s total %.8f vs %.8f -> %lld\n",zaddr,totalstr,dstr(SATOSHIDEN * total),dstr(SATOSHIDEN * jdouble(item,(char *)"amount")),(long long)((uint64_t)(total * SATOSHIDEN) - (uint64_t)(jdouble(item,(char *)"amount") * SATOSHIDEN)));
+                        } 
+                        else 
+                            printf("mismatched %s %s total %.8f vs %.8f -> %lld\n",zaddr,totalstr.c_str(),
+                                    dstr(SATOSHIDEN * total),dstr(SATOSHIDEN * jdouble(item,(char *)"amount")),
+                                    (long long)((uint64_t)(total * SATOSHIDEN) - (uint64_t)(jdouble(item,(char *)"amount") * SATOSHIDEN)));
                     }
                     free_json(array);
                 }
-                free(retstr);
             }
         }
-        free(totalstr);
     }
 }
 
 void Jumblr::opidsupdate()
 {
-    char *retstr; cJSON *array; int32_t i,n; struct jumblr_item *ptr;
-    if ( (retstr= zlistoperationids()) != 0 )
+    std::string retstr = zlistoperationids();
+    if ( !retstr.empty() )
     {
-        if ( (array= cJSON_Parse(retstr)) != 0 )
+        cJSON *array = cJSON_Parse(retstr.c_str());
+        if ( array != nullptr )
         {
+            int32_t n;
             if ( (n= cJSON_GetArraySize(array)) > 0 && cJSON_IsArray(array) != 0 )
             {
-                for (i=0; i<n; i++)
+                for (int32_t i=0; i<n; i++)
                 {
-                    if ( (ptr= opidadd(jstri(array,i))) != 0 )
+                    jumblr_item *ptr = opidadd(jstri(array,i));
+                    if ( ptr != nullptr )
                     {
                         if ( ptr->status == 0 )
                             opidupdate(ptr);
@@ -698,7 +720,6 @@ void Jumblr::opidsupdate()
             }
             free_json(array);
         }
-        free(retstr);
     }
 }
 
@@ -745,114 +766,140 @@ uint64_t Jumblr::increment(uint8_t r,int32_t height,uint64_t total,uint64_t bigg
 
 void Jumblr::iteration()
 {
-    static int32_t lastheight; static uint32_t lasttime;
-    char *zaddr,*addr,*retstr=0; cJSON *array; int32_t i,iter,height,acpublic,counter,chosen_one,n; uint64_t smallest,medium,biggest,amount=0,total=0; double fee; struct jumblr_item *ptr,*tmp; uint16_t r,s;
-    acpublic = ASSETCHAINS_PUBLIC;
+    static int32_t lastheight; 
+    static uint32_t lasttime;
+
+    if (pause)
+        return;
+
+    int32_t acpublic = ASSETCHAINS_PUBLIC;
     if ( ASSETCHAINS_SYMBOL[0] == 0 && GetTime() >= KOMODO_SAPLING_DEADLINE )
         acpublic = 1;
-    if ( pause || acpublic != 0 )
+    if ( acpublic != 0 )
         return;
+
     if ( lasttime == 0 )
     {
-        if ( (retstr= zlistaddresses()) != 0 )
+        std::string retstr = zlistaddresses();
+        if ( !retstr.empty() )
         {
-            if ( (array= cJSON_Parse(retstr)) != 0 )
+            cJSON *array = cJSON_Parse(retstr.c_str());
+            if ( array != nullptr )
             {
+                int32_t n;
                 if ( (n= cJSON_GetArraySize(array)) > 0 && cJSON_IsArray(array) != 0 )
                 {
-                    for (i=0; i<n; i++)
+                    for (int32_t i=0; i<n; i++)
                         zaddrinit(jstri(array,i));
                 }
                 free_json(array);
             }
-            free(retstr), retstr = 0;
         }
     }
-    height = (int32_t)chainActive.LastTip()->GetHeight();
+    int32_t height = (int32_t)chainActive.LastTip()->GetHeight();
     if ( time(NULL) < lasttime+40 )
         return;
+
     lasttime = (uint32_t)time(NULL);
     if ( lastheight == height )
         return;
+
     lastheight = height;
     if ( (height % JUMBLR_SYNCHRONIZED_BLOCKS) != JUMBLR_SYNCHRONIZED_BLOCKS-3 )
         return;
-    fee = JUMBLR_INCR * JUMBLR_FEE;
-    smallest = SATOSHIDEN * ((JUMBLR_INCR + 3*fee) + 3*JUMBLR_TXFEE);
-    medium = SATOSHIDEN * ((JUMBLR_INCR + 3*fee)*10 + 3*JUMBLR_TXFEE);
-    biggest = SATOSHIDEN * ((JUMBLR_INCR + 3*fee)*777 + 3*JUMBLR_TXFEE);
+
+    double fee = JUMBLR_INCR * JUMBLR_FEE;
+    uint64_t smallest = SATOSHIDEN * ((JUMBLR_INCR + 3*fee) + 3*JUMBLR_TXFEE);
+    uint64_t medium = SATOSHIDEN * ((JUMBLR_INCR + 3*fee)*10 + 3*JUMBLR_TXFEE);
+    uint64_t biggest = SATOSHIDEN * ((JUMBLR_INCR + 3*fee)*777 + 3*JUMBLR_TXFEE);
+    uint64_t amount = 0;
+    uint64_t total = 0;
+    uint16_t r;
     OS_randombytes((uint8_t *)&r,sizeof(r));
-    s = (r % 3);
+    uint16_t s = (r % 3);
+    std::string addr;
     switch ( s )
     {
         case 0: // t -> z
         default:
             if ( Jumblr_deposit[0] != 0 && (total= balance(Jumblr_deposit)) >= smallest )
             {
-                if ( (zaddr= zgetnewaddress()) != 0 )
+                std::string zaddr = zgetnewaddress();
+                if ( !zaddr.empty() )
                 {
-                    if ( zaddr[0] == '"' && zaddr[strlen(zaddr)-1] == '"' )
+                    if ( zaddr[0] == '"' && zaddr[zaddr.size()-1] == '"' )
                     {
-                        zaddr[strlen(zaddr)-1] = 0;
-                        addr = zaddr+1;
-                    } else addr = zaddr;
+                        addr = zaddr.substr(1, zaddr.size()-2);
+                    } 
+                    else 
+                        addr = zaddr;
                     amount = increment(r/3,height,total,biggest,medium,smallest);
-                    if ( amount > 0 && (retstr= sendt_to_z(Jumblr_deposit,addr,dstr(amount))) != 0 )
+                    if ( amount > 0 )
                     {
-                        printf("sendt_to_z.(%s)\n",retstr);
-                        free(retstr), retstr = 0;
+                        std::string retstr = sendt_to_z(Jumblr_deposit, addr, dstr(amount));
+                        if (!retstr.empty())
+                            printf("sendt_to_z.(%s)\n",retstr.c_str());
                     }
-                    free(zaddr);
-                } else printf("no zaddr from jumblr_zgetnewaddress\n");
+                } 
+                else 
+                    printf("no zaddr from jumblr_zgetnewaddress\n");
             }
             else if ( Jumblr_deposit[0] != 0 )
                 printf("%s total %.8f vs %.8f\n",Jumblr_deposit,dstr(total),(JUMBLR_INCR + 3*(fee+JUMBLR_TXFEE)));
             break;
         case 1: // z -> z
-            opidsupdate();
-            chosen_one = -1;
-            for (iter=counter=0; iter<2; iter++)
             {
-                counter = n = 0;
-                HASH_ITER(hh,Jumblrs,ptr,tmp)
+                opidsupdate();
+                int32_t chosen_one = -1;
+                for (int32_t iter = 0; iter < 2; iter++)
                 {
-                    if ( ptr->spent == 0 && ptr->status > 0 && addresstype(ptr->src) == 't' && addresstype(ptr->dest) == 'z' )
+                    int32_t counter = 0;
+                    int32_t n = 0;
+                    jumblr_item *ptr;
+                    jumblr_item *tmp;
+                    HASH_ITER(hh,Jumblrs,ptr,tmp)
                     {
-                        if ( (total= balance(ptr->dest)) >= (fee + JUMBLR_FEE)*SATOSHIDEN )
+                        if ( ptr->spent == 0 && ptr->status > 0 
+                                && addresstype(ptr->src) == 't' && addresstype(ptr->dest) == 'z' )
                         {
-                            if ( iter == 1 && counter == chosen_one )
+                            if ( (total= balance(ptr->dest)) >= (fee + JUMBLR_FEE)*SATOSHIDEN )
                             {
-                                if ( (zaddr= zgetnewaddress()) != 0 )
+                                if ( iter == 1 && counter == chosen_one )
                                 {
-                                    if ( zaddr[0] == '"' && zaddr[strlen(zaddr)-1] == '"' )
+                                    std::string zaddr = zgetnewaddress();
+                                    if ( !zaddr.empty() )
                                     {
-                                        zaddr[strlen(zaddr)-1] = 0;
-                                        addr = zaddr+1;
-                                    } else addr = zaddr;
-                                    if ( (retstr= sendz_to_z(ptr->dest,addr,dstr(total))) != 0 )
-                                    {
-                                        printf("n.%d counter.%d chosen_one.%d send z_to_z.(%s)\n",n,counter,chosen_one,retstr);
-                                        free(retstr), retstr = 0;
+                                        if ( zaddr[0] == '"' && zaddr[zaddr.size()-1] == '"' )
+                                        {
+                                            addr = zaddr.substr(1, zaddr.size()-2);
+                                        } 
+                                        else 
+                                            addr = zaddr;
+                                        std::string retstr = sendz_to_z(ptr->dest, addr, dstr(total));
+                                        if ( !retstr.empty() )
+                                        {
+                                            printf("n.%d counter.%d chosen_one.%d send z_to_z.(%s)\n",n,counter,
+                                                    chosen_one,retstr.c_str());
+                                        }
+                                        ptr->spent = (uint32_t)time(NULL);
+                                        break;
                                     }
-                                    ptr->spent = (uint32_t)time(NULL);
-                                    free(zaddr);
-                                    break;
                                 }
+                                counter++;
                             }
-                            counter++;
                         }
+                        n++;
                     }
-                    n++;
-                }
-                if ( counter == 0 )
-                    break;
-                if ( iter == 0 )
-                {
-                    OS_randombytes((uint8_t *)&chosen_one,sizeof(chosen_one));
-                    if ( chosen_one < 0 )
-                        chosen_one = -chosen_one;
-                    chosen_one %= counter;
-                    printf("jumblr z->z chosen_one.%d of %d, from %d\n",chosen_one,counter,n);
+                    if ( counter == 0 )
+                        break;
+                    if ( iter == 0 )
+                    {
+                        OS_randombytes((uint8_t *)&chosen_one,sizeof(chosen_one));
+                        if ( chosen_one < 0 )
+                            chosen_one = -chosen_one;
+                        chosen_one %= counter;
+                        printf("jumblr z->z chosen_one.%d of %d, from %d\n",chosen_one,counter,n);
+                    }
                 }
             }
             break;
@@ -860,13 +907,17 @@ void Jumblr::iteration()
             if ( Jumblr_numsecretaddrs > 0 )
             {
                 opidsupdate();
-                chosen_one = -1;
-                for (iter=0; iter<2; iter++)
+                int32_t chosen_one = -1;
+                for (int32_t iter = 0; iter < 2; iter++)
                 {
-                    counter = n = 0;
+                    int32_t counter = 0;
+                    int32_t n = 0;
+                    jumblr_item *ptr;
+                    jumblr_item *tmp;
                     HASH_ITER(hh,Jumblrs,ptr,tmp)
                     {
-                        if ( ptr->spent == 0 && ptr->status > 0 && addresstype(ptr->src) == 'z' && addresstype(ptr->dest) == 'z' )
+                        if ( ptr->spent == 0 && ptr->status > 0 
+                                && addresstype(ptr->src) == 'z' && addresstype(ptr->dest) == 'z' )
                         {
                             if ( (total= balance(ptr->dest)) >= (fee + JUMBLR_FEE)*SATOSHIDEN )
                             {
@@ -874,11 +925,13 @@ void Jumblr::iteration()
                                 {
                                     char secret_addr[64];
                                     secretaddr(secret_addr);
-                                    if ( (retstr= sendz_to_t(ptr->dest,secret_addr,dstr(total))) != 0 )
+                                    std::string retstr = sendz_to_t(ptr->dest, secret_addr, dstr(total));
+                                    if ( !retstr.empty() )
                                     {
-                                        printf("%s send z_to_t.(%s)\n",secret_addr,retstr);
-                                        free(retstr), retstr = 0;
-                                    } else printf("null return from jumblr_sendz_to_t\n");
+                                        printf("%s send z_to_t.(%s)\n",secret_addr,retstr.c_str());
+                                    } 
+                                    else 
+                                        printf("null return from jumblr_sendz_to_t\n");
                                     ptr->spent = (uint32_t)time(NULL);
                                     break;
                                 }
