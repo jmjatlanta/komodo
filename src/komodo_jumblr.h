@@ -59,9 +59,10 @@ public:
     std::atomic<bool> pause{true};
 
 private:
-    std::string userpass;
-    uint16_t port;
-
+    std::string userpass; // RPC
+    uint16_t port; // RPC
+    int32_t lastheight; // for iterations
+    uint32_t lasttime; // for iterations
 public:
     /****
      * @brief add a secret address

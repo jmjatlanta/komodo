@@ -766,9 +766,6 @@ uint64_t Jumblr::increment(uint8_t r,int32_t height,uint64_t total,uint64_t bigg
 
 void Jumblr::iteration()
 {
-    static int32_t lastheight; 
-    static uint32_t lasttime;
-
     if (pause)
         return;
 
