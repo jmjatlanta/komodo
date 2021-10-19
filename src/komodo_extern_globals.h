@@ -18,6 +18,8 @@
  * Please think twice before adding to this list. Can it be done with a better scope?
  */
 #include "komodo_structs.h"
+#include "komodo_pax.h"
+
 #include <mutex>
 #include <cstdint>
 
@@ -92,6 +94,7 @@ extern komodo_kv *KOMODO_KV;
 extern pax_transaction *PAX;
 extern knotaries_entry *Pubkeys;
 extern komodo_state KOMODO_STATES[34];
+extern std::shared_ptr<Pax> pax;
 
 int32_t komodo_baseid(char *origbase);
 uint64_t komodo_current_supply(uint32_t nHeight);

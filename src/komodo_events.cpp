@@ -16,7 +16,7 @@
 #include "komodo_extern_globals.h"
 #include "komodo_bitcoind.h" // komodo_verifynotarization
 #include "komodo_notary.h" // komodo_notarized_update
-#include "komodo_pax.h" // komodo_pvals
+#include "komodo_pax.h" // Pax::pvals
 #include "komodo_gateway.h" // komodo_opreturn
 
 /*****
@@ -76,7 +76,7 @@ void komodo_eventadd_pricefeed( komodo_state *sp, char *symbol, int32_t height, 
     if (sp != nullptr)
     {
         sp->add_event(symbol, height, pf);
-        komodo_pvals(height,pf->prices, pf->num);
+        pax->pvals(height,pf->prices, pf->num);
     }
 }
 

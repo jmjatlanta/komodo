@@ -1808,7 +1808,6 @@ void komodo_args(char *argv0)
 
         if ( (baseid = komodo_baseid(ASSETCHAINS_SYMBOL)) >= 0 && baseid < 32 )
         {
-            //komodo_maxallowed(baseid);
             printf("baseid.%d MAX_MONEY.%s %.8f\n",baseid,ASSETCHAINS_SYMBOL,(double)MAX_MONEY/SATOSHIDEN);
         }
 

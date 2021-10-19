@@ -14,6 +14,8 @@
  ******************************************************************************/
 #include "komodo_globals.h"
 
+std::shared_ptr<Pax> pax;
+
 int32_t komodo_baseid(char *origbase)
 {
     int32_t i; char base[64];

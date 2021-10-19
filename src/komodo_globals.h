@@ -16,6 +16,7 @@
 #include <mutex>
 #include "komodo_defs.h"
 #include "komodo_structs.h"
+#include "komodo_pax.h"
 
 void komodo_prefetch(FILE *fp);
 uint32_t komodo_heightstamp(int32_t height);
@@ -26,7 +27,6 @@ char *komodo_issuemethod(char *userpass,char *method,char *params,uint16_t port)
 int32_t komodo_isrealtime(int32_t *kmdheightp);
 uint64_t komodo_paxtotal();
 int32_t komodo_longestchain();
-uint64_t komodo_maxallowed(int32_t baseid);
 int32_t komodo_bannedset(int32_t *indallvoutsp,uint256 *array,int32_t max);
 int32_t komodo_checkvout(int32_t vout,int32_t k,int32_t indallvouts);
 

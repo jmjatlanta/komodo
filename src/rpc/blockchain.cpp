@@ -48,12 +48,16 @@
 
 using namespace std;
 
+#include "komodo_defs.h"
+#include "komodo_structs.h"
+#include "komodo_pax.h"
+
 extern int32_t KOMODO_INSYNC;
+extern std::shared_ptr<Pax> pax;
 extern void TxToJSON(const CTransaction& tx, const uint256 hashBlock, UniValue& entry);
 void ScriptPubKeyToJSON(const CScript& scriptPubKey, UniValue& out, bool fIncludeHex);
 int32_t komodo_notarized_height(int32_t *prevMoMheightp,uint256 *hashp,uint256 *txidp);
-#include "komodo_defs.h"
-#include "komodo_structs.h"
+
 
 double GetDifficultyINTERNAL(const CBlockIndex* blockindex, bool networkDifficulty)
 {
@@ -1149,7 +1153,7 @@ UniValue paxprice(const UniValue& params, bool fHelp, const CPubKey& mypk)
     else height = atoi(params[2].get_str().c_str());
     //if ( params.size() == 3 || (basevolume= COIN * atof(params[3].get_str().c_str())) == 0 )
         basevolume = 100000;
-    relvolume = komodo_paxprice(&seed,height,(char *)base.c_str(),(char *)rel.c_str(),basevolume);
+    relvolume = pax->price(&seed,height,(char *)base.c_str(),(char *)rel.c_str(),basevolume);
     ret.push_back(Pair("base", base));
     ret.push_back(Pair("rel", rel));
     ret.push_back(Pair("height", height));
