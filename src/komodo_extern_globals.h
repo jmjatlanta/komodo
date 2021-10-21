@@ -18,6 +18,8 @@
  * Please think twice before adding to this list. Can it be done with a better scope?
  */
 #include "komodo_structs.h"
+#include "komodo_kv.h"
+
 #include <mutex>
 #include <cstdint>
 
@@ -86,12 +88,11 @@ extern uint64_t ASSETCHAINS_CBOPRET;
 
 extern std::mutex komodo_mutex;
 extern std::vector<uint8_t> Mineropret;
-extern pthread_mutex_t KOMODO_KV_mutex;
 extern pthread_mutex_t KOMODO_CC_mutex;
-extern komodo_kv *KOMODO_KV;
 extern pax_transaction *PAX;
 extern knotaries_entry *Pubkeys;
 extern komodo_state KOMODO_STATES[34];
+extern std::shared_ptr<KV> kv;
 
 int32_t komodo_baseid(char *origbase);
 uint64_t komodo_current_supply(uint32_t nHeight);

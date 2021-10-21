@@ -132,8 +132,7 @@ int32_t ASSETCHAINS_STAKED_SPLIT_PERCENTAGE;
 
 std::map <std::int8_t, int32_t> mapHeightEvalActivate;
 
-struct komodo_kv *KOMODO_KV;
-pthread_mutex_t KOMODO_KV_mutex,KOMODO_CC_mutex;
+pthread_mutex_t KOMODO_CC_mutex;
 
 #define MAX_CURRENCIES 32
 char CURRENCIES[][8] = { "USD", "EUR", "JPY", "GBP", "AUD", "CAD", "CHF", "NZD", // major currencies

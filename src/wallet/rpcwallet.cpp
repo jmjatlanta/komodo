@@ -53,7 +53,6 @@
 #include <stdint.h>
 
 #include <boost/assign/list_of.hpp>
-//#include <utf8.h>
 
 #include <univalue.h>
 
@@ -61,6 +60,8 @@
 
 #include "komodo_defs.h"
 #include "hex.h"
+#include "komodo_kv.h"
+
 #include <string.h>
 
 using namespace std;
@@ -69,6 +70,7 @@ using namespace libzcash;
 
 extern char ASSETCHAINS_SYMBOL[KOMODO_ASSETCHAIN_MAXLEN];
 extern std::string ASSETCHAINS_OVERRIDE_PUBKEY;
+extern std::shared_ptr<KV> kv;
 const std::string ADDR_TYPE_SPROUT = "sprout";
 const std::string ADDR_TYPE_SAPLING = "sapling";
 extern UniValue TxJoinSplitToJSON(const CTransaction& tx);
@@ -638,7 +640,7 @@ UniValue kvupdate(const UniValue& params, bool fHelp, const CPubKey& mypk)
         //printf("flags.%d (%s) n.%d\n",flags,params[2].get_str().c_str(),n);
     } else flags = 0;
     if ( n >= 4 )
-        privkey = komodo_kvprivkey(&pubkey,(char *)(n >= 4 ? params[3].get_str().c_str() : "password"));
+        privkey = kv->privkey(&pubkey,(char *)(n >= 4 ? params[3].get_str().c_str() : "password"));
     haveprivkey = 1;
     flags |= 1;
     /*for (i=0; i<32; i++)
@@ -658,7 +660,7 @@ UniValue kvupdate(const UniValue& params, bool fHelp, const CPubKey& mypk)
             valuesize = (int32_t)strlen(params[1].get_str().c_str());
         }
         memcpy(keyvalue,key,keylen);
-        if ( (refvaluesize= komodo_kvsearch(&refpubkey,chainActive.LastTip()->GetHeight(),&tmpflags,&height,&keyvalue[keylen],key,keylen)) >= 0 )
+        if ( (refvaluesize= kv->search(&refpubkey,chainActive.LastTip()->GetHeight(),&tmpflags,&height,&keyvalue[keylen],key,keylen)) >= 0 )
         {
             if ( (tmpflags & KOMODO_KVPROTECTED) != 0 )
             {
@@ -670,8 +672,8 @@ UniValue kvupdate(const UniValue& params, bool fHelp, const CPubKey& mypk)
             }
             if ( keylen+refvaluesize <= sizeof(keyvalue) )
             {
-                sig = komodo_kvsig(keyvalue,keylen+refvaluesize,privkey);
-                if ( komodo_kvsigverify(keyvalue,keylen+refvaluesize,refpubkey,sig) < 0 )
+                sig = kv->sig(keyvalue,keylen+refvaluesize,privkey);
+                if ( kv->sigverify(keyvalue,keylen+refvaluesize,refpubkey,sig) < 0 )
                 {
                     ret.push_back(Pair("error",(char *)"error verifying sig, passphrase is probably wrong"));
                     printf("VERIFY ERROR\n");
@@ -687,7 +689,7 @@ UniValue kvupdate(const UniValue& params, bool fHelp, const CPubKey& mypk)
         if ( memcmp(&zeroes,&refpubkey,sizeof(refpubkey)) != 0 )
             ret.push_back(Pair("owner",refpubkey.GetHex()));
         ret.push_back(Pair("height", (int64_t)height));
-        duration = komodo_kvduration(flags); //((flags >> 2) + 1) * KOMODO_KVDURATION;
+        duration = kv->duration(flags); //((flags >> 2) + 1) * KOMODO_KVDURATION;
         ret.push_back(Pair("expiration", (int64_t)(height+duration)));
         ret.push_back(Pair("flags",(int64_t)flags));
         ret.push_back(Pair("key",params[0].get_str()));
@@ -723,7 +725,7 @@ UniValue kvupdate(const UniValue& params, bool fHelp, const CPubKey& mypk)
         //    printf("%02x",opretbuf[i]);
         //printf(" opretbuf keylen.%d valuesize.%d height.%d (%02x %02x %02x)\n",*(uint16_t *)&keyvalue[0],*(uint16_t *)&keyvalue[2],*(uint32_t *)&keyvalue[4],keyvalue[8],keyvalue[9],keyvalue[10]);
         EnsureWalletIsUnlocked();
-        fee = komodo_kvfee(flags,opretlen,keylen);
+        fee = kv->fee(flags,opretlen,keylen);
         ret.push_back(Pair("fee",(double)fee/COIN));
         CBitcoinAddress destaddress(CRYPTO777_KMDADDR);
         if (!destaddress.IsValid())

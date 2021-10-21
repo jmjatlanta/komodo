@@ -36,6 +36,9 @@
 #include "script/script_error.h"
 #include "script/sign.h"
 #include "script/standard.h"
+#include "komodo_defs.h"
+#include "komodo_structs.h"
+#include "komodo_kv.h"
 
 #include <stdint.h>
 
@@ -48,12 +51,11 @@
 
 using namespace std;
 
+extern std::shared_ptr<KV> kv;
 extern int32_t KOMODO_INSYNC;
 extern void TxToJSON(const CTransaction& tx, const uint256 hashBlock, UniValue& entry);
 void ScriptPubKeyToJSON(const CScript& scriptPubKey, UniValue& out, bool fIncludeHex);
 int32_t komodo_notarized_height(int32_t *prevMoMheightp,uint256 *hashp,uint256 *txidp);
-#include "komodo_defs.h"
-#include "komodo_structs.h"
 
 double GetDifficultyINTERNAL(const CBlockIndex* blockindex, bool networkDifficulty)
 {
@@ -966,7 +968,7 @@ UniValue kvsearch(const UniValue& params, bool fHelp, const CPubKey& mypk)
         if ( keylen < sizeof(key) )
         {
             memcpy(key,params[0].get_str().c_str(),keylen);
-            if ( (valuesize= komodo_kvsearch(&refpubkey,chainActive.LastTip()->GetHeight(),&flags,&height,value,key,keylen)) >= 0 )
+            if ( (valuesize= kv->search(&refpubkey,chainActive.LastTip()->GetHeight(),&flags,&height,value,key,keylen)) >= 0 )
             {
                 std::string val; char *valuestr;
                 val.resize(valuesize);

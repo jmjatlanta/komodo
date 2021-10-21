@@ -216,6 +216,13 @@ bits256 curve25519_shared(bits256 privkey,bits256 otherpub)
     return(hash);
 }
 
+/****
+ * @brief calculate mypublic based on secret and basepoint
+ * @param[out] mypublic the result
+ * @param[in] secret the secret
+ * @param[in] basepoint the basepoint
+ * @returns 0
+ */
 int32_t curve25519_donna(uint8_t *mypublic,const uint8_t *secret,const uint8_t *basepoint)
 {
     bits256 val,p,bp;
@@ -226,74 +233,30 @@ int32_t curve25519_donna(uint8_t *mypublic,const uint8_t *secret,const uint8_t *
     return(0);
 }
 
+/*****
+ * @brief get address and public/private key based on passphrase
+ * @param[out] mysecret the hash of the passphrase (a.k.a private key)
+ * @param[out] mypublic the public key
+ * @param[in] pass the passphrase
+ * @param[in] passlen the length of the passphrase
+ * @returns the hash of the public key (a.k.a. an address)
+ */
 uint64_t conv_NXTpassword(unsigned char *mysecret,unsigned char *mypublic,uint8_t *pass,int32_t passlen)
 {
     static uint8_t basepoint[32] = {9};
-    uint64_t addr; uint8_t hash[32];
+
+    // calculate mysecret
     if ( pass != 0 && passlen != 0 )
         vcalc_sha256(0,mysecret,pass,passlen);
     mysecret[0] &= 248, mysecret[31] &= 127, mysecret[31] |= 64;
+
+    // calculate mypublic
     curve25519_donna(mypublic,mysecret,basepoint);
+    // JMJ Possible optimization here... Why not pass &((char*)addr) directly to vcalc?
+    uint8_t hash[32];
     vcalc_sha256(0,hash,mypublic,32);
+    uint64_t addr;
     memcpy(&addr,hash,sizeof(addr));
-    return(addr);
+    return addr;
 }
 
-uint256 komodo_kvprivkey(uint256 *pubkeyp,char *passphrase)
-{
-    uint256 privkey;
-    conv_NXTpassword((uint8_t *)&privkey,(uint8_t *)pubkeyp,(uint8_t *)passphrase,(int32_t)strlen(passphrase));
-    return(privkey);
-}
-
-uint256 komodo_kvsig(uint8_t *buf,int32_t len,uint256 _privkey)
-{
-    bits256 sig,hash,otherpub,checksig,pubkey,privkey; uint256 usig;
-    memcpy(&privkey,&_privkey,sizeof(privkey));
-    vcalc_sha256(0,hash.bytes,buf,len);
-    otherpub = curve25519(hash,curve25519_basepoint9());
-    pubkey = curve25519(privkey,curve25519_basepoint9());
-    sig = curve25519_shared(privkey,otherpub);
-    checksig = curve25519_shared(hash,pubkey);
-    /*int32_t i; for (i=0; i<len; i++)
-        printf("%02x",buf[i]);
-    printf(" -> ");
-    for (i=0; i<32; i++)
-        printf("%02x",((uint8_t *)&privkey)[i]);
-    printf(" -> ");
-    for (i=0; i<32; i++)
-        printf("%02x",((uint8_t *)&pubkey)[i]);
-    printf(" pubkey\n");*/
-    memcpy(&usig,&sig,sizeof(usig));
-    return(usig);
-}
-
-int32_t komodo_kvsigverify(uint8_t *buf,int32_t len,uint256 _pubkey,uint256 sig)
-{
-    bits256 hash,checksig,pubkey; static uint256 zeroes;
-    memcpy(&pubkey,&_pubkey,sizeof(pubkey));
-    if ( memcmp(&pubkey,&zeroes,sizeof(pubkey)) != 0 )
-    {
-        vcalc_sha256(0,hash.bytes,buf,len);
-        checksig = curve25519_shared(hash,pubkey);
-        /*int32_t i; for (i=0; i<len; i++)
-            printf("%02x",buf[i]);
-        printf(" -> ");
-        for (i=0; i<32; i++)
-            printf("%02x",((uint8_t *)&hash)[i]);
-        printf(" -> ");
-        for (i=0; i<32; i++)
-            printf("%02x",((uint8_t *)&pubkey)[i]);
-        printf(" verify pubkey\n");
-        for (i=0; i<32; i++)
-            printf("%02x",((uint8_t *)&sig)[i]);
-        printf(" sig vs");
-        for (i=0; i<32; i++)
-            printf("%02x",((uint8_t *)&checksig)[i]);
-        printf(" checksig\n");*/
-        if ( memcmp(&checksig,&sig,sizeof(sig)) != 0 )
-            return(-1);
-        //else printf("VALIDATED\n");
-    }
-    return(0);
-}

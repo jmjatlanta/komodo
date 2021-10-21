@@ -13,6 +13,9 @@
  *                                                                            *
  ******************************************************************************/
 #include "komodo_globals.h"
+#include "komodo_kv.h"
+
+std::shared_ptr<KV> kv = std::make_shared<KV>();
 
 int32_t komodo_baseid(char *origbase)
 {

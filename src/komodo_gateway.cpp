@@ -841,7 +841,7 @@ const char *komodo_opreturn(int32_t height,uint64_t value,uint8_t *opretbuf,int3
     tokomodo = (komodo_is_issuer() == 0);
     if ( opretbuf[0] == 'K' && opretlen != 40 )
     {
-        komodo_kvupdate(opretbuf,opretlen,value);
+        kv->update(opretbuf,opretlen,value);
         return("kv");
     }
     else if ( ASSETCHAINS_SYMBOL[0] == 0 && KOMODO_PAX == 0 )

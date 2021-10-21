@@ -14,10 +14,18 @@
  ******************************************************************************/
 #include "komodo_kv.h"
 #include "komodo_extern_globals.h"
-#include "komodo_utils.h" // portable_mutex_lock
-#include "komodo_curve25519.h" // komodo_kvsigverify
+#include "komodo_curve25519.h" // signing and verifying
+#include "komodo_utils.h" // iguana_rwnum
 
-int32_t komodo_kvcmp(uint8_t *refvalue,uint16_t refvaluesize,uint8_t *value,uint16_t valuesize)
+/***
+ * Compare two values
+ * @param refvalue value A
+ * @param refvaluesize the length of value A
+ * @param value value B
+ * @param valuesize the length of value B
+ * @returns -1 if size mismatch or one of the values is null, 0 if both values are equal, < 0 if A < B, >0 if A > B
+ */
+int32_t KV::cmp(uint8_t *refvalue,uint16_t refvaluesize,uint8_t *value,uint16_t valuesize)
 {
     if ( refvalue == 0 && value == 0 )
         return(0);
@@ -25,46 +33,82 @@ int32_t komodo_kvcmp(uint8_t *refvalue,uint16_t refvaluesize,uint8_t *value,uint
         return(-1);
     else if ( refvaluesize != valuesize )
         return(-1);
-    else return(memcmp(refvalue,value,valuesize));
+
+    return memcmp(refvalue,value,valuesize);
 }
 
-int32_t komodo_kvnumdays(uint32_t flags)
+/***
+ * Retrieve number of days stored in flags
+ * @param flags where the number of days is stored (using bitwise manipulation)
+ * @returns number of days (max 365)
+ */
+int32_t KV::numdays(uint32_t flags)
 {
-    int32_t numdays;
-    if ( (numdays= ((flags>>2)&0x3ff)+1) > 365 )
+    int32_t numdays = ((flags>>2)&0x3ff)+1;
+    if (numdays > 365 )
         numdays = 365;
-    return(numdays);
+    return numdays;
 }
 
-int32_t komodo_kvduration(uint32_t flags)
+/****
+ * @brief get duration via flags and block counts
+ * @param flags where number of days is stored
+ * @returns the duration
+ */
+int32_t KV::duration(uint32_t flags)
 {
-    return(komodo_kvnumdays(flags) * KOMODO_KVDURATION);
+    return(numdays(flags) * KOMODO_KVDURATION);
 }
 
-uint64_t komodo_kvfee(uint32_t flags,int32_t opretlen,int32_t keylen)
+/*****
+ * @brief calculate fee
+ * @param flags to calculate number of days
+ * @param opretlen the size of the data
+ * @param keylen the key length
+ * @returns the fee 
+ */
+uint64_t KV::fee(uint32_t flags,int32_t opretlen,int32_t keylen)
 {
-    int32_t numdays,k; uint64_t fee;
-    if ( (k= keylen) > 32 )
-        k = 32;
-    numdays = komodo_kvnumdays(flags);
-    if ( (fee= (numdays*(opretlen * opretlen / k))) < 100000 )
+    if ( keylen > 32 )
+        keylen = 32;
+
+    int32_t num_days = numdays(flags);
+
+    uint64_t fee = num_days*(opretlen * opretlen / keylen);
+    if ( fee < 100000 )
         fee = 100000;
-    return(fee);
+
+    return fee;
 }
 
-int32_t komodo_kvsearch(uint256 *pubkeyp,int32_t current_height,uint32_t *flagsp,int32_t *heightp,uint8_t value[IGUANA_MAXSCRIPTSIZE],uint8_t *key,int32_t keylen)
+/*****
+ * @brief search hash table for key
+ * @param[out] pubkeyp the public key of the found value
+ * @param[in] current_height current chain height (to check expiry)
+ * @param[out] flagsp the flags of the found value
+ * @param[out] heightp the height of the found value
+ * @param[out] value the value
+ * @param[in] key the key to search for
+ * @param[in] keylen the key length
+ * @returns -1 if not found, otherwise the size of `value`
+ */
+int32_t KV::search(uint256 *pubkeyp,int32_t current_height,uint32_t *flagsp,
+        int32_t *heightp,uint8_t value[IGUANA_MAXSCRIPTSIZE],uint8_t *key,int32_t keylen)
 {
-    struct komodo_kv *ptr; int32_t duration,retval = -1;
+    int32_t duration;
+    int32_t retval = -1;
+
     *heightp = -1;
     *flagsp = 0;
+
     memset(pubkeyp,0,sizeof(*pubkeyp));
-    portable_mutex_lock(&KOMODO_KV_mutex);
+    std::lock_guard<std::mutex> lock(kv_mutex);
+    komodo_kv *ptr;
     HASH_FIND(hh,KOMODO_KV,key,keylen,ptr);
     if ( ptr != 0 )
     {
-        duration = komodo_kvduration(ptr->flags);
-        //fprintf(stderr,"duration.%d flags.%d current.%d ht.%d keylen.%d valuesize.%d\n",duration,ptr->flags,current_height,ptr->height,ptr->keylen,ptr->valuesize);
-        if ( current_height > (ptr->height + duration) )
+        duration = this->duration(ptr->flags);
+        if ( current_height > (ptr->height + duration) ) // entry expired, remove from collection
         {
             HASH_DELETE(hh,KOMODO_KV,ptr);
             if ( ptr->value != 0 )
@@ -77,122 +121,191 @@ int32_t komodo_kvsearch(uint256 *pubkeyp,int32_t current_height,uint32_t *flagsp
         {
             *heightp = ptr->height;
             *flagsp = ptr->flags;
-            int32_t i; for (i=0; i<32; i++)
+            for (int32_t i = 0; i<32; i++)
             {
-                //printf("%02x",((uint8_t *)&ptr->pubkey)[31-i]);
                 ((uint8_t *)pubkeyp)[i] = ((uint8_t *)&ptr->pubkey)[31-i];
             }
-            //printf(" ptr->pubkey\n");
             memcpy(pubkeyp,&ptr->pubkey,sizeof(*pubkeyp));
             if ( (retval= ptr->valuesize) > 0 )
                 memcpy(value,ptr->value,retval);
         }
-    } //else fprintf(stderr,"couldnt find (%s)\n",(char *)key);
-    portable_mutex_unlock(&KOMODO_KV_mutex);
-    if ( retval < 0 )
-    {
-        // search rawmempool
     }
+    // TODO: If retval < 0, search rawmempool
     return(retval);
 }
 
-void komodo_kvupdate(uint8_t *opretbuf,int32_t opretlen,uint64_t value)
+/****
+ * @brief add or update a kv entry
+ * @param opretbuf the entry to update
+ * @param opretlen the length of `opretbuf`
+ * @param value the fee
+ */
+void KV::update(uint8_t *opretbuf,int32_t opretlen,uint64_t value)
 {
-    static uint256 zeroes;
-    uint32_t flags; uint256 pubkey,refpubkey,sig; int32_t i,refvaluesize,hassig,coresize,haspubkey,height,kvheight; uint16_t keylen,valuesize,newflag = 0; uint8_t *key,*valueptr,keyvalue[IGUANA_MAXSCRIPTSIZE*8]; struct komodo_kv *ptr; char *transferpubstr,*tstr; uint64_t fee;
     if ( ASSETCHAINS_SYMBOL[0] == 0 ) // disable KV for KMD
         return;
+
+    // break apart opretbuf
+    uint16_t keylen;
+    uint16_t valuesize;
+    int32_t height;
+    uint32_t flags;
     iguana_rwnum(0,&opretbuf[1],sizeof(keylen),&keylen);
     iguana_rwnum(0,&opretbuf[3],sizeof(valuesize),&valuesize);
     iguana_rwnum(0,&opretbuf[5],sizeof(height),&height);
     iguana_rwnum(0,&opretbuf[9],sizeof(flags),&flags);
-    key = &opretbuf[13];
-    if ( keylen+13 > opretlen )
-    {
-        static uint32_t counter;
-        if ( ++counter < 1 )
-            fprintf(stderr,"komodo_kvupdate: keylen.%d + 13 > opretlen.%d, this can be ignored\n",keylen,opretlen);
+    uint8_t *key = &opretbuf[13];
+    if ( keylen+13 > opretlen ) // embedded keylength invalid
         return;
-    }
-    valueptr = &key[keylen];
-    fee = komodo_kvfee(flags,opretlen,keylen);
-    //fprintf(stderr,"fee %.8f vs %.8f flags.%d keylen.%d valuesize.%d height.%d (%02x %02x %02x) (%02x %02x %02x)\n",(double)fee/COIN,(double)value/COIN,flags,keylen,valuesize,height,key[0],key[1],key[2],valueptr[0],valueptr[1],valueptr[2]);
-    if ( value >= fee )
+    uint8_t *valueptr = &key[keylen];
+    if ( value >= this->fee(flags, opretlen, keylen) ) // the given fee covers the required fee
     {
-        coresize = (int32_t)(sizeof(flags)+sizeof(height)+sizeof(keylen)+sizeof(valuesize)+keylen+valuesize+1);
+        bool is_new_entry = false;
+        int32_t coresize = (int32_t)(sizeof(flags)+sizeof(height)+sizeof(keylen)+sizeof(valuesize)+keylen+valuesize+1);
         if ( opretlen == coresize || opretlen == coresize+sizeof(uint256) || opretlen == coresize+2*sizeof(uint256) )
         {
-            memset(&pubkey,0,sizeof(pubkey));
-            memset(&sig,0,sizeof(sig));
-            if ( (haspubkey= (opretlen >= coresize+sizeof(uint256))) != 0 )
+            // opretlen seems to be the right size
+            uint256 pubkey;
+            uint256 sig;
+            if ( opretlen >= coresize+sizeof(uint256) ) // do we have a public key?
             {
-                for (i=0; i<32; i++)
+                for (uint8_t i = 0; i < 32; i++)
                     ((uint8_t *)&pubkey)[i] = opretbuf[coresize+i];
             }
-            if ( (hassig= (opretlen == coresize+sizeof(uint256)*2)) != 0 )
+            if ( opretlen == coresize+sizeof(uint256)*2 ) // Do we have a signature?
             {
-                for (i=0; i<32; i++)
+                for (uint8_t i=0; i<32; i++)
                     ((uint8_t *)&sig)[i] = opretbuf[coresize+sizeof(uint256)+i];
             }
+            uint8_t keyvalue[IGUANA_MAXSCRIPTSIZE*8]; 
             memcpy(keyvalue,key,keylen);
-            if ( (refvaluesize= komodo_kvsearch((uint256 *)&refpubkey,height,&flags,&kvheight,&keyvalue[keylen],key,keylen)) >= 0 )
+            uint256 refpubkey;
+            int32_t kvheight;
+            int32_t refvaluesize = search((uint256 *)&refpubkey,height,&flags,&kvheight,&keyvalue[keylen],key,keylen);
+            if ( refvaluesize >= 0 )
             {
+                static uint256 zeroes;
                 if ( memcmp(&zeroes,&refpubkey,sizeof(refpubkey)) != 0 )
                 {
-                    if ( komodo_kvsigverify(keyvalue,keylen+refvaluesize,refpubkey,sig) < 0 )
+                    if ( sigverify(keyvalue,keylen+refvaluesize,refpubkey,sig) < 0 )
                     {
-                        //fprintf(stderr,"komodo_kvsigverify error [%d]\n",coresize-13);
                         return;
                     }
                 }
             }
-            portable_mutex_lock(&KOMODO_KV_mutex);
+            std::lock_guard<std::mutex> lock(kv_mutex);
+            komodo_kv *ptr;
             HASH_FIND(hh,KOMODO_KV,key,keylen,ptr);
-            if ( ptr != 0 )
+            if ( ptr != nullptr )
             {
-                //fprintf(stderr,"(%s) already there\n",(char *)key);
-                //if ( (ptr->flags & KOMODO_KVPROTECTED) != 0 )
                 {
-                    tstr = (char *)"transfer:";
-                    transferpubstr = (char *)&valueptr[strlen(tstr)];
+                    char *tstr = (char *)"transfer:";
+                    char *transferpubstr = (char *)&valueptr[strlen(tstr)];
                     if ( strncmp(tstr,(char *)valueptr,strlen(tstr)) == 0 && is_hexstr(transferpubstr,0) == 64 )
                     {
                         printf("transfer.(%s) to [%s]? ishex.%d\n",key,transferpubstr,is_hexstr(transferpubstr,0));
-                        for (i=0; i<32; i++)
+                        for (uint8_t i=0; i<32; i++)
                             ((uint8_t *)&pubkey)[31-i] = _decode_hex(&transferpubstr[i*2]);
                     }
                 }
             }
-            else if ( ptr == 0 )
+            else // we did not find the komodo_kv entry, add it
             {
-                ptr = (struct komodo_kv *)calloc(1,sizeof(*ptr));
+                ptr = (komodo_kv *)calloc(1,sizeof(*ptr));
                 ptr->key = (uint8_t *)calloc(1,keylen);
                 ptr->keylen = keylen;
                 memcpy(ptr->key,key,keylen);
-                newflag = 1;
+                is_new_entry = true;
                 HASH_ADD_KEYPTR(hh,KOMODO_KV,ptr->key,ptr->keylen,ptr);
-                //fprintf(stderr,"KV add.(%s) (%s)\n",ptr->key,valueptr);
             }
-            if ( newflag != 0 || (ptr->flags & KOMODO_KVPROTECTED) == 0 )
+            if ( is_new_entry || (ptr->flags & KOMODO_KVPROTECTED) == 0 )
             {
                 if ( ptr->value != 0 )
                     free(ptr->value), ptr->value = 0;
-                if ( (ptr->valuesize= valuesize) != 0 )
+                ptr->valuesize = valuesize;
+                if ( ptr->valuesize != 0 )
                 {
                     ptr->value = (uint8_t *)calloc(1,valuesize);
                     memcpy(ptr->value,valueptr,valuesize);
                 }
-            } else fprintf(stderr,"newflag.%d zero or protected %d\n",newflag,(ptr->flags & KOMODO_KVPROTECTED));
-            /*for (i=0; i<32; i++)
-                printf("%02x",((uint8_t *)&ptr->pubkey)[i]);
-            printf(" <- ");
-            for (i=0; i<32; i++)
-                printf("%02x",((uint8_t *)&pubkey)[i]);
-            printf(" new pubkey\n");*/
+            } 
+            else 
+                fprintf(stderr,"newflag.%s zero or protected %d\n",is_new_entry?"true":"false",
+                        (ptr->flags & KOMODO_KVPROTECTED));
             memcpy(&ptr->pubkey,&pubkey,sizeof(ptr->pubkey));
             ptr->height = height;
             ptr->flags = flags; // jl777 used to or in KVPROTECTED
-            portable_mutex_unlock(&KOMODO_KV_mutex);
-        } else fprintf(stderr,"KV update size mismatch %d vs %d\n",opretlen,coresize);
-    } else fprintf(stderr,"not enough fee\n");
+        } 
+        else 
+            fprintf(stderr,"KV update size mismatch %d vs %d\n",opretlen,coresize);
+    } 
+    else 
+        fprintf(stderr,"not enough fee\n");
+}
+
+/****
+ * @brief get public/private keys based on passed in information
+ * @param[out] pubkeyp the public key
+ * @param[in] passphrase the passphrase
+ * @returns the private key
+ */
+uint256 KV::privkey(uint256 *pubkeyp,char *passphrase)
+{
+    uint256 privkey;
+    conv_NXTpassword((uint8_t *)&privkey,(uint8_t *)pubkeyp,(uint8_t *)passphrase,(int32_t)strlen(passphrase));
+    return privkey;
+}
+
+/***
+ * @brief sign data with a private key
+ * @param[in] buf the data to be signed
+ * @param[in] len the length of the data in `buf`
+ * @param[in] _privkey the private key
+ * @returns the signature
+ */
+uint256 KV::sig(uint8_t *buf,int32_t len,uint256 _privkey)
+{
+    bits256 privkey;
+    memcpy(&privkey,&_privkey,sizeof(privkey));
+
+    bits256 hash;
+    vcalc_sha256(0,hash.bytes,buf,len);
+
+    bits256 otherpub = curve25519(hash,curve25519_basepoint9());
+    bits256 pubkey = curve25519(privkey,curve25519_basepoint9());
+    bits256 sig = curve25519_shared(privkey,otherpub);
+    bits256 checksig = curve25519_shared(hash,pubkey);
+    uint256 usig;
+    memcpy(&usig,&sig,sizeof(usig));
+    return usig;
+}
+
+/*****
+ * @brief verify signature
+ * @param buf the data that was signed
+ * @param len the length of `buf`
+ * @param _pubkey the signer's public key
+ * @param sig the given signature
+ * @returns 0 if signature matches, -1 otherwise
+ */
+bool KV::sigverify(uint8_t *buf,int32_t len,uint256 _pubkey,uint256 sig)
+{
+    static uint256 zeroes;
+
+    bits256 pubkey;
+    memcpy(&pubkey,&_pubkey,sizeof(pubkey));
+
+    if ( memcmp(&pubkey,&zeroes,sizeof(pubkey)) != 0 ) // we have a legit pubkey
+    {
+        bits256 hash;
+        vcalc_sha256(0,hash.bytes,buf,len);
+        bits256 checksig;
+        checksig = curve25519_shared(hash,pubkey);
+
+        if ( memcmp(&checksig,&sig,sizeof(sig)) != 0 )
+            return false;
+    }
+    else
+        return false; // something wrong with pubkey
+    return true;
 }
