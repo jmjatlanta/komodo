@@ -16,9 +16,7 @@
  * Removal or modification of this copyright notice is prohibited.            *
  *                                                                            *
  ******************************************************************************/
-
 #include "addrman.h"
-
 #include "hash.h"
 #include "serialize.h"
 #include "streams.h"
@@ -537,10 +535,10 @@ int CAddrMan::RandomInt(int nMax){
     return GetRandInt(nMax);
 }
 
-std::vector<bool> CAddrMan::DecodeAsmap(fs::path path)
+std::vector<bool> CAddrMan::DecodeAsmap(boost::filesystem::path path)
 {
     std::vector<bool> bits;
-    FILE *filestr = fsbridge::fopen(path, "rb");
+    FILE *filestr = ::fopen(path.string().c_str(), "rb");
     CAutoFile file(filestr, SER_DISK, CLIENT_VERSION);
     if (file.IsNull()) {
         LogPrintf("Failed to open asmap file from disk\n");

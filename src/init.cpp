@@ -1053,15 +1053,16 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
     }
 
     // Read asmap file if configured
-    if (mapArgs.count("-asmap")) {
-        fs::path asmap_path = fs::path(GetArg("-asmap", ""));
+    if (mapArgs.count("-asmap")) 
+    {
+        boost::filesystem::path asmap_path = boost::filesystem::path(GetArg("-asmap", ""));
         if (asmap_path.empty()) {
             asmap_path = DEFAULT_ASMAP_FILENAME;
         }
         if (!asmap_path.is_absolute()) {
             asmap_path = GetDataDir() / asmap_path;
         }
-        if (!fs::exists(asmap_path)) {
+        if (!boost::filesystem::exists(asmap_path)) {
             InitError(strprintf(_("Could not find asmap file %s"), asmap_path));
             return false;
         }

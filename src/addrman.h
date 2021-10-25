@@ -27,7 +27,6 @@
 #include "sync.h"
 #include "timedata.h"
 #include "util.h"
-#include "fs.h"
 #include "clientversion.h"
 #include "hash.h"
 #include "netbase.h"
@@ -36,6 +35,7 @@
 #include <set>
 #include <stdint.h>
 #include <vector>
+#include <boost/filesystem.hpp>
 
 /**
  * Extended statistics about a CAddress
@@ -287,7 +287,7 @@ public:
     std::vector<bool> m_asmap;
 
     // Read asmap from provided binary file
-    static std::vector<bool> DecodeAsmap(fs::path path);
+    static std::vector<bool> DecodeAsmap(boost::filesystem::path path);
 
 
     /**
