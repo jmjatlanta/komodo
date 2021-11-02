@@ -294,7 +294,7 @@ uint8_t DecodeAssetTokenOpRet(const CScript &scriptPubKey, uint8_t &assetsEvalCo
     assetsFuncId = 0;
 
 	// First - decode token opret:
-	funcId = DecodeTokenOpRet(scriptPubKey, dummyEvalCode, tokenid, voutPubkeysDummy, oprets);
+	funcId = CCTokens::DecodeTransactionOpRet(scriptPubKey, dummyEvalCode, tokenid, voutPubkeysDummy, oprets);
     GetOpretBlob(oprets, OPRETID_ASSETSDATA, vopretAssets);
 
     LOGSTREAM((char *)"ccassets", CCLOG_DEBUG2, stream << "DecodeAssetTokenOpRet() from DecodeTokenOpRet returned funcId=" << (int)funcId << std::endl);
@@ -381,15 +381,15 @@ bool GetAssetorigaddrs(struct CCcontract_info *cp, char *origCCaddr, char *origN
         return(false);
 
 	bool bGetCCaddr = false;
-    CCTokensContract_info tokensC;
+    CCTokens tokensC;
 
 	if (vintxFuncId == 's' || vintxFuncId == 'S') {
         tokensC.additionalTokensEvalcode2 = tokensC.additionalTokensEvalcode2;  // add non-fungible if present
-        bGetCCaddr = GetTokensCCaddress(&tokensC, origCCaddr, pubkey2pk(origpubkey));  // tokens to single-eval token or token+nonfungible
+        bGetCCaddr = CCTokens::GetCCaddress(&tokensC, origCCaddr, pubkey2pk(origpubkey));  // tokens to single-eval token or token+nonfungible
 	}
 	else if (vintxFuncId == 'b' || vintxFuncId == 'B') {
         tokensC.additionalTokensEvalcode2 = tokensC.additionalTokensEvalcode2;  // add non-fungible if present
-        bGetCCaddr = GetTokensCCaddress(&tokensC, origCCaddr, pubkey2pk(origpubkey));  // tokens to single-eval token or token+nonfungible
+        bGetCCaddr = CCTokens::GetCCaddress(&tokensC, origCCaddr, pubkey2pk(origpubkey));  // tokens to single-eval token or token+nonfungible
 	}
 	else  {
 		std::cerr << "GetAssetorigaddrs incorrect vintx funcid=" << (char)(vintxFuncId?vintxFuncId:' ') << std::endl;
@@ -437,7 +437,7 @@ int64_t AssetValidateCCvin(struct CCcontract_info *cp,Eval* eval,char *origCCadd
 	// if fillSell or cancelSell --> should spend tokens from dual-eval token-assets unspendable addr
     else if( (funcid == 'S' || funcid == 'x') && 
 		(Getscriptaddress(destaddr, vinTx.vout[tx.vin[vini].prevout.n].scriptPubKey) == 0 || 
-		!GetTokensCCaddress(cp, unspendableAddr, cp->GetUnspendable()) || 
+		!CCTokens::GetCCaddress(cp, unspendableAddr, cp->GetUnspendable()) || 
 		strcmp(destaddr, unspendableAddr) != 0))
     {
         fprintf(stderr,"AssetValidateCCvin() cc addr %s is not dual token-evalcode=0x%02x asset unspendable addr %s\n", destaddr, (int)cp->evalcode, unspendableAddr);
@@ -597,7 +597,7 @@ bool AssetCalcAmounts(struct CCcontract_info *cpAssets, int64_t &inputs, int64_t
 	int32_t numvouts = tx.vout.size();
 	inputs = outputs = 0;
 
-	CCTokensContract_info C;
+	CCTokens C;
 
 	for (int32_t i = 0; i<numvins; i++)
 	{
@@ -618,7 +618,7 @@ bool AssetCalcAmounts(struct CCcontract_info *cpAssets, int64_t &inputs, int64_t
 				std::vector<CPubKey> vinPubkeysEmpty;
 
 				// TODO: maybe we do not need call to IsTokensVout here, cause we've already selected token vins
-				assetoshis = IsTokensvout(false, false, &C, NULL, vinTx, tx.vin[i].prevout.n, assetid);
+				assetoshis = C.IsTokensvout(false, false, NULL, vinTx, tx.vin[i].prevout.n, assetid);
 				if (assetoshis != 0)
 				{
 					//std::cerr << "AssetCalcAmounts() vin i=" << i << " assetoshis=" << assetoshis << std::endl;

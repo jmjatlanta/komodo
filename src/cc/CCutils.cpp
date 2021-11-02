@@ -21,6 +21,7 @@
 #include "komodo_structs.h"
 #include "key_io.h"
 #include "cc/CClib.h"
+#include "cc/CCtokens.h"
 
 #ifdef TESTMODE           
     #define MIN_NON_NOTARIZED_CONFIRMS 2
@@ -201,14 +202,6 @@ void CCaddr1of2set(struct CCcontract_info *cp, CPubKey pk1, CPubKey pk2, uint8_t
     strcpy(cp->coins1of2addr,coinaddr);
 }
 
-void CCaddrTokens1of2set(struct CCcontract_info *cp, CPubKey pk1, CPubKey pk2, uint8_t *priv, char *tokenaddr)
-{
-	cp->tokens1of2pk[0] = pk1;
-	cp->tokens1of2pk[1] = pk2;
-    memcpy(cp->tokens1of2priv,priv,32);
-	strcpy(cp->tokens1of2addr, tokenaddr);
-}
-
 bool Getscriptaddress(char *destaddr,const CScript &scriptPubKey)
 {
     CTxDestination address; txnouttype whichType;
@@ -327,28 +320,6 @@ bool GetCCaddress(struct CCcontract_info *cp,char *destaddr,CPubKey pk)
     return(_GetCCaddress(destaddr,cp->evalcode,pk));
 }
 
-bool _GetTokensCCaddress(char *destaddr, uint8_t evalcode, uint8_t evalcode2, CPubKey pk)
-{
-	CC *payoutCond;
-	destaddr[0] = 0;
-	if ((payoutCond = MakeTokensCCcond1(evalcode, evalcode2, pk)) != 0)
-	{
-		Getscriptaddress(destaddr, CCPubKey(payoutCond));
-		cc_free(payoutCond);
-	}
-	return(destaddr[0] != 0);
-}
-
-// get scriptPubKey adddress for three/dual eval token cc vout
-bool GetTokensCCaddress(struct CCcontract_info *cp, char *destaddr, CPubKey pk)
-{
-	destaddr[0] = 0;
-	if (pk.size() == 0)
-		pk = cp->GetUnspendable();
-	return(_GetTokensCCaddress(destaddr, cp->evalcode, cp->additionalTokensEvalcode2, pk));
-}
-
-
 bool GetCCaddress1of2(struct CCcontract_info *cp,char *destaddr,CPubKey pk,CPubKey pk2)
 {
     CC *payoutCond;
@@ -359,18 +330,6 @@ bool GetCCaddress1of2(struct CCcontract_info *cp,char *destaddr,CPubKey pk,CPubK
         cc_free(payoutCond);
     }
     return(destaddr[0] != 0);
-}
-
-bool GetTokensCCaddress1of2(struct CCcontract_info *cp, char *destaddr, CPubKey pk, CPubKey pk2)
-{
-	CC *payoutCond;
-	destaddr[0] = 0;
-	if ((payoutCond = MakeTokensCCcond1of2(cp->evalcode, cp->additionalTokensEvalcode2, pk, pk2)) != 0)  //  if additionalTokensEvalcode2 not set then it is dual-eval cc else three-eval cc
-	{
-		Getscriptaddress(destaddr, CCPubKey(payoutCond));
-		cc_free(payoutCond);
-	}
-	return(destaddr[0] != 0);
 }
 
 bool ConstrainVout(CTxOut vout, int32_t CCflag, char *cmpaddr, int64_t nValue)

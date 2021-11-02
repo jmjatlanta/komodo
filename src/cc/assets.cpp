@@ -169,7 +169,7 @@ bool CCAssetContract_info::validate(Eval* eval, const CTransaction &tx, uint32_t
         additionalTokensEvalcode2 = vopretNonfungible.begin()[0];
 
     // find dual-eval tokens unspendable addr:
-    GetTokensCCaddress(this, tokensDualEvalUnspendableCCaddr, GetUnspendable());
+    CCTokens::GetCCaddress(this, tokensDualEvalUnspendableCCaddr, GetUnspendable());
     // this is for marker validation:
     GetCCaddress(this, origAssetsCCaddr, origpubkey); 
 

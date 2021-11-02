@@ -23,28 +23,20 @@
 #define IS_CHARINSTR(c, str) (std::string(str).find((char)(c)) != std::string::npos)
 #endif
 
-// NOTE: this inital tx won't be used by other contract
-// for tokens to be used there should be at least one 't' tx with other contract's custom opret
-CScript EncodeTokenCreateOpRet(uint8_t funcid, std::vector<uint8_t> origpubkey, std::string name, std::string description, vscript_t vopretNonfungible)
+CScript CCTokens::EncodeCreateOpRet(uint8_t funcid, const std::vector<uint8_t>& origpubkey, 
+        const std::string& name, const std::string& description, vscript_t vopretNonfungible)
 {
-    /*   CScript opret;
-    uint8_t evalcode = EVAL_TOKENS;
-    funcid = 'c'; // override the param
-
-    opret << OP_RETURN << E_MARSHAL(ss << evalcode << funcid << origpubkey << name << description; \
-    if (!vopretNonfungible.empty()) {
-    ss << (uint8_t)OPRETID_NONFUNGIBLEDATA;
-    ss << vopretNonfungible;
-    });  */
-
+    // NOTE: this inital tx won't be used by other contract
+    // for tokens to be used there should be at least one 't' tx with other contract's custom opret
     std::vector<std::pair<uint8_t, vscript_t>> oprets;
 
     if(!vopretNonfungible.empty())
         oprets.push_back(std::make_pair(OPRETID_NONFUNGIBLEDATA, vopretNonfungible));
-    return EncodeTokenCreateOpRet(funcid, origpubkey, name, description, oprets);
+    return EncodeCreateOpRet(funcid, origpubkey, name, description, oprets);
 }
 
-CScript EncodeTokenCreateOpRet(uint8_t funcid, std::vector<uint8_t> origpubkey, std::string name, std::string description, std::vector<std::pair<uint8_t, vscript_t>> oprets)
+CScript CCTokens::EncodeCreateOpRet(uint8_t funcid, const std::vector<uint8_t>& origpubkey, 
+        const std::string& name, const std::string& description, std::vector<std::pair<uint8_t, vscript_t>> oprets)
 {
     CScript opret;
     uint8_t evalcode = EVAL_TOKENS;
@@ -60,36 +52,16 @@ CScript EncodeTokenCreateOpRet(uint8_t funcid, std::vector<uint8_t> origpubkey, 
     return(opret);
 }
 
-/*
-// opret 'i' for imported tokens
-CScript EncodeTokenImportOpRet(std::vector<uint8_t> origpubkey, std::string name, std::string description, uint256 srctokenid, std::vector<std::pair<uint8_t, vscript_t>> oprets)
-{
-    CScript opret;
-    uint8_t evalcode = EVAL_TOKENS;
-    uint8_t funcid = 'i';
-
-    srctokenid = revuint256(srctokenid); // do not forget this
-
-    opret << OP_RETURN << E_MARSHAL(ss << evalcode << funcid << origpubkey << name << description << srctokenid;
-    for (auto o : oprets) {
-        if (o.first != 0) {
-            ss << (uint8_t)o.first;
-            ss << o.second;
-        }
-    });
-    return(opret);
-}
-*/
-
-
-CScript EncodeTokenOpRet(uint256 tokenid, std::vector<CPubKey> voutPubkeys, std::pair<uint8_t, vscript_t> opretWithId)
+CScript CCTokens::EncodeTransactionOpRet(uint256 tokenid, const std::vector<CPubKey>& voutPubkeys, 
+        std::pair<uint8_t, vscript_t> opretWithId)
 {
     std::vector<std::pair<uint8_t, vscript_t>>  oprets;
     oprets.push_back(opretWithId);
-    return EncodeTokenOpRet(tokenid, voutPubkeys, oprets);
+    return EncodeTransactionOpRet(tokenid, voutPubkeys, oprets);
 }
 
-CScript EncodeTokenOpRet(uint256 tokenid, std::vector<CPubKey> voutPubkeys, std::vector<std::pair<uint8_t, vscript_t>> oprets)
+CScript CCTokens::EncodeTransactionOpRet(uint256 tokenid, const std::vector<CPubKey>& voutPubkeys, 
+        std::vector<std::pair<uint8_t, vscript_t>> oprets)
 {
     CScript opret;
     uint8_t tokenFuncId = 't';
@@ -103,9 +75,6 @@ CScript EncodeTokenOpRet(uint256 tokenid, std::vector<CPubKey> voutPubkeys, std:
     else {
         LOGSTREAM((char *)"cctokens", CCLOG_DEBUG2, stream << "EncodeTokenOpRet voutPubkeys.size()=" << voutPubkeys.size() << " not supported" << std::endl);
     }
-
-    //vopret_t vpayload;
-    //GetOpReturnData(payload, vpayload);
 
     opret << OP_RETURN << E_MARSHAL(ss << evalCodeInOpret << tokenFuncId << tokenid << ccType;
     if (ccType >= 1) ss << voutPubkeys[0];
@@ -136,20 +105,16 @@ CScript EncodeTokenOpRet(uint256 tokenid, std::vector<CPubKey> voutPubkeys, std:
     return opret;
 }
 
-// overload for compatibility 
-//CScript EncodeTokenOpRet(uint8_t tokenFuncId, uint8_t evalCodeInOpret, uint256 tokenid, std::vector<CPubKey> voutPubkeys, CScript payload)
-//{
-//	return EncodeTokenOpRet(tokenid, voutPubkeys, payload);
-//}
-
 // overload for fungible tokens (no additional data in opret):
-uint8_t DecodeTokenCreateOpRet(const CScript &scriptPubKey, std::vector<uint8_t> &origpubkey, std::string &name, std::string &description) {
+uint8_t CCTokens::DecodeCreateOpRet(const CScript &scriptPubKey, std::vector<uint8_t> &origpubkey, 
+        std::string &name, std::string &description) {
     //vopret_t  vopretNonfungibleDummy;
     std::vector<std::pair<uint8_t, vscript_t>>  opretsDummy;
-    return DecodeTokenCreateOpRet(scriptPubKey, origpubkey, name, description, opretsDummy);
+    return DecodeCreateOpRet(scriptPubKey, origpubkey, name, description, opretsDummy);
 }
 
-uint8_t DecodeTokenCreateOpRet(const CScript &scriptPubKey, std::vector<uint8_t> &origpubkey, std::string &name, std::string &description, std::vector<std::pair<uint8_t, vscript_t>> &oprets)
+uint8_t CCTokens::DecodeCreateOpRet(const CScript &scriptPubKey, std::vector<uint8_t> &origpubkey, 
+        std::string &name, std::string &description, std::vector<std::pair<uint8_t, vscript_t>> &oprets)
 {
     vscript_t vopret, vblob;
     uint8_t dummyEvalcode, funcid, opretId = 0;
@@ -171,15 +136,15 @@ uint8_t DecodeTokenCreateOpRet(const CScript &scriptPubKey, std::vector<uint8_t>
             return(funcid);
         }
     }
-    LOGSTREAM((char *)"cctokens", CCLOG_INFO, stream << "DecodeTokenCreateOpRet() incorrect token create opret" << std::endl);
+    LOGSTREAM((char *)"cctokens", CCLOG_INFO, stream << "DecodeCreateOpRet() incorrect token create opret" << std::endl);
     return (uint8_t)0;
 }
 
 // decode token opret: 
 // for 't' returns all data from opret, vopretExtra contains other contract's data (currently only assets'). 
 // for 'c' returns only funcid. NOTE: nonfungible data is not returned
-uint8_t DecodeTokenOpRet(const CScript scriptPubKey, uint8_t &evalCodeTokens, uint256 &tokenid, 
-        std::vector<CPubKey> &voutPubkeys, std::vector<std::pair<uint8_t, vscript_t>>  &oprets)
+uint8_t CCTokens::DecodeTransactionOpRet(const CScript scriptPubKey, uint8_t &evalCodeTokens, 
+        uint256 &tokenid, std::vector<CPubKey> &voutPubkeys, std::vector<std::pair<uint8_t, vscript_t>>  &oprets)
 {
     vscript_t vopret;
     GetOpReturnData(scriptPubKey, vopret);
@@ -208,7 +173,7 @@ uint8_t DecodeTokenOpRet(const CScript scriptPubKey, uint8_t &evalCodeTokens, ui
                 vscript_t dummyPubkey;
                 std::string dummyName;
                 std::string dummyDescription;
-                return DecodeTokenCreateOpRet(scriptPubKey, dummyPubkey, dummyName, dummyDescription, oprets);
+                return DecodeCreateOpRet(scriptPubKey, dummyPubkey, dummyName, dummyDescription, oprets);
             }
         case 't':
             {
@@ -286,7 +251,7 @@ uint8_t DecodeTokenOpRet(const CScript scriptPubKey, uint8_t &evalCodeTokens, ui
 
 
 // make three-eval (token+evalcode+evalcode2) 1of2 cryptocondition:
-CC *MakeTokensCCcond1of2(uint8_t evalcode, uint8_t evalcode2, CPubKey pk1, CPubKey pk2)
+CC *CCTokens::MakeCCcond1of2(uint8_t evalcode, uint8_t evalcode2, CPubKey pk1, CPubKey pk2)
 {
     // make 1of2 sigs cond 
     std::vector<CC*> pks;
@@ -304,12 +269,12 @@ CC *MakeTokensCCcond1of2(uint8_t evalcode, uint8_t evalcode2, CPubKey pk1, CPubK
     return CCNewThreshold(thresholds.size(), thresholds);
 }
 // overload to make two-eval (token+evalcode) 1of2 cryptocondition:
-CC *MakeTokensCCcond1of2(uint8_t evalcode, CPubKey pk1, CPubKey pk2) {
-    return MakeTokensCCcond1of2(evalcode, 0, pk1, pk2);
+CC *CCTokens::MakeCCcond1of2(uint8_t evalcode, CPubKey pk1, CPubKey pk2) {
+    return MakeCCcond1of2(evalcode, 0, pk1, pk2);
 }
 
 // make three-eval (token+evalcode+evalcode2) cryptocondition:
-CC *MakeTokensCCcond1(uint8_t evalcode, uint8_t evalcode2, CPubKey pk)
+CC *CCTokens::MakeCCcond1(uint8_t evalcode, uint8_t evalcode2, CPubKey pk)
 {
     std::vector<CC*> pks;
     pks.push_back(CCNewSecp256k1(pk));
@@ -325,35 +290,35 @@ CC *MakeTokensCCcond1(uint8_t evalcode, uint8_t evalcode2, CPubKey pk)
     return CCNewThreshold(thresholds.size(), thresholds);
 }
 // overload to make two-eval (token+evalcode) cryptocondition:
-CC *MakeTokensCCcond1(uint8_t evalcode, CPubKey pk) {
-    return MakeTokensCCcond1(evalcode, 0, pk);
+CC *CCTokens::MakeCCcond1(uint8_t evalcode, CPubKey pk) {
+    return MakeCCcond1(evalcode, 0, pk);
 }
 
 // make three-eval (token+evalcode+evalcode2) 1of2 cc vout:
-CTxOut MakeTokensCC1of2vout(uint8_t evalcode, uint8_t evalcode2, CAmount nValue, CPubKey pk1, CPubKey pk2)
+CTxOut CCTokens::MakeCC1of2vout(uint8_t evalcode, uint8_t evalcode2, CAmount nValue, CPubKey pk1, CPubKey pk2)
 {
     CTxOut vout;
-    CC *payoutCond = MakeTokensCCcond1of2(evalcode, evalcode2, pk1, pk2);
+    CC *payoutCond = MakeCCcond1of2(evalcode, evalcode2, pk1, pk2);
     vout = CTxOut(nValue, CCPubKey(payoutCond));
     cc_free(payoutCond);
     return(vout);
 }
 // overload to make two-eval (token+evalcode) 1of2 cc vout:
-CTxOut MakeTokensCC1of2vout(uint8_t evalcode, CAmount nValue, CPubKey pk1, CPubKey pk2) {
-    return MakeTokensCC1of2vout(evalcode, 0, nValue, pk1, pk2);
+CTxOut CCTokens::MakeCC1of2vout(uint8_t evalcode, CAmount nValue, CPubKey pk1, CPubKey pk2) {
+    return MakeCC1of2vout(evalcode, 0, nValue, pk1, pk2);
 }
 
 // make three-eval (token+evalcode+evalcode2) cc vout:
-CTxOut MakeTokensCC1vout(uint8_t evalcode, uint8_t evalcode2, CAmount nValue, CPubKey pk)
+CTxOut CCTokens::MakeCC1vout(uint8_t evalcode, uint8_t evalcode2, CAmount nValue, CPubKey pk)
 {
     CTxOut vout;
-    CC *payoutCond = MakeTokensCCcond1(evalcode, evalcode2, pk);
+    CC *payoutCond = MakeCCcond1(evalcode, evalcode2, pk);
     vout = CTxOut(nValue, CCPubKey(payoutCond));
     cc_free(payoutCond);
     return(vout);
 }
 // overload to make two-eval (token+evalcode) cc vout:
-CTxOut MakeTokensCC1vout(uint8_t evalcode, CAmount nValue, CPubKey pk) {
-    return MakeTokensCC1vout(evalcode, 0, nValue, pk);
+CTxOut CCTokens::MakeCC1vout(uint8_t evalcode, CAmount nValue, CPubKey pk) {
+    return MakeCC1vout(evalcode, 0, nValue, pk);
 }
 

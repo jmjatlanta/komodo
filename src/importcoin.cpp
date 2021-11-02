@@ -25,6 +25,7 @@
 #include "wallet/wallet.h"
 
 #include "cc/CCinclude.h"
+#include "cc/CCtokens.h"
 
 int32_t komodo_nextheight();
 
@@ -59,10 +60,10 @@ CTransaction MakeImportCoinTransaction(const ImportProof proof, const CTransacti
         std::vector <std::pair<uint8_t, vscript_t>> oprets;
         std::string name, desc;
 
-        if (DecodeTokenCreateOpRet(mtx.vout.back().scriptPubKey, vorigpubkey, name, desc, oprets) == 'c') {    // parse token 'c' opret
+        if (CCTokens::DecodeCreateOpRet(mtx.vout.back().scriptPubKey, vorigpubkey, name, desc, oprets) == 'c') {    // parse token 'c' opret
             mtx.vout.pop_back(); //remove old token opret
             oprets.push_back(std::make_pair(OPRETID_IMPORTDATA, importData));
-            mtx.vout.push_back(CTxOut(0, EncodeTokenCreateOpRet('c', vorigpubkey, name, desc, oprets)));   // make new token 'c' opret with importData                                                                                    
+            mtx.vout.push_back(CTxOut(0, CCTokens::EncodeCreateOpRet('c', vorigpubkey, name, desc, oprets)));   // make new token 'c' opret with importData                                                                                    
         }
         else {
             LOGSTREAM("importcoin", CCLOG_INFO, stream << "MakeImportCoinTransaction() incorrect token import opret" << std::endl);
@@ -176,7 +177,7 @@ bool UnmarshalImportTx(const CTransaction importTx, ImportProof &proof, CTransac
         std::vector<uint8_t> vorigpubkey;
         std::string name, desc;
 
-        if (DecodeTokenCreateOpRet(importTx.vout.back().scriptPubKey, vorigpubkey, name, desc, oprets) == 0) {
+        if (CCTokens::DecodeCreateOpRet(importTx.vout.back().scriptPubKey, vorigpubkey, name, desc, oprets) == 0) {
             LOGSTREAM("importcoin", CCLOG_INFO, stream << "UnmarshalImportTx() could not decode token opret" << std::endl);
             return false;
         }
@@ -189,7 +190,7 @@ bool UnmarshalImportTx(const CTransaction importTx, ImportProof &proof, CTransac
             }
 
         payouts = std::vector<CTxOut>(importTx.vout.begin(), importTx.vout.end()-1);       //exclude opret with import data 
-        payouts.push_back(CTxOut(0, EncodeTokenCreateOpRet('c', vorigpubkey, name, desc, oprets)));   // make original payouts token opret (without import data)
+        payouts.push_back(CTxOut(0, CCTokens::EncodeCreateOpRet('c', vorigpubkey, name, desc, oprets)));   // make original payouts token opret (without import data)
     }
     else {
         //payouts = std::vector<CTxOut>(importTx.vout.begin()+1, importTx.vout.end());   // see next
@@ -224,7 +225,7 @@ bool UnmarshalBurnTx(const CTransaction burnTx, std::string &targetSymbol, uint3
         uint8_t evalCodeInOpret;
         std::vector<CPubKey> voutTokenPubkeys;
 
-        if (DecodeTokenOpRet(burnTx.vout.back().scriptPubKey, evalCodeInOpret, tokenid, voutTokenPubkeys, oprets) != 't')
+        if (CCTokens::DecodeTransactionOpRet(burnTx.vout.back().scriptPubKey, evalCodeInOpret, tokenid, voutTokenPubkeys, oprets) != 't')
             return false;
 
         //skip token opret:
@@ -338,7 +339,7 @@ CAmount GetCoinImportValue(const CTransaction &tx)
                 std::vector<CPubKey> voutTokenPubkeys;
                 std::vector<std::pair<uint8_t, vscript_t>>  oprets;
 
-                if (DecodeTokenOpRet(tx.vout.back().scriptPubKey, evalCodeInOpret, tokenid, voutTokenPubkeys, oprets) == 0)
+                if (CCTokens::DecodeTransactionOpRet(tx.vout.back().scriptPubKey, evalCodeInOpret, tokenid, voutTokenPubkeys, oprets) == 0)
                     return 0;
 
                 uint8_t nonfungibleEvalCode = EVAL_TOKENS; // init as if no non-fungibles
@@ -351,7 +352,7 @@ CAmount GetCoinImportValue(const CTransaction &tx)
                 int64_t ccBurnOutputs = 0;
                 for (auto v : burnTx.vout)
                     if (v.scriptPubKey.IsPayToCryptoCondition() &&
-                        CTxOut(v.nValue, v.scriptPubKey) == MakeTokensCC1vout(nonfungibleEvalCode, v.nValue, pubkey2pk(ParseHex(CC_BURNPUBKEY))))  // burned to dead pubkey
+                        CTxOut(v.nValue, v.scriptPubKey) == CCTokens::MakeCC1vout(nonfungibleEvalCode, v.nValue, pubkey2pk(ParseHex(CC_BURNPUBKEY))))  // burned to dead pubkey
                         ccBurnOutputs += v.nValue;
 
                 return ccBurnOutputs + burnTx.vout.back().nValue;   // total token burned value

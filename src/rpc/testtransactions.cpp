@@ -151,12 +151,12 @@ UniValue test_burntx(const UniValue& params, bool fHelp, const CPubKey& mypk)
 
     mtx.vin.push_back(CTxIn(tokenid, 0));
     mtx.vin.push_back(CTxIn(tokenid, 1));
-    mtx.vout.push_back(MakeTokensCC1vout(EVAL_TOKENS, 1, burnpk));
+    mtx.vout.push_back(CCTokens::MakeCC1vout(EVAL_TOKENS, 1, burnpk));
 
     std::vector<CPubKey> voutPubkeys;
     voutPubkeys.push_back(burnpk);
 
-    CCTokensContract_info C;
+    CCTokens C;
 
     std::vector<uint8_t> vopret;
     GetNonfungibleData(tokenid, vopret);
@@ -168,7 +168,7 @@ UniValue test_burntx(const UniValue& params, bool fHelp, const CPubKey& mypk)
     CPubKey unspPk = C.GetUnspendable(tokenpriv);
     GetCCaddress(&C, unspendableTokenAddr, unspPk);
     CCaddr2set(&C, EVAL_TOKENS, unspPk, tokenpriv, unspendableTokenAddr);
-    return(FinalizeCCTx(0, &C, mtx, myPubkey, 10000, EncodeTokenOpRet(tokenid, voutPubkeys, std::make_pair(0, vscript_t()))));
+    return(FinalizeCCTx(0, &C, mtx, myPubkey, 10000, C.EncodeTransactionOpRet(tokenid, voutPubkeys, std::make_pair(0, vscript_t()))));
 }
 
 UniValue test_proof(const UniValue& params, bool fHelp, const CPubKey& mypk)

@@ -100,18 +100,18 @@ UniValue FinalizeCCTxExt(bool remote, uint64_t CCmask, struct CCcontract_info *c
 
 	// tokens support:
 	// to spend from dual/three-eval mypk vout
-	GetTokensCCaddress(cp, mytokensaddr, mypk);
+	CCTokens::GetCCaddress(cp, mytokensaddr, mypk);
     // NOTE: if additionalEvalcode2 is not set it is a dual-eval (not three-eval) cc cond:
-	mytokenscond = MakeTokensCCcond1(cp->evalcode, cp->additionalTokensEvalcode2, mypk);  
+	mytokenscond = CCTokens::MakeCCcond1(cp->evalcode, cp->additionalTokensEvalcode2, mypk);  
 
 	// to spend from single-eval EVAL_TOKENS mypk 
-    CCTokensContract_info tokens;
+    CCTokens tokens;
 	GetCCaddress(&tokens, mysingletokensaddr, mypk);
 	mysingletokenscond = MakeCCcond1(EVAL_TOKENS, mypk);
 
 	// to spend from dual/three-eval EVAL_TOKEN+evalcode 'unspendable' pk:
-	GetTokensCCaddress(cp, unspendabletokensaddr, unspendablepk);  // it may be a three-eval cc, if cp->additionalEvalcode2 is set
-	othertokenscond = MakeTokensCCcond1(cp->evalcode, cp->additionalTokensEvalcode2, unspendablepk);
+	tokens.GetCCaddress(cp, unspendabletokensaddr, unspendablepk);  // it may be a three-eval cc, if cp->additionalEvalcode2 is set
+	othertokenscond = tokens.MakeCCcond1(cp->evalcode, cp->additionalTokensEvalcode2, unspendablepk);
 
     //Reorder vins so that for multiple normal vins all other except vin0 goes to the end
     //This is a must to avoid hardfork change of validation in every CC, because there could be maximum one normal vin at the begining with current validation.
@@ -286,7 +286,7 @@ UniValue FinalizeCCTxExt(bool remote, uint64_t CCmask, struct CCcontract_info *c
 					if (othercond1of2tokens == 0)
                         // NOTE: if additionalEvalcode2 is not set then it is dual-eval cc else three-eval cc
                         // TODO: verify evalcodes order if additionalEvalcode2 is not 0
-						othercond1of2tokens = MakeTokensCCcond1of2(cp->evalcode, cp->additionalTokensEvalcode2, cp->tokens1of2pk[0], cp->tokens1of2pk[1]);
+						othercond1of2tokens = CCTokens::MakeCCcond1of2(cp->evalcode, cp->additionalTokensEvalcode2, cp->tokens1of2pk[0], cp->tokens1of2pk[1]);
 					cond = othercond1of2tokens;
 				}
                 else
@@ -546,7 +546,7 @@ int64_t CCfullsupply(uint256 tokenid)
     uint256 hashBlock; int32_t numvouts; CTransaction tx; std::vector<uint8_t> origpubkey; std::string name,description;
     if ( myGetTransaction(tokenid,tx,hashBlock) != 0 && (numvouts= tx.vout.size()) > 0 )
     {
-        if (DecodeTokenCreateOpRet(tx.vout[numvouts-1].scriptPubKey,origpubkey,name,description))
+        if (CCTokens::DecodeCreateOpRet(tx.vout[numvouts-1].scriptPubKey,origpubkey,name,description))
         {
             return(tx.vout[1].nValue);
         }
@@ -570,7 +570,7 @@ int64_t CCtoken_balance(char *coinaddr,uint256 reftokenid)
             char str[65];
 			std::vector<CPubKey> voutTokenPubkeys;
             std::vector<std::pair<uint8_t, vscript_t>>  oprets;
-            if ( reftokenid==txid || (DecodeTokenOpRet(tx.vout[numvouts-1].scriptPubKey, evalCode, tokenid, voutTokenPubkeys, oprets) != 0 && reftokenid == tokenid))
+            if ( reftokenid==txid || (CCTokens::DecodeTransactionOpRet(tx.vout[numvouts-1].scriptPubKey, evalCode, tokenid, voutTokenPubkeys, oprets) != 0 && reftokenid == tokenid))
             {
                 sum += it->second.satoshis;
             }

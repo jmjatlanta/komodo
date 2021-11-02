@@ -91,7 +91,7 @@ std::shared_ptr<CCcontract_info> CCinit(uint8_t evalcode)
         case EVAL_GATEWAYS:
             return std::make_shared<CCGatewaysContract_info>();
 		case EVAL_TOKENS:
-            return std::make_shared<CCTokensContract_info>();
+            return std::make_shared<CCTokens>();
         case EVAL_IMPORTGATEWAY:
             return std::make_shared<CCImportGatewayContract_info>();
         default:

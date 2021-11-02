@@ -143,7 +143,7 @@ bool CCHeirContract_info::validate(Eval* eval, const CTransaction& tx, uint32_t 
     
     std::cerr << "HeirValidate funcid=" << (char)funcId << " evalcode=" << (int)evalcode << std::endl;
     
-    CCTokensContract_info tokensC;
+    CCTokens tokensC;
     
     switch (funcId) {
         case 'F':
@@ -322,7 +322,7 @@ uint8_t _DecodeHeirEitherOpRet(CScript scriptPubKey, uint256 &tokenid, CPubKey& 
     vscript_t vopretExtra /*, vopretStripped*/;
 
 
-	if (DecodeTokenOpRet(scriptPubKey, evalCodeTokens, tokenid, voutPubkeysDummy, oprets) != 0 && GetOpretBlob(oprets, OPRETID_HEIRDATA, vopretExtra)) {
+	if (CCTokens::DecodeTransactionOpRet(scriptPubKey, evalCodeTokens, tokenid, voutPubkeysDummy, oprets) != 0 && GetOpretBlob(oprets, OPRETID_HEIRDATA, vopretExtra)) {
         /* if (vopretExtra.size() > 1) {
             // restore the second opret:
 
@@ -532,7 +532,7 @@ template <class Helper> int64_t Add1of2AddressInputs(struct CCcontract_info* cp,
             if ((txid == fundingtxid || fundingTxidInOpret == fundingtxid) &&
                 funcId != 0 &&
                 isMyFuncId(funcId) &&
-                (typeid(Helper) != typeid(TokenHelper) || IsTokensvout(true, true, cp, nullptr, heirtx, voutIndex, tokenid) > 0) && // token validation logic
+                (typeid(Helper) != typeid(TokenHelper) || ( cp->evalcode == EVAL_TOKENS && dynamic_cast<CCTokens*>(cp)->IsTokensvout(true, true, nullptr, heirtx, voutIndex, tokenid) > 0)) && // token validation logic
                 //(voutValue = IsHeirFundingVout<Helper>(cp, heirtx, voutIndex, ownerPubkey, heirPubkey)) > 0 &&		// heir contract vout validation logic - not used since we moved to 2-eval vouts
                 !myIsutxo_spentinmempool(ignoretxid,ignorevin,txid, voutIndex))
             {
@@ -553,7 +553,7 @@ template <class Helper> int64_t Add1of2AddressInputs(struct CCcontract_info* cp,
 /**
  * enumerate all tx's sending to CCHeir 1of2address and calc total lifetime funds
  */
-template <class Helper> int64_t LifetimeHeirContractFunds(struct CCcontract_info* cp, uint256 fundingtxid, CPubKey ownerPubkey, CPubKey heirPubkey)
+template <class Helper> int64_t LifetimeHeirContractFunds(CCcontract_info* cp, uint256 fundingtxid, CPubKey ownerPubkey, CPubKey heirPubkey)
 {
     char coinaddr[64];
     Helper::GetCoinsOrTokensCCaddress1of2(coinaddr, ownerPubkey, heirPubkey); // get the address of cryptocondition '1 of 2 pubkeys'
@@ -561,7 +561,6 @@ template <class Helper> int64_t LifetimeHeirContractFunds(struct CCcontract_info
     std::vector<std::pair<CAddressIndexKey, CAmount>> addressIndexes;
     SetCCtxids(addressIndexes, coinaddr,true);
     
-    //fprintf(stderr,"LifetimeHeirContractFunds() scan lifetime of %s\n",coinaddr);
     int64_t total = 0;
     for (std::vector<std::pair<CAddressIndexKey, CAmount>>::const_iterator it = addressIndexes.begin(); it != addressIndexes.end(); it++) {
         uint256 hashBlock;
@@ -578,16 +577,13 @@ template <class Helper> int64_t LifetimeHeirContractFunds(struct CCcontract_info
             CScript heirScript = (heirtx.vout.size() > 0) ? heirtx.vout[heirtx.vout.size() - 1].scriptPubKey : CScript();   // check boundary
             uint8_t funcId = DecodeHeirEitherOpRet(heirScript, tokenid, fundingTxidInOpret, hasHeirSpendingBegunDummy, false);
             
-            //std::cerr << "LifetimeHeirContractFunds() found tx=" << txid.GetHex() << " vout[0].nValue=" << subtx.vout[ccVoutIdx].nValue << " opreturn=" << (char)funcId << '\n';
-            
             if (funcId != 0 &&
                 (txid == fundingtxid || fundingTxidInOpret == fundingtxid) &&
                 isMyFuncId(funcId) && !isSpendingTx(funcId) &&
-                (typeid(Helper) != typeid(TokenHelper) || IsTokensvout(true, true, cp, nullptr, heirtx, ivout, tokenid) > 0) &&
+                (typeid(Helper) != typeid(TokenHelper) || (cp->evalcode == EVAL_TOKENS && dynamic_cast<CCTokens*>(cp)->IsTokensvout(true, true, nullptr, heirtx, ivout, tokenid) > 0)) &&
                 !myIsutxo_spentinmempool(ignoretxid,ignorevin,txid, ivout)) // exclude tx in mempool
             {
                 total += it->second; // dont do this: tx.vout[ivout].nValue; // in vin[0] always is the pay to 1of2 addr (funding or change)
-                //std::cerr << "LifetimeHeirContractFunds() added tx=" << txid.GetHex() << " it->second=" << it->second << " vout[0].nValue=" << tx.vout[ivout].nValue << " opreturn=" << (char)funcId << '\n';
             }
         }
     }

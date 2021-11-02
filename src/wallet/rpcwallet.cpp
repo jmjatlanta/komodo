@@ -5660,7 +5660,7 @@ UniValue CCaddress(struct CCcontract_info *cp,char *name,std::vector<unsigned ch
         mypk = pubkey2pk(Mypubkey());
         GetCCaddress1of2(cp,destaddr,mypk,pubkey2pk(pubkey));
         result.push_back(Pair(str,destaddr));
-        if (GetTokensCCaddress1of2(cp,destaddr,mypk,pubkey2pk(pubkey))>0)
+        if (CCTokens::GetCCaddress1of2(cp,destaddr,mypk,pubkey2pk(pubkey))>0)
         {
             sprintf(str,"%sCC1of2TokensAddress",name);
             result.push_back(Pair(str,destaddr));
@@ -5668,7 +5668,7 @@ UniValue CCaddress(struct CCcontract_info *cp,char *name,std::vector<unsigned ch
     }
     else if (strcmp(name,"Tokens")!=0)
     {
-        if (GetTokensCCaddress(cp,destaddr,pk)>0)
+        if (CCTokens::GetCCaddress(cp,destaddr,pk)>0)
         {
             sprintf(str,"%sCCTokensAddress",name);
             result.push_back(Pair(str,destaddr));
@@ -6245,7 +6245,7 @@ UniValue tokenaddress(const UniValue& params, bool fHelp, const CPubKey& mypk)
     if ( fHelp || params.size() > 1 )
         throw runtime_error("tokenaddress [pubkey]\n");
 
-    CCTokensContract_info C;
+    CCTokens C;
     if ( ensure_CCrequirements(C.evalcode) < 0 )
         throw runtime_error(CC_REQUIREMENTS_MSG);
 
@@ -7401,7 +7401,7 @@ UniValue tokenlist(const UniValue& params, bool fHelp, const CPubKey& mypk)
         throw runtime_error("tokenlist\n");
     if ( ensure_CCrequirements(EVAL_TOKENS) < 0 )
         throw runtime_error(CC_REQUIREMENTS_MSG);
-    return(TokenList());
+    return CCTokens().TokenList();
 }
 
 UniValue tokeninfo(const UniValue& params, bool fHelp, const CPubKey& mypk)
@@ -7412,7 +7412,7 @@ UniValue tokeninfo(const UniValue& params, bool fHelp, const CPubKey& mypk)
     if ( ensure_CCrequirements(EVAL_TOKENS) < 0 )
         throw runtime_error(CC_REQUIREMENTS_MSG);
     tokenid = Parseuint256((char *)params[0].get_str().c_str());
-    return(TokenInfo(tokenid));
+    return CCTokens().TokenInfo(tokenid);
 }
 
 UniValue tokenorders(const UniValue& params, bool fHelp, const CPubKey& mypk)
@@ -7471,13 +7471,14 @@ UniValue tokenbalance(const UniValue& params, bool fHelp, const CPubKey& mypk)
     else 
 		pubkey = Mypubkey();
 
-    balance = GetTokenBalance(pubkey2pk(pubkey),tokenid);
+    CCTokens tokensContract;
+    balance = tokensContract.GetTokenBalance(pubkey2pk(pubkey),tokenid);
 
 	if (CCerror.empty()) {
 		char destaddr[64];
 
 		result.push_back(Pair("result", "success"));
-        CCTokensContract_info C;
+        CCTokens C;
 		if (GetCCaddress(&C, destaddr, pubkey2pk(pubkey)) != 0)
 			result.push_back(Pair("CCaddress", destaddr));
 
@@ -7541,7 +7542,7 @@ UniValue tokencreate(const UniValue& params, bool fHelp, const CPubKey& mypk)
         }
     }
 
-    hextx = CreateToken(0, supply, name, description, nonfungibleData);
+    hextx = CCTokens::CreateToken(0, supply, name, description, nonfungibleData);
     if( hextx.size() > 0 )     {
         result.push_back(Pair("result", "success"));
         result.push_back(Pair("hex", hextx));
@@ -7581,7 +7582,7 @@ UniValue tokentransfer(const UniValue& params, bool fHelp, const CPubKey& mypk)
         return(result);
     }
 
-    hex = TokenTransfer(0, tokenid, pubkey, amount);
+    hex = CCTokens::Transfer(0, tokenid, pubkey, amount);
 
     if( !CCerror.empty() )   {
         ERR_RESULT(CCerror);

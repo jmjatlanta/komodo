@@ -30,6 +30,7 @@
 #include "notaries_staked.h"
 #include "cc/eval.h"
 #include "cc/CCinclude.h"
+#include "cc/CCtokens.h"
 #include "hex.h"
 #ifdef ENABLE_WALLET
 #include "wallet/wallet.h"
@@ -1622,7 +1623,7 @@ UniValue decodeccopret(const UniValue& params, bool fHelp, const CPubKey& mypk)
     std::vector<unsigned char> hex(ParseHex(params[0].get_str()));
     CScript scripthex(hex.begin(),hex.end());
     std::vector<std::pair<uint8_t, vscript_t>>  oprets;
-    if (DecodeTokenOpRet(scripthex,tokenevalcode,tokenid,pubkeys, oprets)!=0 && tokenevalcode==EVAL_TOKENS && oprets.size()>0)
+    if (CCTokens::DecodeTransactionOpRet(scripthex,tokenevalcode,tokenid,pubkeys, oprets)!=0 && tokenevalcode==EVAL_TOKENS && oprets.size()>0)
     {
         // seems we need a loop here
         vOpretExtra = oprets[0].second;  

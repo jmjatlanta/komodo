@@ -69,7 +69,7 @@ int64_t IsChannelsvout(struct CCcontract_info *cp,const CTransaction& tx,CPubKey
     char destaddr[65],channeladdr[65],tokenschanneladdr[65];
 
     GetCCaddress1of2(cp,channeladdr,srcpub,destpub);
-    GetTokensCCaddress1of2(cp,tokenschanneladdr,srcpub,destpub);
+    CCTokens::GetCCaddress1of2(cp,tokenschanneladdr,srcpub,destpub);
     if ( tx.vout[v].scriptPubKey.IsPayToCryptoCondition() != 0 )
     {
         if ( Getscriptaddress(destaddr,tx.vout[v].scriptPubKey) > 0 && (strcmp(destaddr,channeladdr) == 0 || strcmp(destaddr,tokenschanneladdr) == 0))
@@ -102,7 +102,7 @@ CScript EncodeChannelsOpRet(uint8_t funcid,uint256 tokenid,uint256 opentxid,CPub
         std::vector<CPubKey> pks;
         pks.push_back(srcpub);
         pks.push_back(destpub);
-        return(EncodeTokenOpRet(tokenid,pks, std::make_pair(OPRETID_CHANNELSDATA,  vopret)));
+        return(CCTokens::EncodeTransactionOpRet(tokenid,pks, std::make_pair(OPRETID_CHANNELSDATA,  vopret)));
     }
     opret << OP_RETURN << vopret;
     return(opret);
@@ -114,7 +114,7 @@ uint8_t DecodeChannelsOpRet(const CScript &scriptPubKey, uint256 &tokenid, uint2
     std::vector<uint8_t> vopret,vOpretExtra; uint8_t *script,e,f,tokenevalcode;
     std::vector<CPubKey> pubkeys;
 
-    if (DecodeTokenOpRet(scriptPubKey,tokenevalcode,tokenid,pubkeys,oprets)!=0 && GetOpretBlob(oprets, OPRETID_CHANNELSDATA, vOpretExtra) && tokenevalcode==EVAL_TOKENS && vOpretExtra.size()>0)
+    if (CCTokens::DecodeTransactionOpRet(scriptPubKey,tokenevalcode,tokenid,pubkeys,oprets)!=0 && GetOpretBlob(oprets, OPRETID_CHANNELSDATA, vOpretExtra) && tokenevalcode==EVAL_TOKENS && vOpretExtra.size()>0)
     {
         vopret=vOpretExtra;
     }
@@ -403,7 +403,7 @@ int64_t AddChannelsInputs(struct CCcontract_info *cp,CMutableTransaction &mtx, C
 
     if ((numvouts=openTx.vout.size()) > 0 && DecodeChannelsOpRet(openTx.vout[numvouts-1].scriptPubKey,tokenid,tmp_txid,srcpub,destpub,param1,param2,param3)=='O')
     {
-        if (tokenid!=zeroid) GetTokensCCaddress1of2(cp,coinaddr,srcpub,destpub);
+        if (tokenid!=zeroid) CCTokens::GetCCaddress1of2(cp,coinaddr,srcpub,destpub);
         else GetCCaddress1of2(cp,coinaddr,srcpub,destpub);
         SetCCunspents(unspentOutputs,coinaddr,true);
     }
@@ -453,7 +453,7 @@ int64_t AddChannelsInputs(struct CCcontract_info *cp,CMutableTransaction &mtx, C
         mtx.vin.push_back(CTxIn(txid,0,CScript()));
         mtx.vin.push_back(CTxIn(txid,marker,CScript()));
         Myprivkey(myprivkey);        
-        if (tokenid!=zeroid) CCaddrTokens1of2set(cp,srcpub,destpub,myprivkey,coinaddr);
+        if (tokenid!=zeroid) CCTokens::CCaddr1of2set(cp,srcpub,destpub,myprivkey,coinaddr);
         else CCaddr1of2set(cp,srcpub,destpub,myprivkey,coinaddr);
         memset(myprivkey,0,32);
         return totalinputs;
@@ -466,7 +466,7 @@ UniValue ChannelOpen(const CPubKey& pk, uint64_t txfee,CPubKey destpub,int32_t n
     CMutableTransaction mtx = CreateNewContextualCMutableTransaction(Params().GetConsensus(), komodo_nextheight());
     uint8_t hash[32],hashdest[32]; uint64_t amount,tokens=0,funds; int32_t i; uint256 hashchain,entropy,hentropy;
     CPubKey mypk; 
-    CCTokensContract_info tokensC;
+    CCTokens tokensC;
     
     if ( numpayments <= 0 || payment <= 0 || numpayments > CHANNELS_MAXPAYMENTS )
         CCERR_RESULT("channelscc",CCLOG_INFO, stream << "invalid ChannelOpen param numpayments." << numpayments << " payment." << payment << " - max_numpayments." << CHANNELS_MAXPAYMENTS);
@@ -483,7 +483,7 @@ UniValue ChannelOpen(const CPubKey& pk, uint64_t txfee,CPubKey destpub,int32_t n
     if (tokenid!=zeroid)
     {
         amount=AddNormalinputs(mtx,mypk,txfee+2*CC_MARKER_VALUE,5,pk.IsValid());
-        tokens=AddTokenCCInputs(&tokensC, mtx, mypk, tokenid, funds, 64);       
+        tokens= tokensC.AddCCInputs(mtx, mypk, tokenid, funds, 64);       
     }
     else amount=AddNormalinputs(mtx,mypk,funds+txfee+2*CC_MARKER_VALUE,64,pk.IsValid());
     if (amount+tokens >= funds+txfee+2*CC_MARKER_VALUE)
@@ -496,7 +496,7 @@ UniValue ChannelOpen(const CPubKey& pk, uint64_t txfee,CPubKey destpub,int32_t n
             memcpy(hash,hashdest,32);
         }
         endiancpy((uint8_t *)&hashchain,hashdest,32);
-        if (tokenid!=zeroid) mtx.vout.push_back(MakeTokensCC1of2vout(EVAL_CHANNELS,funds,mypk,destpub));
+        if (tokenid!=zeroid) mtx.vout.push_back(CCTokens::MakeCC1of2vout(EVAL_CHANNELS,funds,mypk,destpub));
         else mtx.vout.push_back(MakeCC1of2vout(EVAL_CHANNELS,funds,mypk,destpub));
         mtx.vout.push_back(MakeCC1vout(EVAL_CHANNELS,CC_MARKER_VALUE,mypk));
         mtx.vout.push_back(MakeCC1vout(EVAL_CHANNELS,CC_MARKER_VALUE,destpub));
@@ -578,7 +578,7 @@ UniValue ChannelPayment(const CPubKey& pk, uint64_t txfee,uint256 opentxid,int64
             }
             else 
                 CCERR_RESULT("channelscc",CCLOG_INFO, stream << "invalid previous tx");
-            if (tokenid!=zeroid) mtx.vout.push_back(MakeTokensCC1of2vout(EVAL_CHANNELS, change, srcpub, destpub));
+            if (tokenid!=zeroid) mtx.vout.push_back(CCTokens::MakeCC1of2vout(EVAL_CHANNELS, change, srcpub, destpub));
             else mtx.vout.push_back(MakeCC1of2vout(EVAL_CHANNELS, change, srcpub, destpub));
             mtx.vout.push_back(MakeCC1vout(EVAL_CHANNELS,CC_MARKER_VALUE,srcpub));
             mtx.vout.push_back(MakeCC1vout(EVAL_CHANNELS,CC_MARKER_VALUE,destpub));
@@ -618,7 +618,7 @@ UniValue ChannelClose(const CPubKey& pk, uint64_t txfee,uint256 opentxid)
         CCChannelsContract_info C;
         if ((funds=AddChannelsInputs(&C,mtx,channelOpenTx,prevtxid,mypk)) !=0 && funds>0)
         {
-            if (tokenid!=zeroid) mtx.vout.push_back(MakeTokensCC1of2vout(EVAL_CHANNELS, funds, mypk, destpub));
+            if (tokenid!=zeroid) mtx.vout.push_back(CCTokens::MakeCC1of2vout(EVAL_CHANNELS, funds, mypk, destpub));
             else mtx.vout.push_back(MakeCC1of2vout(EVAL_CHANNELS, funds, mypk, destpub));
             mtx.vout.push_back(MakeCC1vout(EVAL_CHANNELS,CC_MARKER_VALUE,mypk));
             mtx.vout.push_back(MakeCC1vout(EVAL_CHANNELS,CC_MARKER_VALUE,destpub));

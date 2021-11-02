@@ -85,7 +85,7 @@ CMutableTransaction MakeSelfImportSourceTx(CTxDestination &dest, int64_t amount)
     mtx.vout.push_back(CTxOut(txfee, scriptPubKey));
 
     //make opret with 'burned' amount:
-    CCTokensContract_info C;
+    CCTokens C;
     FinalizeCCTx(0, &C, mtx, myPubKey, txfee, CScript() << OP_RETURN << E_MARSHAL(ss << (uint8_t)EVAL_IMPORTCOIN << (uint8_t)'A' << amount));
     return mtx;
 }
@@ -530,16 +530,16 @@ bool CheckMigration(Eval *eval, const CTransaction &importTx, const CTransaction
 
 
     uint256 tokenid = zeroid;
+    CCTokens C;
     if (vimportOpret.begin()[0] == EVAL_TOKENS) { // for tokens (new opret with tokens)
         if ( is_STAKED(ASSETCHAINS_SYMBOL) == 1 )
             return eval->Invalid("no-tokens-migrate-on-LABS");
-        CCTokensContract_info C;
         std::vector<std::pair<uint8_t, vscript_t>>  oprets;
         uint8_t evalCodeInOpret;
         std::vector<CPubKey> voutTokenPubkeys;
         vscript_t vnonfungibleOpret;
 
-        if (DecodeTokenOpRet(importTx.vout.back().scriptPubKey, evalCodeInOpret, tokenid, voutTokenPubkeys, oprets) == 0)
+        if (C.DecodeTransactionOpRet(importTx.vout.back().scriptPubKey, evalCodeInOpret, tokenid, voutTokenPubkeys, oprets) == 0)
             return eval->Invalid("cannot-decode-import-tx-token-opret");
 
         uint8_t nonfungibleEvalCode = EVAL_TOKENS; // init to no non-fungibles
@@ -559,14 +559,14 @@ bool CheckMigration(Eval *eval, const CTransaction &importTx, const CTransaction
         CAmount ccBurnOutputs = 0;
         for (auto v : burnTx.vout)
             if (v.scriptPubKey.IsPayToCryptoCondition() &&
-                CTxOut(v.nValue, v.scriptPubKey) == MakeTokensCC1vout(nonfungibleEvalCode, v.nValue, pubkey2pk(ParseHex(CC_BURNPUBKEY))))  // burned to dead pubkey
+                CTxOut(v.nValue, v.scriptPubKey) == CCTokens::MakeCC1vout(nonfungibleEvalCode, v.nValue, pubkey2pk(ParseHex(CC_BURNPUBKEY))))  // burned to dead pubkey
                 ccBurnOutputs += v.nValue;
 
         // calc outputs for import tx
         CAmount ccImportOutputs = 0;
         for (auto v : importTx.vout)
             if (v.scriptPubKey.IsPayToCryptoCondition() &&
-                !IsTokenMarkerVout(v))  // should not be marker here
+                !C.IsTokenMarkerVout(v))  // should not be marker here
                 ccImportOutputs += v.nValue;
 
         if (ccBurnOutputs != ccImportOutputs)
@@ -589,7 +589,7 @@ bool CheckMigration(Eval *eval, const CTransaction &importTx, const CTransaction
         std::vector<std::pair<uint8_t, vscript_t>>  oprets;
         uint8_t evalCodeInOpret;
         std::vector<CPubKey> voutTokenPubkeys;
-        if (burnTx.vout.size() > 0 && DecodeTokenOpRet(burnTx.vout.back().scriptPubKey, evalCodeInOpret, sourceTokenId, voutTokenPubkeys, oprets) == 0)
+        if (burnTx.vout.size() > 0 && C.DecodeTransactionOpRet(burnTx.vout.back().scriptPubKey, evalCodeInOpret, sourceTokenId, voutTokenPubkeys, oprets) == 0)
             return eval->Invalid("cannot-decode-burn-tx-token-opret");
 
         if (sourceTokenId != tokenbaseTx.GetHash())              // check tokenid in burn tx opret maches the passed tokenbase tx (to prevent cheating by importing user)
@@ -598,13 +598,13 @@ bool CheckMigration(Eval *eval, const CTransaction &importTx, const CTransaction
         std::vector<std::pair<uint8_t, vscript_t>>  opretsSrc;
         vscript_t vorigpubkeySrc;
         std::string nameSrc, descSrc;
-        if (DecodeTokenCreateOpRet(tokenbaseTx.vout.back().scriptPubKey, vorigpubkeySrc, nameSrc, descSrc, opretsSrc) == 0)
+        if (C.DecodeCreateOpRet(tokenbaseTx.vout.back().scriptPubKey, vorigpubkeySrc, nameSrc, descSrc, opretsSrc) == 0)
             return eval->Invalid("cannot-decode-token-creation-tx");
 
         std::vector<std::pair<uint8_t, vscript_t>>  opretsImport;
         vscript_t vorigpubkeyImport;
         std::string nameImport, descImport;
-        if (importTx.vout.size() == 0 || DecodeTokenCreateOpRet(importTx.vout.back().scriptPubKey, vorigpubkeySrc, nameSrc, descSrc, opretsImport) == 0)
+        if (importTx.vout.size() == 0 || C.DecodeCreateOpRet(importTx.vout.back().scriptPubKey, vorigpubkeySrc, nameSrc, descSrc, opretsImport) == 0)
             return eval->Invalid("cannot-decode-token-import-tx");
 
         // check that name,pubkey,description in import tx correspond ones in token creation tx in the source chain:

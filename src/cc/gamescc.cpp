@@ -259,12 +259,12 @@ uint8_t games_registeropretdecode(uint256 &gametxid,uint256 &tokenid,uint256 &pl
     tokenid = zeroid;
     GetOpReturnData(scriptPubKey, vopret);
     script = (uint8_t *)vopret.data();
-    if ( script[1] == 'c' && (f= DecodeTokenCreateOpRet(scriptPubKey,origpubkey,name,description,oprets)) == 'c' )
+    if ( script[1] == 'c' && (f= CCTokens::DecodeCreateOpRet(scriptPubKey,origpubkey,name,description,oprets)) == 'c' )
     {
         GetOpretBlob(oprets, OPRETID_NONFUNGIBLEDATA, vopretNonfungible);
         vopret = vopretNonfungible;
     }
-    else if ( script[1] != 'R' && (f= DecodeTokenOpRet(scriptPubKey, e, tokenid, voutPubkeys, oprets)) != 0 )
+    else if ( script[1] != 'R' && (f= CCTokens::DecodeTransactionOpRet(scriptPubKey, e, tokenid, voutPubkeys, oprets)) != 0 )
     {
         GetOpretBlob(oprets, OPRETID_ROGUEGAMEDATA, vopretDummy);  // blob from non-creation tx opret
         vopret = vopretDummy;
@@ -293,12 +293,12 @@ uint8_t games_finishopretdecode(uint256 &gametxid, uint256 &tokenid, int32_t &re
     tokenid = zeroid;
     GetOpReturnData(scriptPubKey, vopret);
     script = (uint8_t *)vopret.data();
-    if ( script[1] == 'c' && (f= DecodeTokenCreateOpRet(scriptPubKey,origpubkey,name,description, oprets)) == 'c' )
+    if ( script[1] == 'c' && (f= CCTokens::DecodeCreateOpRet(scriptPubKey,origpubkey,name,description, oprets)) == 'c' )
     {
         GetOpretBlob(oprets, OPRETID_NONFUNGIBLEDATA, vopretNonfungible);
         vopret = vopretNonfungible;
     }
-    else if ( script[1] != 'H' && script[1] != 'Q' && (f= DecodeTokenOpRet(scriptPubKey, e, tokenid, voutPubkeys, opretsDummy)) != 0 )
+    else if ( script[1] != 'H' && script[1] != 'Q' && (f= CCTokens::DecodeTransactionOpRet(scriptPubKey, e, tokenid, voutPubkeys, opretsDummy)) != 0 )
     {
         //fprintf(stderr,"decode opret %c tokenid.%s\n",script[1],tokenid.GetHex().c_str());
         GetNonfungibleData(tokenid, vopretNonfungible);  //load nonfungible data from the 'tokenbase' tx
@@ -1235,6 +1235,7 @@ UniValue games_register(uint64_t txfee,struct CCcontract_info *cp,cJSON *params)
     std::vector<uint8_t> playerdata; 
     std::string rawtx,symbol,pname; 
     bits256 t;
+    CCTokens tokensC; 
     
     if ( txfee == 0 )
         txfee = 10000;
@@ -1275,7 +1276,6 @@ UniValue games_register(uint64_t txfee,struct CCcontract_info *cp,cJSON *params)
                     mtx.vin.push_back(CTxIn(tokenid,0)); // spending cc marker as token is burned
                     char unspendableTokenAddr[64]; 
                     uint8_t tokenpriv[32];
-                    CCTokensContract_info tokensC; 
                     CPubKey unspPk = tokensC.GetUnspendable(tokenpriv);
                     GetCCaddress(&tokensC, unspendableTokenAddr, unspPk);
                     CCaddr2set(cp, EVAL_TOKENS, unspPk, tokenpriv, unspendableTokenAddr);
@@ -1283,7 +1283,7 @@ UniValue games_register(uint64_t txfee,struct CCcontract_info *cp,cJSON *params)
                 mtx.vout.push_back(MakeCC1of2vout(cp->evalcode,buyin + inputsum - txfee,gamespk,mypk));
                 GetCCaddress1of2(cp,destaddr,gamespk,gamespk);
                 CCaddr1of2set(cp,gamespk,gamespk,cp->CCpriv,destaddr);
-                mtx.vout.push_back(MakeTokensCC1vout(cp->evalcode, 1, burnpk));
+                mtx.vout.push_back(CCTokens::MakeCC1vout(cp->evalcode, 1, burnpk));
                 
                 uint8_t e, funcid; uint256 tid; std::vector<CPubKey> voutPubkeys, voutPubkeysEmpty; int32_t didtx = 0;
                 CScript opretRegister = games_registeropret(gametxid, playertxid);
@@ -1293,7 +1293,7 @@ UniValue games_register(uint64_t txfee,struct CCcontract_info *cp,cJSON *params)
                     if ( myGetTransaction(playertxid,playertx,hashBlock) != 0 )
                     {
                         std::vector<std::pair<uint8_t, vscript_t>>  oprets;
-                        if ( (funcid= DecodeTokenOpRet(playertx.vout.back().scriptPubKey, e, tid, voutPubkeys, oprets)) != 0)
+                        if ( (funcid= tokensC.DecodeTransactionOpRet(playertx.vout.back().scriptPubKey, e, tid, voutPubkeys, oprets)) != 0)
                         {  // if token in the opret
                             didtx = 1;
                             if ( funcid == 'c' )
@@ -1301,7 +1301,7 @@ UniValue games_register(uint64_t txfee,struct CCcontract_info *cp,cJSON *params)
                             vscript_t vopretRegister;
                             GetOpReturnData(opretRegister, vopretRegister);
                             rawtx = FinalizeCCTx(0, cp, mtx, mypk, txfee,
-                                                 EncodeTokenOpRet(tid, voutPubkeysEmpty /*=never spent*/, std::make_pair(OPRETID_ROGUEGAMEDATA, vopretRegister)));
+                                    tokensC.EncodeTransactionOpRet(tid, voutPubkeysEmpty /*=never spent*/, std::make_pair(OPRETID_ROGUEGAMEDATA, vopretRegister)));
                         }
                     }
                 }
@@ -1576,9 +1576,9 @@ UniValue games_finish(uint64_t txfee,struct CCcontract_info *cp,cJSON *params,ch
                         }
                         else
                         {
-                            CCTokensContract_info tokensC;
+                            CCTokens tokensC;
                             mtx.vout.push_back(MakeCC1vout(EVAL_TOKENS, txfee, tokensC.GetUnspendable()));            // marker to token cc addr, burnable and validated
-                            mtx.vout.push_back(MakeTokensCC1vout(cp->evalcode,1,mypk));
+                            mtx.vout.push_back(CCTokens::MakeCC1vout(cp->evalcode,1,mypk));
                             cashout = games_cashout(&P);
                             fprintf(stderr,"\ncashout %.8f extracted %s\n",(double)cashout/COIN,str);
                             if ( funcid == 'H' && maxplayers > 1 )
@@ -1621,7 +1621,7 @@ UniValue games_finish(uint64_t txfee,struct CCcontract_info *cp,cJSON *params,ch
                         sprintf(seedstr,"%llu",(long long)seed);
                         std::vector<uint8_t> vopretNonfungible;
                         GetOpReturnData(opret, vopretNonfungible);
-                        rawtx = FinalizeCCTx(0, cp, mtx, mypk, txfee, EncodeTokenCreateOpRet('c', Mypubkey(), std::string(seedstr), gametxid.GetHex(), vopretNonfungible));
+                        rawtx = FinalizeCCTx(0, cp, mtx, mypk, txfee, CCTokens::EncodeCreateOpRet('c', Mypubkey(), std::string(seedstr), gametxid.GetHex(), vopretNonfungible));
                     }
                     memset(mypriv,0,sizeof(mypriv));
                     return(games_rawtxresult(result,rawtx,1));
@@ -1649,7 +1649,7 @@ UniValue games_players(uint64_t txfee,struct CCcontract_info *cp,cJSON *params)
     std::vector<std::pair<CAddressUnspentKey, CAddressUnspentValue> > unspentOutputs;
     gamespk = cp->GetUnspendable();
     mypk = pubkey2pk(Mypubkey());
-    GetTokensCCaddress(cp,coinaddr,mypk);
+    CCTokens::GetCCaddress(cp,coinaddr,mypk);
     SetCCunspents(unspentOutputs,coinaddr,true);
     games_univalue(result,"players",-1,-1);
     for (std::vector<std::pair<CAddressUnspentKey, CAddressUnspentValue> >::const_iterator it=unspentOutputs.begin(); it!=unspentOutputs.end(); it++)

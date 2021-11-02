@@ -21,6 +21,7 @@
 
 #include "notarisationdb.h"
 #include "rpc/server.h"
+#include "cc/CCtokens.h"
 
 static std::map<std::string,bool> nspv_remote_commands =  {{"channelsopen", true},{"channelspayment", true},{"channelsclose", true},{"channelsrefund", true},
 {"channelslist", true},{"channelsinfo", true},{"oraclescreate", true},{"oraclesfund", true},{"oraclesregister", true},{"oraclessubscribe", true}, 
@@ -509,7 +510,7 @@ int32_t NSPV_mempoolfuncs(bits256 *satoshisp,int32_t *vindexp,std::vector<uint25
                     std::vector<uint8_t> vopret,vOpretExtra; uint8_t *script,e,f,tokenevalcode;
                     std::vector<CPubKey> pubkeys;
 
-                    if (DecodeTokenOpRet(tx.vout[tx.vout.size()-1].scriptPubKey,tokenevalcode,tokenid,pubkeys,oprets)!=0 && GetOpretBlob(oprets, OPRETID_CHANNELSDATA, vOpretExtra) && tokenevalcode==EVAL_TOKENS && vOpretExtra.size()>0)
+                    if (CCTokens::DecodeTransactionOpRet(tx.vout[tx.vout.size()-1].scriptPubKey,tokenevalcode,tokenid,pubkeys,oprets)!=0 && GetOpretBlob(oprets, OPRETID_CHANNELSDATA, vOpretExtra) && tokenevalcode==EVAL_TOKENS && vOpretExtra.size()>0)
                     {
                         vopret=vOpretExtra;
                     }

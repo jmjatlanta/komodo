@@ -1255,7 +1255,7 @@ UniValue ImportGatewayInfo(uint256 bindtxid)
   
     CCImportGatewayContract_info C;
     ImportGatewaypk = C.GetUnspendable();
-    GetTokensCCaddress(&C,gatewaystokens,ImportGatewaypk);
+    CCTokens::GetCCaddress(&C,gatewaystokens,ImportGatewaypk);
     if ( myGetTransaction(bindtxid,tx,hashBlock) == 0 || (numvouts= tx.vout.size()) <= 0 )
     {        
         CCerror = strprintf("cant find bindtxid %s",uint256_str(str,bindtxid));

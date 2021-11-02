@@ -22,7 +22,7 @@ UniValue AssetOrders(uint256 refassetid, CPubKey pk, uint8_t additionalEvalCode)
 	UniValue result(UniValue::VARR);  
 
     CCAssetContract_info assetsC;
-    CCTokensContract_info tokensC;
+    CCTokens tokensC;
 
 	auto addOrders = [&](CCcontract_info *cp, std::vector<std::pair<CAddressUnspentKey, CAddressUnspentValue> >::const_iterator it)
 	{
@@ -77,7 +77,7 @@ UniValue AssetOrders(uint256 refassetid, CPubKey pk, uint8_t additionalEvalCode)
                     {
                         GetCCaddress(cp, origaddr, pubkey2pk(origpubkey));  
                         item.push_back(Pair("origaddress", origaddr));
-                        GetTokensCCaddress(&tokensC, origtokenaddr, pubkey2pk(origpubkey));
+                        CCTokens::GetCCaddress(cp, origtokenaddr, pubkey2pk(origpubkey));
                         item.push_back(Pair("origtokenaddress", origtokenaddr));
                     }
                     if (assetid != zeroid)
@@ -120,7 +120,7 @@ UniValue AssetOrders(uint256 refassetid, CPubKey pk, uint8_t additionalEvalCode)
         if (vopretNonfungible.size() > 0)
             assetsC.additionalTokensEvalcode2 = vopretNonfungible.begin()[0];
     }
-	GetTokensCCaddress(&assetsC, assetsTokensUnspendableAddr, assetsC.GetUnspendable());
+	CCTokens::GetCCaddress(&assetsC, assetsTokensUnspendableAddr, assetsC.GetUnspendable());
 	SetCCunspents(unspentOutputsTokens, assetsTokensUnspendableAddr,true);
 
     // tokenbids:
@@ -140,7 +140,7 @@ UniValue AssetOrders(uint256 refassetid, CPubKey pk, uint8_t additionalEvalCode)
 
         // try also dual eval tokenasks (and we do not need bids):
         assetsC.additionalTokensEvalcode2 = additionalEvalCode;
-        GetTokensCCaddress(&assetsC, assetsDualEvalTokensUnspendableAddr, assetsC.GetUnspendable());
+        CCTokens::GetCCaddress(&assetsC, assetsDualEvalTokensUnspendableAddr, assetsC.GetUnspendable());
         SetCCunspents(unspentOutputsDualEvalTokens, assetsDualEvalTokensUnspendableAddr,true);
 
         for (std::vector<std::pair<CAddressUnspentKey, CAddressUnspentValue> >::const_iterator itDualEvalTokens = unspentOutputsDualEvalTokens.begin();
@@ -174,7 +174,7 @@ std::string CreateBuyOffer(int64_t txfee, int64_t bidamount, uint256 assetid, in
         fprintf(stderr,"cant find assetid\n");
         return("");
     }
-    if (vintx.vout.size() > 0 && DecodeTokenCreateOpRet(vintx.vout[vintx.vout.size()-1].scriptPubKey, origpubkey, name, description) == 0)
+    if (vintx.vout.size() > 0 && CCTokens::DecodeCreateOpRet(vintx.vout[vintx.vout.size()-1].scriptPubKey, origpubkey, name, description) == 0)
     {
         fprintf(stderr,"assetid isnt assetcreation txid\n");
         return("");
@@ -201,7 +201,7 @@ std::string CreateBuyOffer(int64_t txfee, int64_t bidamount, uint256 assetid, in
 		std::vector<CPubKey> voutTokenPubkeys;  // should be empty - no token vouts
 
         return FinalizeCCTx(0, &C, mtx, mypk, txfee, 
-			EncodeTokenOpRet(assetid, voutTokenPubkeys,     // TODO: actually this tx is not 'tokens', maybe it is better not to have token opret here but only asset opret.
+			CCTokens::EncodeTransactionOpRet(assetid, voutTokenPubkeys,     // TODO: actually this tx is not 'tokens', maybe it is better not to have token opret here but only asset opret.
 				std::make_pair(OPRETID_ASSETSDATA, EncodeAssetOpRet('b', zeroid, pricetotal, Mypubkey()))));   // But still such token opret should not make problems because no token eval in these vouts
     }
 	CCerror = strprintf("no coins found to make buy offer");
@@ -232,8 +232,8 @@ std::string CreateSell(int64_t txfee,int64_t askamount,uint256 assetid,int64_t p
         std::vector<uint8_t> vopretNonfungible;
         mask = ~((1LL << mtx.vin.size()) - 1);
 		// add single-eval tokens (or non-fungible tokens):
-           CCTokensContract_info tokensC;
-        if ((inputs = AddTokenCCInputs(&tokensC, mtx, mypk, assetid, askamount, 60, vopretNonfungible)) > 0)
+           CCTokens tokensC;
+        if ((inputs = tokensC.AddCCInputs(mtx, mypk, assetid, askamount, 60, vopretNonfungible)) > 0)
         {
 			if (inputs < askamount) {
 				//was: askamount = inputs;
@@ -250,19 +250,19 @@ std::string CreateSell(int64_t txfee,int64_t askamount,uint256 assetid,int64_t p
                 assetsC.additionalTokensEvalcode2 = vopretNonfungible.begin()[0];
 
 			CPubKey unspendableAssetsPubkey = assetsC.GetUnspendable();
-            mtx.vout.push_back(MakeTokensCC1vout(EVAL_ASSETS, assetsC.additionalTokensEvalcode2, askamount, unspendableAssetsPubkey));
+            mtx.vout.push_back(tokensC.MakeCC1vout(EVAL_ASSETS, assetsC.additionalTokensEvalcode2, askamount, unspendableAssetsPubkey));
             mtx.vout.push_back(MakeCC1vout(EVAL_ASSETS, txfee, mypk));  //marker (seems, it is not for tokenorders)
             if (inputs > askamount)
                 CCchange = (inputs - askamount);
             if (CCchange != 0)
                 // change to single-eval or non-fungible token vout (although for non-fungible token change currently is not possible)
-                mtx.vout.push_back(MakeTokensCC1vout((assetsC.additionalTokensEvalcode2) ? assetsC.additionalTokensEvalcode2 : EVAL_TOKENS, CCchange, mypk));	
+                mtx.vout.push_back(tokensC.MakeCC1vout((assetsC.additionalTokensEvalcode2) ? assetsC.additionalTokensEvalcode2 : EVAL_TOKENS, CCchange, mypk));	
 
 			std::vector<CPubKey> voutTokenPubkeys;
 			voutTokenPubkeys.push_back(unspendableAssetsPubkey);   
 
             return FinalizeCCTx(mask, &tokensC, mtx, mypk, txfee, 
-                EncodeTokenOpRet(assetid, voutTokenPubkeys, 
+                tokensC.EncodeTransactionOpRet(assetid, voutTokenPubkeys, 
                     std::make_pair(OPRETID_ASSETSDATA, EncodeAssetOpRet('s', zeroid, pricetotal, Mypubkey()))));
 		}
 		else {
@@ -346,7 +346,7 @@ std::string CancelBuyOffer(int64_t txfee,uint256 assetid,uint256 bidtxid)
 
             CCAssetContract_info C;									
             return(FinalizeCCTx(mask, &C, mtx, mypk, txfee, 
-				EncodeTokenOpRet(assetid, voutTokenPubkeys, 
+				CCTokens::EncodeTransactionOpRet(assetid, voutTokenPubkeys, 
                     std::make_pair(OPRETID_ASSETSDATA, EncodeAssetOpRet('o', zeroid, 0, Mypubkey())))));
         }
     }
@@ -393,7 +393,7 @@ std::string CancelSell(int64_t txfee,uint256 assetid,uint256 asktxid)
             if (vopretNonfungible.size() > 0)
                 assetsC.additionalTokensEvalcode2 = vopretNonfungible.begin()[0];
 
-            mtx.vout.push_back(MakeTokensCC1vout(assetsC.additionalTokensEvalcode2 == 0 ? EVAL_TOKENS : assetsC.additionalTokensEvalcode2, askamount, mypk));	// one-eval token vout
+            mtx.vout.push_back(CCTokens::MakeCC1vout(assetsC.additionalTokensEvalcode2 == 0 ? EVAL_TOKENS : assetsC.additionalTokensEvalcode2, askamount, mypk));	// one-eval token vout
             mtx.vout.push_back(CTxOut(txfee,CScript() << ParseHex(HexStr(mypk)) << OP_CHECKSIG));
             
 			std::vector<CPubKey> voutTokenPubkeys;  
@@ -412,7 +412,7 @@ std::string CancelSell(int64_t txfee,uint256 assetid,uint256 asktxid)
 			CCaddr2set(&assetsC, EVAL_TOKENS, unspendableAssetsPk, unspendableAssetsPrivkey, unspendableAssetsAddr);
 
             return(FinalizeCCTx(mask, &assetsC, mtx, mypk, txfee, 
-				EncodeTokenOpRet(assetid, voutTokenPubkeys,  
+				CCTokens::EncodeTransactionOpRet(assetid, voutTokenPubkeys,  
                     std::make_pair(OPRETID_ASSETSDATA, EncodeAssetOpRet('x', zeroid, 0, Mypubkey())))));
         }
     }
@@ -430,7 +430,7 @@ std::string FillBuyOffer(int64_t txfee,uint256 assetid,uint256 bidtxid,int64_t f
 	int32_t bidvout=0; 
 	uint64_t mask; 
 	int64_t origprice, bidamount, paid_amount, remaining_required, inputs, CCchange=0; 
-	CCTokensContract_info tokensC;
+	CCTokens tokensC;
     CCAssetContract_info assetsC;
 
     if (fillamount < 0)
@@ -455,7 +455,7 @@ std::string FillBuyOffer(int64_t txfee,uint256 assetid,uint256 bidtxid,int64_t f
 			mtx.vin.push_back(CTxIn(bidtxid, bidvout, CScript()));					// Coins on Assets unspendable
             
             std::vector<uint8_t> vopretNonfungible;
-            if ((inputs = AddTokenCCInputs(&tokensC, mtx, mypk, assetid, fillamount, 60, vopretNonfungible)) > 0)
+            if ((inputs = tokensC.AddCCInputs(mtx, mypk, assetid, fillamount, 60, vopretNonfungible)) > 0)
             {
 				if (inputs < fillamount) {
 					std::cerr << "FillBuyOffer(): insufficient tokens to fill buy offer" << std::endl;
@@ -477,7 +477,7 @@ std::string FillBuyOffer(int64_t txfee,uint256 assetid,uint256 bidtxid,int64_t f
 
 				mtx.vout.push_back(MakeCC1vout(EVAL_ASSETS, bidamount - paid_amount, unspendableAssetsPk));     // vout0 coins remainder
                 mtx.vout.push_back(CTxOut(paid_amount,CScript() << ParseHex(HexStr(mypk)) << OP_CHECKSIG));		// vout1 coins to normal
-                mtx.vout.push_back(MakeTokensCC1vout(additionalTokensEvalcode2 == 0 ? EVAL_TOKENS : additionalTokensEvalcode2, fillamount, pubkey2pk(origpubkey)));	// vout2 single-eval tokens sent to the originator
+                mtx.vout.push_back(CCTokens::MakeCC1vout(additionalTokensEvalcode2 == 0 ? EVAL_TOKENS : additionalTokensEvalcode2, fillamount, pubkey2pk(origpubkey)));	// vout2 single-eval tokens sent to the originator
                 mtx.vout.push_back(MakeCC1vout(EVAL_ASSETS, txfee, origpubkey));                                // vout3 marker to origpubkey
                 
 				if (CCchange != 0)
@@ -497,7 +497,7 @@ std::string FillBuyOffer(int64_t txfee,uint256 assetid,uint256 bidtxid,int64_t f
 				voutTokenPubkeys.push_back(pubkey2pk(origpubkey));
 
                 return(FinalizeCCTx(mask, &tokensC, mtx, mypk, txfee, 
-					EncodeTokenOpRet(assetid, voutTokenPubkeys, 
+					tokensC.EncodeTransactionOpRet(assetid, voutTokenPubkeys, 
                         std::make_pair(OPRETID_ASSETSDATA, EncodeAssetOpRet('B', zeroid, remaining_required, origpubkey)))));
             } else return("dont have any assets to fill bid");
         }
@@ -578,10 +578,10 @@ std::string FillSell(int64_t txfee, uint256 assetid, uint256 assetid2, uint256 a
                 CCchange = (inputs - paid_nValue);
 
             // vout.0 tokens remainder to unspendable cc addr:
-            mtx.vout.push_back(MakeTokensCC1vout(EVAL_ASSETS, additionalTokensEvalcode2, orig_assetoshis - received_assetoshis, 
+            mtx.vout.push_back(CCTokens::MakeCC1vout(EVAL_ASSETS, additionalTokensEvalcode2, orig_assetoshis - received_assetoshis, 
                     assetsC.GetUnspendable())); 
             //vout.1 purchased tokens to self token single-eval or dual-eval token+nonfungible cc addr:
-            mtx.vout.push_back(MakeTokensCC1vout(additionalTokensEvalcode2 == 0 ? EVAL_TOKENS : additionalTokensEvalcode2, received_assetoshis, mypk));					
+            mtx.vout.push_back(CCTokens::MakeCC1vout(additionalTokensEvalcode2 == 0 ? EVAL_TOKENS : additionalTokensEvalcode2, received_assetoshis, mypk));					
             
             if (assetid2 != zeroid) {
                 std::cerr << "FillSell() WARNING: asset swap not implemented yet! (paid_nValue)" << std::endl;
@@ -617,7 +617,7 @@ std::string FillSell(int64_t txfee, uint256 assetid, uint256 assetid2, uint256 a
             assetsC.additionalTokensEvalcode2 = additionalTokensEvalcode2;
 
             return(FinalizeCCTx(mask, &assetsC, mtx, mypk, txfee,
-                EncodeTokenOpRet(assetid, voutTokenPubkeys, 
+                CCTokens::EncodeTransactionOpRet(assetid, voutTokenPubkeys, 
                     std::make_pair(OPRETID_ASSETSDATA, EncodeAssetOpRet(assetid2 != zeroid ? 'E' : 'S', assetid2, remaining_nValue, origpubkey)))));
         } else {
             CCerror = strprintf("filltx not enough utxos");
