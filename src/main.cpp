@@ -3421,6 +3421,9 @@ static int64_t nTimeTotal = 0;
 bool FindBlockPos(int32_t tmpflag,CValidationState &state, CDiskBlockPos &pos, unsigned int nAddSize, unsigned int nHeight, uint64_t nTime, bool fKnown = false);
 bool ReceivedBlockTransactions(const CBlock &block, CValidationState& state, CBlockIndex *pindexNew, const CDiskBlockPos& pos);
 
+// uncomment to add benchmark timings
+// #define BENCHMARK_CONNECT_BLOCK
+
 /*****
  * @brief Apply the effects of this block (with given index) on the UTXO set represented by coins
  * @param[in] block the block to add
@@ -3782,10 +3785,13 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
                                REJECT_INVALID, "bad-sapling-root-in-block");
         }
     }
+
+#ifdef BENCHMARK_CONNECT_BLOCK
     int64_t nTime1 = GetTimeMicros(); nTimeConnect += nTime1 - nTimeStart;
     LogPrint("bench", "      - Connect %u transactions: %.2fms (%.3fms/tx, %.3fms/txin) [%.2fs]\n",
             (unsigned)block.vtx.size(), 0.001 * (nTime1 - nTimeStart), 0.001 * (nTime1 - nTimeStart) / block.vtx.size(), 
             nInputs <= 1 ? 0 : 0.001 * (nTime1 - nTimeStart) / (nInputs-1), nTimeConnect * 0.000001);
+#endif
 
     blockReward += nFees + sum;
     if ( ASSETCHAINS_SYMBOL[0] == 0 && pindex->GetHeight() >= KOMODO_NOTARIES_HEIGHT2)
@@ -3823,10 +3829,12 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
     if (!control.Wait())
         return state.DoS(100, false);
 
+#ifdef BENCHMARK_CONNECT_BLOCK
     int64_t nTime2 = GetTimeMicros(); nTimeVerify += nTime2 - nTimeStart;
     LogPrint("bench", "    - Verify %u txins: %.2fms (%.3fms/txin) [%.2fs]\n", nInputs - 1,
             0.001 * (nTime2 - nTimeStart), nInputs <= 1 ? 0 : 0.001 * (nTime2 - nTimeStart) / (nInputs-1),
             nTimeVerify * 0.000001);
+#endif
 
     if (fJustCheck)
         return true;
@@ -3904,16 +3912,20 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
     // add this block to the view's block chain
     view.SetBestBlock(pindex->GetBlockHash());
 
+#ifdef BENCHMARK_CONNECT_BLOCK
     int64_t nTime3 = GetTimeMicros(); nTimeIndex += nTime3 - nTime2;
     LogPrint("bench", "    - Index writing: %.2fms [%.2fs]\n", 0.001 * (nTime3 - nTime2), nTimeIndex * 0.000001);
+#endif
 
     // Watch for changes to the previous coinbase transaction.
     static uint256 hashPrevBestCoinBase;
     GetMainSignals().UpdatedTransaction(hashPrevBestCoinBase);
     hashPrevBestCoinBase = block.vtx[0].GetHash();
 
+#ifdef BENCHMARK_CONNECT_BLOCK
     int64_t nTime4 = GetTimeMicros(); nTimeCallbacks += nTime4 - nTime3;
     LogPrint("bench", "    - Callbacks: %.2fms [%.2fs]\n", 0.001 * (nTime4 - nTime3), nTimeCallbacks * 0.000001);
+#endif
 
     komodo_connectblock(false, pindex, block);  // dPoW state update.
 
@@ -4128,7 +4140,11 @@ bool static DisconnectTip(CValidationState &state, bool fBare = false) {
     // Apply the block atomically to the chain state.
     uint256 sproutAnchorBeforeDisconnect = pcoinsTip->GetBestAnchor(SPROUT);
     uint256 saplingAnchorBeforeDisconnect = pcoinsTip->GetBestAnchor(SAPLING);
+
+#ifdef BENCHMARK_CONNECT_BLOCK
     int64_t nStart = GetTimeMicros();
+#endif 
+
     {
         CCoinsViewCache view(pcoinsTip);
         if (!DisconnectBlock(block, state, pindexDelete, view))
@@ -4141,7 +4157,10 @@ bool static DisconnectTip(CValidationState &state, bool fBare = false) {
     pindexDelete->newcoins = 0;
     pindexDelete->zfunds = 0;
 
+#ifdef BENCHMARK_CONNECT_BLOCK
     LogPrint("bench", "- Disconnect block: %.2fms\n", (GetTimeMicros() - nStart) * 0.001);
+#endif
+
     uint256 sproutAnchorAfterDisconnect = pcoinsTip->GetBestAnchor(SPROUT);
     uint256 saplingAnchorAfterDisconnect = pcoinsTip->GetBestAnchor(SAPLING);
     // Write the chain state to disk, if necessary.
@@ -4305,10 +4324,14 @@ bool ConnectTip(CValidationState &state, CBlockIndex *pindexNew, CBlock *pblock)
         assert(pcoinsTip->GetSproutAnchorAt(pcoinsTip->GetBestAnchor(SPROUT), oldSproutTree));
         assert(pcoinsTip->GetSaplingAnchorAt(pcoinsTip->GetBestAnchor(SAPLING), oldSaplingTree));
     }
-    // Apply the block atomically to the chain state.
+
+#ifdef BENCHMARK_CONNECT_BLOCK
     int64_t nTime2 = GetTimeMicros(); nTimeReadFromDisk += nTime2 - nTime1;
     int64_t nTime3;
     LogPrint("bench", "  - Load block from disk: %.2fms [%.2fs]\n", (nTime2 - nTime1) * 0.001, nTimeReadFromDisk * 0.000001);
+#endif
+
+    // Apply the block atomically to the chain state.
     {
         CCoinsViewCache view(pcoinsTip);
         bool rv = ConnectBlock(*pblock, state, pindexNew, view, false, true);
@@ -4327,21 +4350,33 @@ bool ConnectTip(CValidationState &state, CBlockIndex *pindexNew, CBlock *pblock)
             return error("ConnectTip(): ConnectBlock %s failed", pindexNew->GetBlockHash().ToString());
         }
         mapBlockSource.erase(pindexNew->GetBlockHash());
+
+#ifdef BENCHMARK_CONNECT_BLOCK
         nTime3 = GetTimeMicros(); nTimeConnectTotal += nTime3 - nTime2;
         LogPrint("bench", "  - Connect total: %.2fms [%.2fs]\n", (nTime3 - nTime2) * 0.001, nTimeConnectTotal * 0.000001);
+#endif
+
         if ( KOMODO_NSPV_FULLNODE )
             assert(view.Flush());
     }
+
+#ifdef BENCHMARK_CONNECT_BLOCK
     int64_t nTime4 = GetTimeMicros(); nTimeFlush += nTime4 - nTime3;
     LogPrint("bench", "  - Flush: %.2fms [%.2fs]\n", (nTime4 - nTime3) * 0.001, nTimeFlush * 0.000001);
+#endif 
+
     // Write the chain state to disk, if necessary.
     if ( KOMODO_NSPV_FULLNODE )
     {
         if (!FlushStateToDisk(state, FLUSH_STATE_IF_NEEDED))
             return false;
     }
+
+#ifdef BENCHMARK_CONNECT_BLOCK
     int64_t nTime5 = GetTimeMicros(); nTimeChainState += nTime5 - nTime4;
     LogPrint("bench", "  - Writing chainstate: %.2fms [%.2fs]\n", (nTime5 - nTime4) * 0.001, nTimeChainState * 0.000001);
+#endif
+
     // Remove conflicting transactions from the mempool.
     list<CTransaction> txConflicted;
     mempool.removeForBlock(pblock->vtx, pindexNew->GetHeight(), txConflicted, !IsInitialBlockDownload());
@@ -4368,17 +4403,15 @@ bool ConnectTip(CValidationState &state, CBlockIndex *pindexNew, CBlock *pblock)
 
     EnforceNodeDeprecation(pindexNew->GetHeight());
 
+#ifdef BENCHMARK_CONNECT_BLOCK
     int64_t nTime6 = GetTimeMicros(); nTimePostConnect += nTime6 - nTime5; nTimeTotal += nTime6 - nTime1;
     LogPrint("bench", "  - Connect postprocess: %.2fms [%.2fs]\n", (nTime6 - nTime5) * 0.001, nTimePostConnect * 0.000001);
     LogPrint("bench", "- Connect block: %.2fms [%.2fs]\n", (nTime6 - nTime1) * 0.001, nTimeTotal * 0.000001);
+#endif
+
     if ( KOMODO_LONGESTCHAIN != 0 && (pindexNew->GetHeight() == KOMODO_LONGESTCHAIN || pindexNew->GetHeight() == KOMODO_LONGESTCHAIN+1) )
         KOMODO_INSYNC = (int32_t)pindexNew->GetHeight();
     else KOMODO_INSYNC = 0;
-    //fprintf(stderr,"connect.%d insync.%d ASSETCHAINS_SAPLING.%d\n",(int32_t)pindexNew->GetHeight(),KOMODO_INSYNC,ASSETCHAINS_SAPLING);
-    /*if ( KOMODO_INSYNC != 0 ) //ASSETCHAINS_SYMBOL[0] == 0 &&
-        komodo_broadcast(pblock,8);
-    else if ( ASSETCHAINS_SYMBOL[0] != 0 )
-        komodo_broadcast(pblock,4);*/
     if ( KOMODO_NSPV_FULLNODE )
     {
         if ( ASSETCHAINS_CBOPRET != 0 )
