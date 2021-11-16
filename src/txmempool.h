@@ -128,6 +128,36 @@ public:
     size_t DynamicMemoryUsage() const { return 0; }
 };
 
+class TxPool
+{
+public:
+    TxPool() {}
+    virtual ~TxPool() {}
+    virtual bool lookup(uint256 key, CTransaction &value) const = 0;
+};
+
+class TransactionPool : public TxPool
+{
+public:
+    virtual bool lookup(uint256 key, CTransaction &value) const override
+    {
+        auto itr = transactions.find(key);
+        if (itr == transactions.end())
+            return false;
+        value = *((*itr).second);
+        return true;
+    }
+    bool add(CTransaction *tx)
+    {
+        if(transactions.find(tx->GetHash()) != transactions.end())
+            return false;
+        transactions[tx->GetHash()] = tx;
+        return true;
+    }
+protected:
+    std::map<uint256, const CTransaction *> transactions;
+};
+
 /**
  * CTxMemPool stores valid-according-to-the-current-best-chain
  * transactions that may be included in the next block.
@@ -138,7 +168,7 @@ public:
  * an input of a transaction in the pool, it is dropped,
  * as are non-standard transactions.
  */
-class CTxMemPool
+class CTxMemPool : public TxPool
 {
 private:
     uint32_t nCheckFrequency; //! Value n means that n times in 2^32 we check.
@@ -155,6 +185,10 @@ private:
     std::map<uint256, const CTransaction*> mapSproutNullifiers;
     std::map<uint256, const CTransaction*> mapSaplingNullifiers;
 
+    /*****
+     * @brief check internal collections for validity
+     * @param type which collection to check (sprout or sapling)
+     */
     void checkNullifiers(ShieldedType type) const;
     
 public:
@@ -195,35 +229,136 @@ public:
     ~CTxMemPool();
 
     /**
-     * If sanity-checking is turned on, check makes sure the pool is
-     * consistent (does not contain two transactions that spend the same inputs,
-     * all inputs are in the mapNextTx array). If sanity-checking is turned off,
-     * check does nothing.
+     * @brief Makes sure the pool is consistent (does not contain 
+     * two transactions that spend the same inputs, all inputs are in the mapNextTx array).
+     * @note If sanity-checking is turned off, this does nothing.
+     * @param pcoins
      */
     void check(const CCoinsViewCache *pcoins) const;
+    /*****
+     * @brief set the frequency of the sanity check
+     * @param dFrequency the new frequency (0 = never)
+     */
     void setSanityCheck(double dFrequency = 1.0) { nCheckFrequency = static_cast<uint32_t>(dFrequency * 4294967295.0); }
 
+    /****
+     * @brief add a tx to the memory pool without checks
+     * @param hash the tx hash
+     * @param entry the tx
+     * @param fCurrentEstimate true to run fee estimate logic during processing
+     * @returns true always
+     */
     bool addUnchecked(const uint256& hash, const CTxMemPoolEntry &entry, bool fCurrentEstimate = true);
+    /****
+     * @brief add to address index
+     * @param entry what to add
+     * @param view the current view (to get the previous outputs of tx's inputs)
+     */
     void addAddressIndex(const CTxMemPoolEntry &entry, const CCoinsViewCache &view);
+    /*****
+     * @brief retrieve address indexes
+     * @param addresses the search criteria
+     * @param results the results
+     * @returns always true
+     */
     bool getAddressIndex(std::vector<std::pair<uint160, int> > &addresses,
                          std::vector<std::pair<CMempoolAddressDeltaKey, CMempoolAddressDelta> > &results);
+    /*****
+     * @brief remove an address index
+     * @param txhash the hash to search for
+     * @returns always true
+     */
     bool removeAddressIndex(const uint256 txhash);
-
+    /****
+     * @brief add an entry to the spent index
+     * @param entry what to add
+     * @param view the view
+     */
     void addSpentIndex(const CTxMemPoolEntry &entry, const CCoinsViewCache &view);
+    /****
+     * @brief Retrieve an entry from the spent index
+     * @param key what to search for
+     * @param value the results
+     * @returns true if key found
+     */
     bool getSpentIndex(CSpentIndexKey &key, CSpentIndexValue &value);
+    /****
+     * @brief remove an entry from the spent index
+     * @param txhash what to remove
+     * @returns always true
+     */
     bool removeSpentIndex(const uint256 txhash);
+    /******
+     * @brief remove a transaction from the memory pool
+     * @param origTx the transaction to remove
+     * @param removed what was removed (origTx could have had children)
+     * @param fRecursive true to look for children
+     */
     void remove(const CTransaction &tx, std::list<CTransaction>& removed, bool fRecursive = false);
+    /******
+     * @brief remove a transaction and all related txs
+     * @param invalidRoot the tx to remove + txs with this as anchor
+     * @param type SPROUT or SAPLING
+     */
     void removeWithAnchor(const uint256 &invalidRoot, ShieldedType type);
+    /*****
+     * @brief Remove transactions due to a reorg
+     * @param pcoins
+     * @param nMemPoolHeight
+     * @param flags
+     */
     void removeForReorg(const CCoinsViewCache *pcoins, unsigned int nMemPoolHeight, int flags);
+    /*****
+     * @brief remove txs that conflict with a tx
+     * @param tx the transaction
+     * @param[out] removed what was removed
+     */
     void removeConflicts(const CTransaction &tx, std::list<CTransaction>& removed);
+    /****
+     * @brief remove entries that have expired
+     * @param nBlockHeight the chain height
+     */
     void removeExpired(unsigned int nBlockHeight);
+    /****
+     * @brief Remove txs due to a block being connected
+     * @note Also updates the miner fee estimator.
+     * @param vtx
+     * @param nBlockHeight
+     * @param conflicts
+     * @param fCurrentEstimate
+     */
     void removeForBlock(const std::vector<CTransaction>& vtx, unsigned int nBlockHeight,
                         std::list<CTransaction>& conflicts, bool fCurrentEstimate = true);
+    /****
+     * @brief Removes transactions which don't commit to
+     * the given branch ID from the mempool.
+     * @note Called whenever the tip changes. 
+     * @param nMemPoolBranchId the branch id to keep
+     */
     void removeWithoutBranchId(uint32_t nMemPoolBranchId);
+    /****
+     * @brief cleans out this mempool
+     */
     void clear();
+    /****
+     * @brief Retrieve a collection of tx hashes in the mempool
+     * @param[out] vtxid the results
+     */
     void queryHashes(std::vector<uint256>& vtxid);
+    /****
+     * @brief "spend" coins related to hash
+     * @param hashTx the hash to look for
+     * @param coins the coins db to "spend" from
+     */
     void pruneSpent(const uint256& hash, CCoins &coins);
+    /****
+     * @returns number of transactions updated
+     */
     unsigned int GetTransactionsUpdated() const;
+    /*****
+     * @brief adds to the number of transactions updated
+     * @param n the number to add
+     */
     void AddTransactionsUpdated(unsigned int n);
     /**
      * Check that none of this transactions inputs are in the mempool, and thus
@@ -231,49 +366,113 @@ public:
      */
     bool HasNoInputsOf(const CTransaction& tx) const;
 
-    /** Affect CreateNewBlock prioritisation of transactions */
-    void PrioritiseTransaction(const uint256 hash, const std::string strHash, double dPriorityDelta, const CAmount& nFeeDelta);
+    /******
+     * @brief Affect CreateNewBlock prioritisation of transactions 
+     * @param hash the transaction
+     * @param strHash the hash as a string (used for debugging message)
+     * @param dPriorityDelta the priority delta
+     * @param nFeeDelta the fee delta
+     */
+    void PrioritiseTransaction(const uint256 hash, const std::string strHash, double dPriorityDelta, 
+            const CAmount& nFeeDelta);
+    /*****
+     * @brief add priority to an existing transaction
+     * @param hash the tx to look for
+     * @param dPriorityDelta the priority delta
+     * @param nFeeDelta the fee delta
+     */
     void ApplyDeltas(const uint256 hash, double &dPriorityDelta, CAmount &nFeeDelta);
+    /****
+     * @brief remove prioritization data from transaction
+     * @param hash the tx to look for
+     */
     void ClearPrioritisation(const uint256 hash);
-
+    /****
+     * @brief determine if a nullifier exists
+     * @param nullifier what to look for
+     * @param type SPROUT or SAPLING
+     * @returns true if found
+     */
     bool nullifierExists(const uint256& nullifier, ShieldedType type) const;
-
+    /*****
+     * @brief notify wallets of recently added transactions
+     */
     void NotifyRecentlyAdded();
+    /****
+     * @returns true if wallets have been notified (REGTEST only)
+     */
     bool IsFullyNotified();
-    
+    /****
+     * @returns number of items in mempool
+     */
     unsigned long size()
     {
         LOCK(cs);
         return mapTx.size();
     }
 
+    /****
+     * @returns total transaction size of all txs in this pool
+     */
     uint64_t GetTotalTxSize()
     {
         LOCK(cs);
         return totalTxSize;
     }
 
+    /****
+     * @param hash what to look for
+     * @returns true if tx exists in mempool
+     */
     bool exists(uint256 hash) const
     {
         LOCK(cs);
         return (mapTx.count(hash) != 0);
     }
 
-    bool lookup(uint256 hash, CTransaction& result) const;
+    /******
+     * @brief find a transaction by its hash
+     * @param hash what to look for
+     * @param result the result
+     * @returns true if found
+     */
+    bool lookup(uint256 hash, CTransaction& result) const override;
 
-    /** Estimate fee rate needed to get into the next nBlocks */
+    /**
+     * @brief Estimate fee needed to get into next nBlocks blocks
+     * @param nBlocks number of blocks
+     * @returns fee estimate to get into next nBlocks blocks
+     */
     CFeeRate estimateFee(int nBlocks) const;
 
-    /** Estimate priority needed to get into the next nBlocks */
+    /** 
+     * @brief Estimate priority needed to get into the next nBlocks 
+     * @param nBlocks number of blocks
+     * @returns priority estimate to get into the next nBlocks blocks
+     */
     double estimatePriority(int nBlocks) const;
     
-    /** Write/Read estimates to disk */
+    /** 
+     * @brief Write estimates to disk 
+     * @param fileout the file
+     * @returns true
+     */
     bool WriteFeeEstimates(CAutoFile& fileout) const;
+    /****
+     * @brief read estimates from disk
+     * @param filein the file
+     * @returns true
+     */
     bool ReadFeeEstimates(CAutoFile& filein);
 
+    /****
+     * @returns the estimated overhead of this pool
+     */
     size_t DynamicMemoryUsage() const;
 
-    /** Return nCheckFrequency */
+    /** 
+     * @returns current check frequency setting 
+     */
     uint32_t GetCheckFrequency() const {
         return nCheckFrequency;
     }

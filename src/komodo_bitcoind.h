@@ -128,7 +128,14 @@ bool komodo_hardfork_active(uint32_t time);
 
 uint256 komodo_calcmerkleroot(CBlock *pblock, uint256 prevBlockHash, int32_t nHeight, bool fNew, CScript scriptPubKey);
 
-int32_t komodo_isPoS(CBlock *pblock, int32_t height,CTxDestination *addressout);
+/*****
+ * @brief Determine if a block is a PoS block
+ * @param pblock the block to check
+ * @param height chain height
+ * @param[out] addressout the destination address
+ * @returns true if the block is a PoS block
+ */
+bool komodo_isPoS(CBlock *pblock, int32_t height,CTxDestination *addressout);
 
 void komodo_disconnect(CBlockIndex *pindex,CBlock& block);
 
@@ -174,14 +181,22 @@ int32_t komodo_isrealtime(int32_t *kmdheightp);
 
 int32_t komodo_validate_interest(const CTransaction &tx,int32_t txheight,uint32_t cmptime,int32_t dispflag);
 
-/*
- komodo_checkPOW (fast) is called early in the process and should only refer to data immediately available. it is a filter to prevent bad blocks from going into the local DB. The more blocks we can filter out at this stage, the less junk in the local DB that will just get purged later on.
-
- komodo_checkPOW (slow) is called right before connecting blocks so all prior blocks can be assumed to be there and all checks must pass
-
- commission must be in coinbase.vout[1] and must be >= 10000 sats
- PoS stake must be without txfee and in the last tx in the block at vout[0]
+/*****
+ * @brief check PoW of a block
+ * @note komodo_checkPOW (fast) is called early in the process and should only refer to data immediately 
+ * available. it is a filter to prevent bad blocks from going into the local DB. The more blocks we can 
+ * filter out at this stage, the less junk in the local DB that will just get purged later on.
+ * komodo_checkPOW (slow) is called right before connecting blocks so all prior blocks can be assumed to 
+ * be there and all checks must pass.
+ * commission must be in coinbase.vout[1] and must be >= 10000 sats
+ * PoS stake must be without txfee and in the last tx in the block at vout[0]
+ * @param stakeTxValue
+ * @param slowFlag
+ * @param pblock the block to check
+ * @param height the current block height
+ * @returns true on success
  */
+bool komodo_checkPOW(int64_t stakeTxValue, int32_t slowflag,CBlock *pblock,int32_t height);
 
 uint64_t komodo_commission(const CBlock *pblock,int32_t height);
 
@@ -199,7 +214,15 @@ arith_uint256 komodo_PoWtarget(int32_t *percPoSp,arith_uint256 target,int32_t he
 
 uint32_t komodo_stake(int32_t validateflag,arith_uint256 bnTarget,int32_t nHeight,uint256 txid,int32_t vout,uint32_t blocktime,uint32_t prevtime,char *destaddr,int32_t PoSperc);
 
-int32_t komodo_is_PoSblock(int32_t slowflag,int32_t height,CBlock *pblock,arith_uint256 bnTarget,arith_uint256 bhash);
+/****
+ * @param slowflag
+ * @param height
+ * @param pblock the block to check
+ * @param bnTarget
+ * @param bhash
+ * @returns true if the block is a PoS block
+ */
+bool komodo_is_PoSblock(int32_t slowflag,int32_t height,CBlock *pblock,arith_uint256 bnTarget,arith_uint256 bhash);
 
 // for now, we will ignore slowFlag in the interest of keeping success/fail simpler for security purposes
 bool verusCheckPOSBlock(int32_t slowflag, CBlock *pblock, int32_t height);
@@ -219,8 +242,6 @@ bool komodo_appendACscriptpub();
 void GetKomodoEarlytxidScriptPub();
 
 int64_t komodo_checkcommission(CBlock *pblock,int32_t height);
-
-int32_t komodo_checkPOW(int64_t stakeTxValue, int32_t slowflag,CBlock *pblock,int32_t height);
 
 int32_t komodo_acpublic(uint32_t tiptime);
 

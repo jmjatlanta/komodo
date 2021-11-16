@@ -138,7 +138,7 @@ public:
     unsigned int nTime;
 };
 
-/** inv message data */
+/** inv (inventory) message data */
 class CInv
 {
 public:
