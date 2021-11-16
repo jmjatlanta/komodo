@@ -596,10 +596,6 @@ int32_t komodo_notarycmp(uint8_t *scriptPubKey,int32_t scriptlen,uint8_t pubkeys
     return(-1);
 }
 
-// int32_t (!!!)
-/*
-    read blackjok3rtt comments in main.cpp 
-*/
 /* 
     JMJ: Moved hwmheight out of komodo_connectblock to allow testing. 
     Adjusting this should only be done by komodo_connectblock or a unit test
@@ -608,7 +604,14 @@ static int32_t hwmheight;
 
 void adjust_hwmheight(int32_t newHeight) { hwmheight = newHeight; }
 
-int32_t komodo_connectblock(bool fJustCheck, CBlockIndex *pindex,CBlock& block)
+/****
+ * @brief connect a block
+ * @param fJustCheck TRUE to return number of notarizations (0/1)
+ * @param pindex the new block index
+ * @param block the block to add
+ * @returns 0 if !fJustCheck, otherwise -1 or 0 = error or no notarizations, 1 = a notarization was found
+ */
+int32_t komodo_connectblock(bool fJustCheck, CBlockIndex *pindex, const CBlock& block)
 {
     int32_t staked_era; static int32_t lastStakedEra;
     std::vector<int32_t> notarisations;
@@ -628,7 +631,6 @@ int32_t komodo_connectblock(bool fJustCheck, CBlockIndex *pindex,CBlock& block)
         fprintf(stderr,"unexpected null komodostateptr.[%s]\n",ASSETCHAINS_SYMBOL);
         return(0);
     }
-    //fprintf(stderr,"%s connect.%d\n",ASSETCHAINS_SYMBOL,pindex->nHeight);
     // Wallet Filter. Disabled here. Cant be activated by notaries or pools with some changes.
     if ( is_STAKED(ASSETCHAINS_SYMBOL) != 0 || STAKED_NOTARY_ID > -1 )
     {
@@ -696,7 +698,7 @@ int32_t komodo_connectblock(bool fJustCheck, CBlockIndex *pindex,CBlock& block)
                             printf("%02x",scriptPubKey[k]);
                         printf(" scriptPubKey doesnt match any notary vini.%d of %d\n",j,numvins);
                     }
-                } //else printf("cant get scriptPubKey for ht.%d txi.%d vin.%d\n",height,i,j);
+                }
             }
             numvalid = bitweight(signedmask);
             if ( ((height < 90000 || (signedmask & 1) != 0) && numvalid >= KOMODO_MINRATIFY) ||
@@ -753,8 +755,6 @@ int32_t komodo_connectblock(bool fJustCheck, CBlockIndex *pindex,CBlock& block)
                     }
                 }
             }
-            if ( 0 && ASSETCHAINS_SYMBOL[0] == 0 )
-                printf("[%s] ht.%d txi.%d signedmask.%llx numvins.%d numvouts.%d notarized.%d special.%d isratification.%d\n",ASSETCHAINS_SYMBOL,height,i,(long long)signedmask,numvins,numvouts,notarized,specialtx,isratification);
             if ( !fJustCheck && (notarized != 0 && (notarizedheight != 0 || specialtx != 0)) )
             {
                 if ( isratification != 0 )
@@ -799,9 +799,10 @@ int32_t komodo_connectblock(bool fJustCheck, CBlockIndex *pindex,CBlock& block)
             komodo_stateupdate(height,0,0,0,zero,0,0,0,0,height,(uint32_t)pindex->nTime,0,0,0,0,zero,0);
     } 
     else 
-        { fprintf(stderr,"komodo_connectblock: unexpected null pindex\n"); return(0); }
-    //KOMODO_INITDONE = (uint32_t)time(NULL);
-    //fprintf(stderr,"%s end connect.%d\n",ASSETCHAINS_SYMBOL,pindex->GetHeight());
+    { 
+        fprintf(stderr,"komodo_connectblock: unexpected null pindex\n"); 
+        return(0); 
+    }
     if (fJustCheck)
     {
         if ( notarisations.size() == 0 )
@@ -811,11 +812,11 @@ int32_t komodo_connectblock(bool fJustCheck, CBlockIndex *pindex,CBlock& block)
         if ( notarisations.size() > 1 || (notarisations.size() == 1 && notarisations[0] != 1) )
             return(-1);
         
-        fprintf(stderr,"komodo_connectblock: unxexpected behaviour when fJustCheck == true, report blackjok3rtt plz ! \n");
+        fprintf(stderr,"komodo_connectblock: unxexpected behaviour when fJustCheck == true!\n");
         /* this needed by gcc-8, it counts here that control reaches end of non-void function without this.
            by default, we count that if control reached here -> the valid notarization isnt in position 1 or there are too many notarizations in this block.
         */
         return(-1); 
     }
-    else return(0);
+    return 0;
 }

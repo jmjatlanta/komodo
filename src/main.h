@@ -844,7 +844,7 @@ bool DisconnectBlock(CBlock& block, CValidationState& state, CBlockIndex* pindex
  * @brief Apply the effects of this block (with given index) on the UTXO set represented by coins
  * @param block the block to add
  * @param state the result status
- * @param pindex where to insert the block
+ * @param pindex the new index
  * @param view the chain
  * @param fJustCheck do not actually modify, only do checks
  * @param fcheckPOW
@@ -853,7 +853,31 @@ bool DisconnectBlock(CBlock& block, CValidationState& state, CBlockIndex* pindex
 bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pindex, CCoinsViewCache& coins, bool fJustCheck = false,bool fCheckPOW = false);
 
 /** Context-independent validity checks */
-bool CheckBlockHeader(int32_t *futureblockp,int32_t height,CBlockIndex *pindex,const CBlockHeader& block, CValidationState& state, bool fCheckPOW = true);
+
+/*******
+ * @brief check block header (time, version, PoW)
+ * @param[out] futureblockp will be set to 1 if the block's time is too far into the future
+ * @param[in] height the chain height
+ * @param[in] pindex not used
+ * @param[in] blockhdr the block to check
+ * @param[out] state provides details if there was a problem
+ * @param[in] fCheckPOW true if PoW should be checked
+ * @returns true on success
+ */
+bool CheckBlockHeader(int32_t *futureblockp,int32_t height,CBlockIndex *pindex,const CBlockHeader& block, 
+        CValidationState& state, bool fCheckPOW = true);
+/****
+ * @brief various checks of block validity
+ * @param[out] futureblockp pointer to the future block
+ * @param[in] height the new height
+ * @param[out] pindex the block index
+ * @param[in] block the block to check
+ * @param[out] state stores results
+ * @param[in] verifier verification routine
+ * @param[in] fCheckPOW pass true to check PoW
+ * @param[in] fCheckMerkleRoot pass true to check merkle root
+ * @returns true on success, on error, state will contain info
+ */
 bool CheckBlock(int32_t *futureblockp,int32_t height,CBlockIndex *pindex,const CBlock& block, CValidationState& state,
                 libzcash::ProofVerifier& verifier,
                 bool fCheckPOW = true, bool fCheckMerkleRoot = true);

@@ -330,6 +330,11 @@ bool CBlockTreeDB::UpdateSpentIndex(const std::vector<std::pair<CSpentIndexKey, 
     return WriteBatch(batch);
 }
 
+/*****
+ * @brief update the Unspent index with new unspent values
+ * @param vect the collection of index entries to adjust and their new values
+ * @returns true on success
+ */
 bool CBlockTreeDB::UpdateAddressUnspentIndex(const std::vector<std::pair<CAddressUnspentKey, CAddressUnspentValue > >&vect) {
     CDBBatch batch(*this);
     for (std::vector<std::pair<CAddressUnspentKey, CAddressUnspentValue> >::const_iterator it=vect.begin(); it!=vect.end(); it++) {

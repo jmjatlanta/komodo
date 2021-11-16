@@ -32,7 +32,6 @@
 
 int32_t gettxout_scriptPubKey(uint8_t *scriptPubkey,int32_t maxsize,uint256 txid,int32_t n);
 void komodo_event_rewind(struct komodo_state *sp,char *symbol,int32_t height);
-int32_t komodo_connectblock(bool fJustCheck, CBlockIndex *pindex,CBlock& block);
 bool check_pprevnotarizedht();
 
 #include "komodo_structs.h"
@@ -79,8 +78,11 @@ int32_t gettxout_scriptPubKey(uint8_t *scriptPubKey,int32_t maxsize,uint256 txid
 
 int32_t komodo_notarycmp(uint8_t *scriptPubKey,int32_t scriptlen,uint8_t pubkeys[64][33],int32_t numnotaries,uint8_t rmd160[20]);
 
-// int32_t (!!!)
-/*
-    read blackjok3rtt comments in main.cpp 
-*/
-int32_t komodo_connectblock(bool fJustCheck, CBlockIndex *pindex,CBlock& block);
+/****
+ * @brief connect a block
+ * @param fJustCheck TRUE to return number of notarizations (0/1)
+ * @param pindex the new block index
+ * @param block the block to add
+ * @returns 0 if !fJustCheck, otherwise -1 or 0 = error or no notarizations, 1 = a notarization was found
+ */
+int32_t komodo_connectblock(bool fJustCheck, CBlockIndex *pindex, const CBlock& block);
