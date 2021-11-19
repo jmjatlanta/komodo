@@ -250,6 +250,7 @@ TEST(block_tests, TestProcessBlock)
 TEST(block_tests, TestForkBlock)
 {
     TestChain chain;
+    bool forceProcessing = true; // true = local or whitelisted peers, false = non-requested blocks
     EXPECT_EQ(chain.GetIndex()->GetHeight(), 0);
     auto notary = chain.AddWallet(chain.getNotaryKey());
     auto alice = chain.AddWallet();
@@ -285,7 +286,7 @@ TEST(block_tests, TestForkBlock)
         // Add the PoW
         EXPECT_TRUE(CalcPoW(&aBlock));
         CValidationState state;
-        EXPECT_TRUE( ProcessNewBlock(false, newHeight, state, nullptr, &aBlock, true, nullptr) );
+        EXPECT_TRUE( ProcessNewBlock(false, newHeight, state, nullptr, &aBlock, forceProcessing, nullptr) );
         if (!state.IsValid())
             FAIL() << state.GetRejectReason();
     }
@@ -312,7 +313,7 @@ TEST(block_tests, TestForkBlock)
         // Add the PoW
         EXPECT_TRUE(CalcPoW(&bBlock));
         CValidationState state;
-        EXPECT_TRUE( ProcessNewBlock(false, newHeight, state, nullptr, &bBlock, true, nullptr) );
+        EXPECT_TRUE( ProcessNewBlock(false, newHeight, state, nullptr, &bBlock, forceProcessing, nullptr) );
         if (!state.IsValid())
             FAIL() << state.GetRejectReason();
         // The transaction still exists in the mempool, chain b is not tip (yet)
@@ -320,9 +321,9 @@ TEST(block_tests, TestForkBlock)
     }
     newHeight += 1;
     chain.IncrementChainTime();
+    CBlock a2Block;
     // add another block to chain "A" but that does not spend Alice's coin
     {
-        CBlock a2Block;
         // add first a coinbase tx
         auto consensusParams = Params().GetConsensus();
         CMutableTransaction txNew = CreateNewContextualCMutableTransaction(consensusParams, newHeight);
@@ -341,7 +342,7 @@ TEST(block_tests, TestForkBlock)
         // Add the PoW
         EXPECT_TRUE(CalcPoW(&a2Block));
         CValidationState state;
-        EXPECT_TRUE( ProcessNewBlock(false, newHeight, state, nullptr, &a2Block, true, nullptr) );
+        EXPECT_TRUE( ProcessNewBlock(false, newHeight, state, nullptr, &a2Block, forceProcessing, nullptr) );
         if (!state.IsValid())
             FAIL() << state.GetRejectReason();
         // The transaction still exists in the mempool, chain b is not tip (yet)
@@ -370,7 +371,7 @@ TEST(block_tests, TestForkBlock)
         // Add the PoW
         EXPECT_TRUE(CalcPoW(&b2Block));
         CValidationState state;
-        EXPECT_TRUE( ProcessNewBlock(false, newHeight, state, nullptr, &b2Block, true, nullptr) );
+        EXPECT_TRUE( ProcessNewBlock(false, newHeight, state, nullptr, &b2Block, forceProcessing, nullptr) );
         if (!state.IsValid())
             FAIL() << state.GetRejectReason();
         // The transaction still exists in the mempool, chain b is not tip (yet)
@@ -399,12 +400,15 @@ TEST(block_tests, TestForkBlock)
         // Add the PoW
         EXPECT_TRUE(CalcPoW(&b3Block));
         CValidationState state;
-        EXPECT_TRUE( ProcessNewBlock(false, newHeight, state, nullptr, &b3Block, true, nullptr) );
+        EXPECT_TRUE( ProcessNewBlock(false, newHeight, state, nullptr, &b3Block, forceProcessing, nullptr) );
         if (!state.IsValid())
             FAIL() << state.GetRejectReason();
+        // verify that the tip is still "chain A"
+        EXPECT_EQ(chainActive.Height(), newHeight-1);
+        EXPECT_EQ(chainActive.Tip()->GetBlockHash(), a2Block.GetHash());
     }
-    // Verify transaction is now gone from the mempool
-    EXPECT_EQ(mempool.size(), 0);
+    // Verify transaction is still in the mempool
+    EXPECT_EQ(mempool.size(), 1);
 }
 
 TEST(block_tests, TestBlockRemovesMempoolTx)

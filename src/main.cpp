@@ -4650,7 +4650,7 @@ static bool ActivateBestChainStep(bool fSkipdpow, CValidationState &state, CBloc
         }
     }
 
-    if (fBlocksDisconnected) {
+    if (fBlocksDisconnected && !fInvalidFound) {
         mempool.removeForReorg(pcoinsTip, chainActive.Tip()->GetHeight() + 1, STANDARD_LOCKTIME_VERIFY_FLAGS);
     }
     mempool.removeWithoutBranchId(
@@ -5642,7 +5642,6 @@ bool AcceptBlock(int32_t *futureblockp,CBlock& block, CValidationState& state, C
 
     // TODO: deal better with return value and error conditions for duplicate
     // and unrequested blocks.
-    //fprintf(stderr,"Accept %s flags already.%d requested.%d morework.%d farahead.%d\n",pindex->GetBlockHash().ToString().c_str(),fAlreadyHave,fRequested,fHasMoreWork,fTooFarAhead);
     if (fAlreadyHave) return true;
     if (!fRequested) {  // If we didn't ask for it:
         if (pindex->nTx != 0) return true;  // This is a previously-processed block that was pruned
