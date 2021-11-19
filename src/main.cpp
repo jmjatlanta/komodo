@@ -399,8 +399,8 @@ namespace {
             AddressCurrentlyConnected(state->address);
         }
 
-        BOOST_FOREACH(const QueuedBlock& entry, state->vBlocksInFlight)
-        mapBlocksInFlight.erase(entry.hash);
+        for(const QueuedBlock& entry : state->vBlocksInFlight)
+            mapBlocksInFlight.erase(entry.hash);
         EraseOrphansFor(nodeid);
         nPreferredDownload -= state->fPreferredDownload;
 
@@ -5512,6 +5512,14 @@ bool ContextualCheckBlock(int32_t slowflag,const CBlock& block, CValidationState
     return true;
 }
 
+/*****
+ * @brief add the block to the block index
+ * @param[out] futureblockp set to 1 if block's time is too far in the future
+ * @param[in] block the block to add
+ * @param[out] state error state (if any)
+ * @param[out] ppindex the index entry that was added
+ * @returns true on success
+ */
 bool AcceptBlockHeader(int32_t *futureblockp,const CBlockHeader& block, CValidationState& state, CBlockIndex** ppindex)
 {
     static uint256 zero;
@@ -5531,7 +5539,7 @@ bool AcceptBlockHeader(int32_t *futureblockp,const CBlockHeader& block, CValidat
             *ppindex = pindex;
         if ( pindex != 0 && (pindex->nStatus & BLOCK_FAILED_MASK) != 0 )
         {
-            if ( ASSETCHAINS_CC == 0 )//&& (ASSETCHAINS_PRIVATE == 0 || KOMODO_INSYNC >= Params().GetConsensus().vUpgrades[Consensus::UPGRADE_SAPLING].nActivationHeight) )
+            if ( ASSETCHAINS_CC == 0 )
                 return state.Invalid(error("%s: block is marked invalid", __func__), 0, "duplicate");
             else
             {
@@ -5539,15 +5547,6 @@ bool AcceptBlockHeader(int32_t *futureblockp,const CBlockHeader& block, CValidat
                 pindex->nStatus &= ~BLOCK_FAILED_MASK;
             }
         }
-        /*if ( pindex != 0 && hash == komodo_requestedhash )
-        {
-            fprintf(stderr,"AddToBlockIndex A komodo_requestedhash %s\n",komodo_requestedhash.ToString().c_str());
-            memset(&komodo_requestedhash,0,sizeof(komodo_requestedhash));
-            komodo_requestedcount = 0;
-        }*/
-
-        //if ( pindex == 0 )
-        //    fprintf(stderr,"accepthdr %s already known but no pindex\n",hash.ToString().c_str());
         return true;
     }
     if (!CheckBlockHeader(futureblockp,*ppindex!=0?(*ppindex)->GetHeight():0,*ppindex, block, state,0))
@@ -5566,9 +5565,7 @@ bool AcceptBlockHeader(int32_t *futureblockp,const CBlockHeader& block, CValidat
         if (mi == mapBlockIndex.end())
         {
             LogPrintf("AcceptBlockHeader hashPrevBlock %s not found\n",block.hashPrevBlock.ToString().c_str());
-            //*futureblockp = 1;
             return(false);
-            //return state.DoS(10, error("%s: prev block not found", __func__), 0, "bad-prevblk");
         }
         pindexPrev = (*mi).second;
         if (pindexPrev == 0 )
@@ -5581,7 +5578,6 @@ bool AcceptBlockHeader(int32_t *futureblockp,const CBlockHeader& block, CValidat
     }
     if (!ContextualCheckBlockHeader(block, state, pindexPrev))
     {
-        //fprintf(stderr,"AcceptBlockHeader ContextualCheckBlockHeader failed\n");
         LogPrintf("AcceptBlockHeader ContextualCheckBlockHeader failed\n");
         return false;
     }
@@ -5592,17 +5588,10 @@ bool AcceptBlockHeader(int32_t *futureblockp,const CBlockHeader& block, CValidat
             miSelf = mapBlockIndex.find(hash);
             if (miSelf != mapBlockIndex.end())
                 miSelf->second = pindex;
-            //fprintf(stderr,"AcceptBlockHeader couldnt add to block index\n");
         }
     }
     if (ppindex)
         *ppindex = pindex;
-    /*if ( pindex != 0 && hash == komodo_requestedhash )
-    {
-        fprintf(stderr,"AddToBlockIndex komodo_requestedhash %s\n",komodo_requestedhash.ToString().c_str());
-        memset(&komodo_requestedhash,0,sizeof(komodo_requestedhash));
-        komodo_requestedcount = 0;
-    }*/
     return true;
 }
 
@@ -5859,7 +5848,7 @@ bool ProcessNewBlock(bool from_miner, int32_t height, CValidationState &state, C
         LOCK(cs_main);
         if ( chainActive.LastTip() != 0 )
             komodo_currentheight_set(chainActive.LastTip()->GetHeight());
-        checked = CheckBlock(&futureblock,height!=0?height:komodo_block2height(pblock),0,*pblock, state, verifier,0);
+        checked = CheckBlock(&futureblock,height!=0?height:komodo_block2height(pblock),0,*pblock, state, verifier, false);
         bool fRequested = MarkBlockAsReceived(hash);
         fRequested |= fForceProcessing;
         if ( checked && !komodo_checkPOW(0,0,pblock,height) )

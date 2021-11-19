@@ -897,9 +897,17 @@ bool TestBlockValidity(CValidationState &state, const CBlock& block, CBlockIndex
  * If dbp is non-NULL, the file is known to already reside on disk
  */
 bool AcceptBlock(int32_t *futureblockp,CBlock& block, CValidationState& state, CBlockIndex **pindex, bool fRequested, CDiskBlockPos* dbp);
-bool AcceptBlockHeader(int32_t *futureblockp,const CBlockHeader& block, CValidationState& state, CBlockIndex **ppindex= NULL);
 
-
+/*****
+ * @brief add the block to the block index
+ * @param[out] futureblockp set to 1 if block's time is too far in the future
+ * @param[in] block the block to add
+ * @param[out] state error state (if any)
+ * @param[out] ppindex the index entry that was added
+ * @returns true on success
+ */
+bool AcceptBlockHeader(int32_t *futureblockp,const CBlockHeader& block, CValidationState& state, 
+        CBlockIndex **ppindex= NULL);
 
 /**
  * When there are blocks in the active chain with missing data (e.g. if the
