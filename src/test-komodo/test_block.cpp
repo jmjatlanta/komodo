@@ -316,7 +316,7 @@ TEST(block_tests, TestForkBlock)
         EXPECT_TRUE( ProcessNewBlock(false, newHeight, state, nullptr, &bBlock, forceProcessing, nullptr) );
         if (!state.IsValid())
             FAIL() << state.GetRejectReason();
-        // The transaction still exists in the mempool, chain b is not tip (yet)
+        // The transaction still exists in the mempool, chain b is not tip
         EXPECT_EQ(mempool.size(), 1);
     }
     newHeight += 1;
@@ -345,7 +345,7 @@ TEST(block_tests, TestForkBlock)
         EXPECT_TRUE( ProcessNewBlock(false, newHeight, state, nullptr, &a2Block, forceProcessing, nullptr) );
         if (!state.IsValid())
             FAIL() << state.GetRejectReason();
-        // The transaction still exists in the mempool, chain b is not tip (yet)
+        // The transaction still exists in the mempool, chain A is still the longest chain
         EXPECT_EQ(mempool.size(), 1);
     }
     // add a block to chain "B" that tries to doublespend the mempool tx
@@ -374,7 +374,7 @@ TEST(block_tests, TestForkBlock)
         EXPECT_TRUE( ProcessNewBlock(false, newHeight, state, nullptr, &b2Block, forceProcessing, nullptr) );
         if (!state.IsValid())
             FAIL() << state.GetRejectReason();
-        // The transaction still exists in the mempool, chain b is not tip (yet)
+        // The transaction still exists in the mempool, chain b is not tip
         EXPECT_EQ(mempool.size(), 1);
     }
     // add another block that makes chain "B" the longest chain
@@ -403,6 +403,7 @@ TEST(block_tests, TestForkBlock)
         EXPECT_TRUE( ProcessNewBlock(false, newHeight, state, nullptr, &b3Block, forceProcessing, nullptr) );
         if (!state.IsValid())
             FAIL() << state.GetRejectReason();
+        // the chain should fail consensus. Therefore chain A is still the longest chain
         // verify that the tip is still "chain A"
         EXPECT_EQ(chainActive.Height(), newHeight-1);
         EXPECT_EQ(chainActive.Tip()->GetBlockHash(), a2Block.GetHash());
@@ -426,34 +427,93 @@ TEST(block_tests, TestBlockRemovesMempoolTx)
     // add a transaction to the mempool
     CTransaction fundAlice = notary->CreateSpendTransaction(alice, 100000);
     EXPECT_TRUE( chain.acceptTx(fundAlice).IsValid() );
+    auto consensusParams = Params().GetConsensus();
     // construct 2 blocks at the same height to fork chain
     int32_t newHeight = chain.GetIndex()->GetHeight() + 1;
-    CBlock bBlock;
-    // add first a coinbase tx
-    auto consensusParams = Params().GetConsensus();
-    CMutableTransaction txNew = CreateNewContextualCMutableTransaction(consensusParams, newHeight);
-    txNew.vin.resize(1);
-    txNew.vin[0].prevout.SetNull();
-    txNew.vin[0].scriptSig = (CScript() << newHeight << CScriptNum(1)) + COINBASE_FLAGS;
-    txNew.vout.resize(1);
-    txNew.vout[0].nValue = GetBlockSubsidy(newHeight,consensusParams);
-    txNew.nExpiryHeight = 0;
-    bBlock.vtx.push_back(CTransaction(txNew));
-    // add the transaction that was in the mempool
-    bBlock.vtx.push_back(fundAlice);
-    // finish constructing the block
-    bBlock.nBits = GetNextWorkRequired( chain.GetIndex(), &bBlock, Params().GetConsensus());
-    bBlock.nTime = GetTime();
-    bBlock.hashPrevBlock = lastBlock.GetHash();
-    bBlock.hashMerkleRoot = bBlock.BuildMerkleTree();
-    // Add the PoW
-    EXPECT_TRUE(CalcPoW(&bBlock));
-    CValidationState state;
-    EXPECT_TRUE( ProcessNewBlock(false, newHeight, state, nullptr, &bBlock, true, nullptr) );
-    if (!state.IsValid())
-        FAIL() << state.GetRejectReason();
-    // The transaction no longer exists in the mempool
-    EXPECT_EQ(mempool.size(), 0);
+    // transaction on chain A that spends the mempool tx
+    {
+        CBlock aBlock;
+        // add first a coinbase tx
+        CMutableTransaction txNew = CreateNewContextualCMutableTransaction(consensusParams, newHeight);
+        txNew.vin.resize(1);
+        txNew.vin[0].prevout.SetNull();
+        txNew.vin[0].scriptSig = (CScript() << newHeight << CScriptNum(1)) + COINBASE_FLAGS;
+        txNew.vout.resize(1);
+        txNew.vout[0].nValue = GetBlockSubsidy(newHeight,consensusParams);
+        txNew.nExpiryHeight = 0;
+        aBlock.vtx.push_back(CTransaction(txNew));
+        // add the transaction that was in the mempool
+        aBlock.vtx.push_back(fundAlice);
+        // finish constructing the block
+        aBlock.nBits = GetNextWorkRequired( chain.GetIndex(), &aBlock, Params().GetConsensus());
+        aBlock.nTime = GetTime();
+        aBlock.hashPrevBlock = lastBlock.GetHash();
+        aBlock.hashMerkleRoot = aBlock.BuildMerkleTree();
+        // Add the PoW
+        EXPECT_TRUE(CalcPoW(&aBlock));
+        CValidationState state;
+        EXPECT_TRUE( ProcessNewBlock(false, newHeight, state, nullptr, &aBlock, true, nullptr) );
+        if (!state.IsValid())
+            FAIL() << state.GetRejectReason();
+        // The transaction no longer exists in the mempool
+        EXPECT_EQ(mempool.size(), 0);
+    }
+    // try to use the transaction on another fork
+    CBlock b1Block;
+    {
+        // add first a coinbase tx
+        CMutableTransaction txNew = CreateNewContextualCMutableTransaction(consensusParams, newHeight);
+        txNew.vin.resize(1);
+        txNew.vin[0].prevout.SetNull();
+        txNew.vin[0].scriptSig = (CScript() << newHeight << CScriptNum(1)) + COINBASE_FLAGS;
+        txNew.vout.resize(1);
+        txNew.vout[0].nValue = GetBlockSubsidy(newHeight,consensusParams);
+        txNew.nExpiryHeight = 0;
+        b1Block.vtx.push_back(CTransaction(txNew));
+        // add the transaction that was in the mempool (double spending)
+        b1Block.vtx.push_back(fundAlice);
+        // finish constructing the block
+        b1Block.nBits = GetNextWorkRequired( chain.GetIndex(), &b1Block, Params().GetConsensus());
+        b1Block.nTime = GetTime();
+        b1Block.hashPrevBlock = lastBlock.GetHash();
+        b1Block.hashMerkleRoot = b1Block.BuildMerkleTree();
+        // Add the PoW
+        EXPECT_TRUE(CalcPoW(&b1Block));
+        CValidationState state;
+        EXPECT_TRUE( ProcessNewBlock(false, newHeight, state, nullptr, &b1Block, true, nullptr) );
+        if (!state.IsValid())
+            FAIL() << state.GetRejectReason();
+        // The transaction still does not exist in mempool, but does exist on both chain A and B
+        EXPECT_EQ(mempool.size(), 0);
+    }
+    // now activate chain B by making it the longest chain
+    newHeight += 1;
+    chain.IncrementChainTime();
+    {
+        CBlock b2Block;
+        CMutableTransaction txNew = CreateNewContextualCMutableTransaction(consensusParams, newHeight);
+        txNew.vin.resize(1);
+        txNew.vin[0].prevout.SetNull();
+        txNew.vin[0].scriptSig = (CScript() << newHeight << CScriptNum(1)) + COINBASE_FLAGS;
+        txNew.vout.resize(1);
+        txNew.vout[0].nValue = GetBlockSubsidy(newHeight,consensusParams);
+        txNew.nExpiryHeight = 0;
+        b2Block.vtx.push_back(CTransaction(txNew));
+        b2Block.nBits = GetNextWorkRequired( chain.GetIndex(), &b2Block, Params().GetConsensus());
+        b2Block.nTime = GetTime();
+        b2Block.hashPrevBlock = b1Block.GetHash();
+        b2Block.hashMerkleRoot = b2Block.BuildMerkleTree();
+        // Add the PoW
+        EXPECT_TRUE(CalcPoW(&b2Block));
+        CValidationState state;
+        EXPECT_TRUE( ProcessNewBlock(false, newHeight, state, nullptr, &b2Block, true, nullptr) );
+        if (!state.IsValid())
+            FAIL() << state.GetRejectReason();
+        // The transaction still does not exist in mempool, but does exist on both chain A and B
+        EXPECT_EQ(mempool.size(), 0);
+        // the tip should be on chain B
+        EXPECT_EQ( chainActive.Tip()->GetBlockHash(), b2Block.GetHash() );
+    }
 }
 
 TEST(block_tests, TestProcessBadBlock)
