@@ -56,9 +56,6 @@ int32_t ensure_CCrequirements(uint8_t evalcode);
 
 UniValue test_ac(const UniValue& params, bool fHelp, const CPubKey& mypk)
 {
-    // make fake token tx: 
-    struct CCcontract_info *cp, C;
-
     if (fHelp || (params.size() != 4))
         throw runtime_error("incorrect params\n");
     if (ensure_CCrequirements(EVAL_HEIR) < 0)

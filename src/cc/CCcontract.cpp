@@ -51,16 +51,6 @@ bool CCcontract_info::ismyvin(CScript const& scriptSig)
     return out;    
 }
 
-/// cc contract transaction validation callback that enforces the contract consensus rules
-/// @param eval object of Eval type, used to report validation error like eval->Invalid("some error");
-/// @param tx transaction object to validate
-/// @param nIn not used at this time
-bool CCcontract_info::validate(Eval* eval, const CTransaction &tx, uint32_t nIn)
-{
-    throw std::logic_error("validation not supported for eval code");
-    return false; // just to keep the compiler quiet
-}
-
 /***
  * Get an unspendable public key
  * @param unspendablepriv filled with the private key

@@ -156,7 +156,6 @@ std::vector<CCcontract_info> &GetCryptoConditions()
 {
     static bool initialized = false;
     static std::vector<CCcontract_info> vCC = std::vector<CCcontract_info>();
-    CCcontract_info C;
     
     if (!initialized)
     {
@@ -228,9 +227,9 @@ static bool SignStepCC(const BaseSignatureCreator& creator, const CScript& scrip
     vector<CPubKey> vPK;
     vector<valtype> vParams = vector<valtype>();
     COptCCParams p;
+    CCcontract_info *cp;
     
     // get information to sign with
-    CCcontract_info C;
     
     scriptPubKey.IsPayToCryptoCondition(&subScript, vParams);
     if (vParams.empty())
@@ -238,10 +237,10 @@ static bool SignStepCC(const BaseSignatureCreator& creator, const CScript& scrip
         // get the keyID address of the cc and if it is an unspendable cc address, use its pubkey
         // we have nothing else
         char addr[64];
-        if (_Getscriptaddress(addr, subScript) && GetCCByUnspendableAddress(&C, addr))
+        if (_Getscriptaddress(addr, subScript) && GetCCByUnspendableAddress(cp, addr))
         {
-            vPK.push_back(CPubKey(ParseHex(C.CChexstr)));
-            p = COptCCParams(p.VERSION, C.evalcode, 1, 1, vPK, vParams);
+            vPK.push_back(CPubKey(ParseHex(cp->CChexstr)));
+            p = COptCCParams(p.VERSION, cp->evalcode, 1, 1, vPK, vParams);
         }
     }
     else
@@ -255,7 +254,7 @@ static bool SignStepCC(const BaseSignatureCreator& creator, const CScript& scrip
         CKey privKey;
         
         // must be a valid cc eval code
-        if (CCinitLite(&C, p.evalCode))
+        if (CCinitLite(cp, p.evalCode))
         {
             // pay to cc address is a valid tx
             if (!is1of2)
@@ -263,10 +262,10 @@ static bool SignStepCC(const BaseSignatureCreator& creator, const CScript& scrip
                 bool havePriv = creator.KeyStore().GetKey(p.vKeys[0].GetID(), privKey);
                 
                 // if we don't have the private key, it must be the unspendable address
-                if (!havePriv && (p.vKeys[0] == CPubKey(ParseHex(C.CChexstr))))
+                if (!havePriv && (p.vKeys[0] == CPubKey(ParseHex(cp->CChexstr))))
                 {
                     privKey = CKey();
-                    std::vector<unsigned char> vch(&(C.CCpriv[0]), C.CCpriv + sizeof(C.CCpriv));
+                    std::vector<unsigned char> vch(&(cp->CCpriv[0]), cp->CCpriv + sizeof(cp->CCpriv));
                     privKey.Set(vch.begin(), vch.end(), false);
                 }
                 
@@ -296,10 +295,10 @@ static bool SignStepCC(const BaseSignatureCreator& creator, const CScript& scrip
                     if (creator.IsKeystoreValid() && creator.KeyStore().GetKey(pk.GetID(), privKey) && privKey.IsValid())
                         break;
                     
-                    if (pk == CPubKey(ParseHex(C.CChexstr)))
+                    if (pk == CPubKey(ParseHex(cp->CChexstr)))
                     {
                         privKey = CKey();
-                        std::vector<unsigned char> vch(&(C.CCpriv[0]), C.CCpriv + sizeof(C.CCpriv));
+                        std::vector<unsigned char> vch(&(cp->CCpriv[0]), cp->CCpriv + sizeof(cp->CCpriv));
                         privKey.Set(vch.begin(), vch.end(), false);
                         break;
                     }

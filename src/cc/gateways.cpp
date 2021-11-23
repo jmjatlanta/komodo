@@ -224,7 +224,7 @@ uint8_t DecodeGatewaysDepositOpRet(const CScript &scriptPubKey,uint256 &bindtxid
 
 CScript EncodeGatewaysClaimOpRet(uint8_t funcid,uint256 tokenid,uint256 bindtxid,std::string refcoin,uint256 deposittxid,CPubKey destpub,int64_t amount)
 {
-    CScript opret; uint8_t evalcode = EVAL_GATEWAYS; struct CCcontract_info *cp,C; CPubKey gatewayspk;
+    CScript opret; uint8_t evalcode = EVAL_GATEWAYS; CPubKey gatewayspk;
     std::vector<CPubKey> pubkeys;
     vscript_t vopret;
 

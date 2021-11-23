@@ -66,4 +66,15 @@ struct CClibContract_info : public CCcontract_info
             }
         }
     }
+
+    /// cc contract transaction validation callback that enforces the contract consensus rules
+    /// @param eval object of Eval type, used to report validation error like eval->Invalid("some error");
+    /// @param tx transaction object to validate
+    /// @param nIn not used at this time
+    virtual bool validate(Eval* eval, const CTransaction &tx, uint32_t nIn) override
+    {
+        throw std::logic_error("validation not supported for eval code");
+        return false; // just to keep the compiler quiet
+    }
+
 };

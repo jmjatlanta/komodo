@@ -8,9 +8,10 @@
 struct CCcontract_info
 {
     /***
-     * Default ctor, sets everything to 0
+     * Default ctor
      */
-    CCcontract_info() { memset(this, 0, sizeof(CCcontract_info)); }
+    CCcontract_info() = default;
+
     /****
      * Constructor that sets the most common values
      * @param evalcode the type of contract
@@ -65,7 +66,7 @@ struct CCcontract_info
     /// @param eval object of Eval type, used to report validation error like eval->Invalid("some error");
     /// @param tx transaction object to validate
     /// @param nIn not used at this time
-    virtual bool validate(Eval* eval, const CTransaction &tx, uint32_t nIn);
+    virtual bool validate(Eval* eval, const CTransaction &tx, uint32_t nIn) = 0;
 
     /// checks if the value of evalcode in cp object is present in the scriptSig parameter, 
     /// that is, the vin for this scriptSig will be validated by the cc contract (Antara module) defined by the eval code in this CCcontract_info object
@@ -79,9 +80,7 @@ struct CCcontract_info
     ///         break;
     ///     }
     /// \endcode
-    virtual bool ismyvin(CScript const& scriptSig);
+    bool ismyvin(CScript const& scriptSig);
 
-    /// @private
-    //uint8_t didinit;
 };
 
