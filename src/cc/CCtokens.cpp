@@ -385,7 +385,7 @@ int64_t CCTokens::IsTokensvout(bool goDeeper, bool checkPubkeys /*<--not used, a
 				
                     // maybe this is like gatewayclaim to single-eval token?
                     if( evalCodeNonfungible == 0 )  // do not allow to convert non-fungible to fungible token
-                        testVouts.push_back(std::make_pair(MakeCC1vout(EVAL_TOKENS, tx.vout[v].nValue, voutPubkeys[0]), std::string("single-eval cc1 pk[0]")));
+                        testVouts.push_back(std::make_pair(::MakeCC1vout(EVAL_TOKENS, tx.vout[v].nValue, voutPubkeys[0]), std::string("single-eval cc1 pk[0]")));
 
                     // maybe this is like FillSell for non-fungible token?
                     if( evalCode1 != 0 )
@@ -396,7 +396,7 @@ int64_t CCTokens::IsTokensvout(bool goDeeper, bool checkPubkeys /*<--not used, a
                     // the same for pk[1]:
 					if (voutPubkeys.size() == 2) {
                         if (evalCodeNonfungible == 0)  // do not allow to convert non-fungible to fungible token
-                            testVouts.push_back(std::make_pair(MakeCC1vout(EVAL_TOKENS, tx.vout[v].nValue, voutPubkeys[1]), std::string("single-eval cc1 pk[1]")));
+                            testVouts.push_back(std::make_pair(::MakeCC1vout(EVAL_TOKENS, tx.vout[v].nValue, voutPubkeys[1]), std::string("single-eval cc1 pk[1]")));
                         if (evalCode1 != 0)
                             testVouts.push_back(std::make_pair(CCTokens::MakeCC1vout(evalCode1, tx.vout[v].nValue, voutPubkeys[1]), std::string("dual-eval-token cc1 pk[1]")));
                         if (evalCode2 != 0)
@@ -424,7 +424,7 @@ int64_t CCTokens::IsTokensvout(bool goDeeper, bool checkPubkeys /*<--not used, a
 
 				for(std::vector<CPubKey>::iterator it = vinPubkeys.begin(); it != vinPubkeys.end(); it++) {
                     if (evalCodeNonfungible == 0)  // do not allow to convert non-fungible to fungible token
-                        testVouts.push_back(std::make_pair(MakeCC1vout(EVAL_TOKENS, tx.vout[v].nValue, *it), std::string("single-eval cc1 self vin pk")));
+                        testVouts.push_back(std::make_pair(::MakeCC1vout(EVAL_TOKENS, tx.vout[v].nValue, *it), std::string("single-eval cc1 self vin pk")));
                     testVouts.push_back(std::make_pair(CCTokens::MakeCC1vout(evalCode1, evalCode2, tx.vout[v].nValue, *it), std::string("three-eval cc1 self vin pk")));
 
                     if (evalCode2 != 0) 
@@ -505,7 +505,7 @@ int64_t CCTokens::IsTokensvout(bool goDeeper, bool checkPubkeys /*<--not used, a
 }
 
 bool CCTokens::IsTokenMarkerVout(CTxOut vout) {
-    return vout == MakeCC1vout(EVAL_TOKENS, vout.nValue, GetUnspendable());
+    return vout == ::MakeCC1vout(EVAL_TOKENS, vout.nValue, GetUnspendable());
 }
 
 /******
@@ -772,7 +772,7 @@ int64_t CCTokens::HasBurnedTokensvouts(Eval* eval, const CTransaction& tx, uint2
         {
             // make all possible token vouts for dead pk:
             for (std::vector<CPubKey>::iterator it = voutPubkeys.begin(); it != voutPubkeys.end(); it++) {
-                testVouts.push_back(std::make_pair(MakeCC1vout(EVAL_TOKENS, tx.vout[i].nValue, *it), std::string("single-eval cc1 burn pk")));
+                testVouts.push_back(std::make_pair(::MakeCC1vout(EVAL_TOKENS, tx.vout[i].nValue, *it), std::string("single-eval cc1 burn pk")));
                 testVouts.push_back(std::make_pair(CCTokens::MakeCC1vout(evalCode, evalCode2, tx.vout[i].nValue, *it), std::string("three-eval cc1 burn pk")));
 
                 if (evalCode2 != 0)
@@ -841,7 +841,7 @@ std::string CCTokens::CreateToken(int64_t txfee, int64_t tokensupply, const std:
 
         // NOTE: we should prevent spending fake-tokens from this marker in IsTokenvout():
         CCTokens C;
-        mtx.vout.push_back(MakeCC1vout(EVAL_TOKENS, txfee, C.GetUnspendable()));            // new marker to token cc addr, burnable and validated, vout pos now changed to 0 (from 1)
+        mtx.vout.push_back(::MakeCC1vout(EVAL_TOKENS, txfee, C.GetUnspendable()));            // new marker to token cc addr, burnable and validated, vout pos now changed to 0 (from 1)
 		mtx.vout.push_back(CCTokens::MakeCC1vout(destEvalCode, tokensupply, mypk));
 
 		return(FinalizeCCTx(0, &C, mtx, mypk, txfee, EncodeCreateOpRet('c', Mypubkey(), name, description, nonfungibleData)));
