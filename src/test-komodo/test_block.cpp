@@ -249,6 +249,7 @@ TEST(block_tests, TestProcessBlock)
 
 TEST(block_tests, TestForkBlock)
 {
+    ASSETCHAINS_CC = 0; // turn off CryptoConditions
     TestChain chain;
     bool forceProcessing = true; // true = local or whitelisted peers, false = non-requested blocks
     EXPECT_EQ(chain.GetIndex()->GetHeight(), 0);
@@ -409,6 +410,7 @@ TEST(block_tests, TestForkBlock)
         EXPECT_EQ(chainActive.Tip()->GetBlockHash(), a2Block.GetHash());
     }
     // Verify transaction is still in the mempool
+    // this fails, if ASSETCHAINS_CC != 0, as the tx has been removed even though the fork was rejected
     EXPECT_EQ(mempool.size(), 1);
 }
 
