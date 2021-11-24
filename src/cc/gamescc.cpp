@@ -1235,7 +1235,6 @@ UniValue games_register(uint64_t txfee,struct CCcontract_info *cp,cJSON *params)
     std::vector<uint8_t> playerdata; 
     std::string rawtx,symbol,pname; 
     bits256 t;
-    CCTokens tokensC; 
     
     if ( txfee == 0 )
         txfee = 10000;
@@ -1251,6 +1250,7 @@ UniValue games_register(uint64_t txfee,struct CCcontract_info *cp,cJSON *params)
             gametxid = juint256(jitem(params,0));
             if ( (err= games_isvalidgame(cp,gameheight,tx,buyin,maxplayers,gametxid,1)) == 0 )
             {
+                CCTokens tokensC; 
                 if ( n > 1 )
                 {
                     playertxid = juint256(jitem(params,1));

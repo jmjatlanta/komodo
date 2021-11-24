@@ -77,7 +77,7 @@ UniValue AssetOrders(uint256 refassetid, CPubKey pk, uint8_t additionalEvalCode)
                     {
                         GetCCaddress(cp, origaddr, pubkey2pk(origpubkey));  
                         item.push_back(Pair("origaddress", origaddr));
-                        CCTokens::GetCCaddress(cp, origtokenaddr, pubkey2pk(origpubkey));
+                        CCTokens::GetCCaddress(&tokensC, origtokenaddr, pubkey2pk(origpubkey));
                         item.push_back(Pair("origtokenaddress", origtokenaddr));
                     }
                     if (assetid != zeroid)
@@ -232,7 +232,7 @@ std::string CreateSell(int64_t txfee,int64_t askamount,uint256 assetid,int64_t p
         std::vector<uint8_t> vopretNonfungible;
         mask = ~((1LL << mtx.vin.size()) - 1);
 		// add single-eval tokens (or non-fungible tokens):
-           CCTokens tokensC;
+        CCTokens tokensC;
         if ((inputs = tokensC.AddCCInputs(mtx, mypk, assetid, askamount, 60, vopretNonfungible)) > 0)
         {
 			if (inputs < askamount) {
