@@ -739,6 +739,13 @@ void UpdateCoins(const CTransaction& tx, CCoinsViewCache& inputs, int nHeight);
 
 /** Context-independent validity checks */
 bool CheckTransaction(uint32_t tiptime,const CTransaction& tx, CValidationState& state, libzcash::ProofVerifier& verifier, int32_t txIndex, int32_t numTxs);
+/*****
+ * @brief basic tx checks that do not depend on any context
+ * @param tiptime chain time
+ * @param tx the transaction to check
+ * @param state error details
+ * @returns true if tx seems valid
+ */
 bool CheckTransactionWithoutProofVerification(uint32_t tiptime,const CTransaction& tx, CValidationState &state);
 
 /** Check for standard transaction types

@@ -650,27 +650,46 @@ const char *banned_txids[] =
     //"ce567928b5490a17244167af161b1d8dd6ff753fef222fe6855d95b2278a35b3", // missed
 };
 
-int32_t komodo_checkvout(int32_t vout,int32_t k,int32_t indallvouts)
+/*****
+ * @brief check to see if particular vout has been banned
+ * @note within a tx, individual vouts can be banned, not necessarily the entire tx
+ * @pre txid should already have been matched
+ * @param vout index of vout
+ * @param k index of banned array
+ * @param indallvouts index position where all vouts should be banned for that txid
+ * @returns true if vout matches banned vout index
+ */
+bool komodo_checkvout(int32_t vout,int32_t k,int32_t indallvouts)
 {
     if ( k < indallvouts )
-        return(vout == 1);
+        return vout == 1;
     else if ( k == indallvouts || k == indallvouts+1 )
-        return(1);
-    else return(vout == 0);
+        return 1;
+    return vout == 0;
 }
 
+/*******
+ * @brief load the set of banned txids
+ * @param indallvoutsp number of elements stored here minus 2
+ * @param array the array to fill
+ * @param max the max size of the array
+ * @returns the number of elements stored in array
+ */
 int32_t komodo_bannedset(int32_t *indallvoutsp,uint256 *array,int32_t max)
 {
-    int32_t i;
     if ( sizeof(banned_txids)/sizeof(*banned_txids) > max )
     {
         fprintf(stderr,"komodo_bannedset: buffer too small %d vs %d\n",(int32_t)(sizeof(banned_txids)/sizeof(*banned_txids)),max);
         StartShutdown();
     }
+
+    int32_t i;
     for (i=0; i<sizeof(banned_txids)/sizeof(*banned_txids); i++)
         array[i] = uint256S(banned_txids[i]);
+
     *indallvoutsp = i-2;
-    return(i);
+
+    return i;
 }
 
 void komodo_passport_iteration();
@@ -724,7 +743,7 @@ int32_t komodo_check_deposit(int32_t height,const CBlock& block,uint32_t prevtim
             {
                 for (k=0; k<numbanned; k++)
                 {
-                    if ( block.vtx[i].vin[j].prevout.hash == array[k] && komodo_checkvout(block.vtx[i].vin[j].prevout.n,k,indallvouts) != 0 ) //(block.vtx[i].vin[j].prevout.n == 1 || k >= indallvouts)  )
+                    if ( block.vtx[i].vin[j].prevout.hash == array[k] && komodo_checkvout(block.vtx[i].vin[j].prevout.n,k,indallvouts) )
                     {
                         printf("banned tx.%d being used at ht.%d txi.%d vini.%d\n",k,height,i,j);
                         return(-1);

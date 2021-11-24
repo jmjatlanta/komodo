@@ -179,7 +179,14 @@ int32_t komodo_nextheight();
 
 int32_t komodo_isrealtime(int32_t *kmdheightp);
 
-int32_t komodo_validate_interest(const CTransaction &tx,int32_t txheight,uint32_t cmptime,int32_t dispflag);
+/****
+ * @brief see if tx has expired
+ * @param tx the transaction to examine
+ * @param txheight the height of the chain
+ * @param cmptime block time or median time passed
+ * @returns true on success
+ */
+bool komodo_validate_interest(const CTransaction &tx,int32_t txheight,uint32_t cmptime);
 
 /*****
  * @brief check PoW of a block

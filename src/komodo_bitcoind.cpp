@@ -751,42 +751,39 @@ int32_t komodo_is_notarytx(const CTransaction& tx)
     return(0);
 }
 
+/*****
+ * @brief search or calculate the height of a block
+ * @param block
+ * @returns the height of the block
+ */
 int32_t komodo_block2height(CBlock *block)
 {
-    static uint32_t match,mismatch;
-    int32_t i,n,height2=-1,height = 0; uint8_t *ptr; CBlockIndex *pindex = NULL;
+    int32_t height2=-1; // height found in mapBlockIndex
+    int32_t height = 0; // calculated height
+    CBlockIndex *pindex = NULL;
+
     BlockMap::const_iterator it = mapBlockIndex.find(block->GetHash());
     if ( it != mapBlockIndex.end() && (pindex = it->second) != 0 )
     {
         height2 = (int32_t)pindex->GetHeight();
         if ( height2 >= 0 )
-            return(height2);
+            return height2;
     }
-    if ( pindex && block != 0 && block->vtx[0].vin.size() > 0 )
+
+    if ( pindex && block != nullptr && block->vtx[0].vin.size() > 0 )
     {
-        ptr = (uint8_t *)&block->vtx[0].vin[0].scriptSig[0];
-        if ( ptr != 0 && block->vtx[0].vin[0].scriptSig.size() > 5 )
+        uint8_t *ptr = (uint8_t *)&block->vtx[0].vin[0].scriptSig[0];
+        if ( ptr != nullptr && block->vtx[0].vin[0].scriptSig.size() > 5 )
         {
-            //for (i=0; i<6; i++)
-            //    printf("%02x",ptr[i]);
-            n = ptr[0];
-            for (i=0; i<n; i++) // looks strange but this works
+            for (int32_t i=0; i< ptr[0]; i++) // looks strange but this works
             {
                 //03bb81000101(bb 187) (81 48001) (00 12288256)  <- coinbase.6 ht.12288256
                 height += ((uint32_t)ptr[i+1] << (i*8));
-                //printf("(%02x %x %d) ",ptr[i+1],((uint32_t)ptr[i+1] << (i*8)),height);
             }
-            //printf(" <- coinbase.%d ht.%d\n",(int32_t)block->vtx[0].vin[0].scriptSig.size(),height);
         }
     }
-    if ( height != height2 )
-    {
-        //fprintf(stderr,"block2height height.%d vs height2.%d, match.%d mismatch.%d\n",height,height2,match,mismatch);
-        mismatch++;
-        if ( height2 >= 0 )
-            height = height2;
-    } else match++;
-    return(height);
+
+    return height;
 }
 
 int32_t komodo_block2pubkey33(uint8_t *pubkey33,CBlock *block)
@@ -1127,9 +1124,15 @@ int32_t komodo_isrealtime(int32_t *kmdheightp)
     else return(0);
 }
 
-int32_t komodo_validate_interest(const CTransaction &tx,int32_t txheight,uint32_t cmptime,int32_t dispflag)
+/****
+ * @brief see if tx has expired
+ * @param tx the transaction to examine
+ * @param txheight the height of the chain
+ * @param cmptime block time or median time passed
+ * @returns true on success
+ */
+bool komodo_validate_interest(const CTransaction &tx,int32_t txheight,uint32_t cmptime)
 {
-    dispflag = 1;
     if ( KOMODO_REWIND == 0 && ASSETCHAINS_SYMBOL[0] == 0 && (int64_t)tx.nLockTime >= LOCKTIME_THRESHOLD ) //1473793441 )
     {
         if ( txheight > 246748 )
@@ -1138,17 +1141,16 @@ int32_t komodo_validate_interest(const CTransaction &tx,int32_t txheight,uint32_
                 cmptime -= 16000;
             if ( (int64_t)tx.nLockTime < cmptime-KOMODO_MAXMEMPOOLTIME )
             {
-                if ( tx.nLockTime != 1477258935 && dispflag != 0 )
+                if ( tx.nLockTime != 1477258935)
                 {
-                    fprintf(stderr,"komodo_validate_interest.%d reject.%d [%d] locktime %u cmp2.%u\n",dispflag,txheight,(int32_t)(tx.nLockTime - (cmptime-KOMODO_MAXMEMPOOLTIME)),(uint32_t)tx.nLockTime,cmptime);
+                    fprintf(stderr,"komodo_validate_interest.reject.%d [%d] locktime %u cmp2.%u\n",txheight,
+                            (int32_t)(tx.nLockTime - (cmptime-KOMODO_MAXMEMPOOLTIME)),(uint32_t)tx.nLockTime,cmptime);
                 }
-                return(-1);
+                return false;
             }
-            if ( 0 && dispflag != 0 )
-                fprintf(stderr,"validateinterest.%d accept.%d [%d] locktime %u cmp2.%u\n",dispflag,(int32_t)txheight,(int32_t)(tx.nLockTime - (cmptime-KOMODO_MAXMEMPOOLTIME)),(int32_t)tx.nLockTime,cmptime);
         }
     }
-    return(0);
+    return true;
 }
 
 CAmount GetBlockSubsidy(int nHeight, const Consensus::Params& consensusParams);

@@ -256,6 +256,11 @@ bool CScript::IsPayToScriptHash() const
             (*this)[22] == OP_EQUAL);
 }
 
+/****
+ * @brief see if the script is an HTLC script
+ * @param scriptpubkey the script pubkey
+ * @returns true if matches the atomicdex HTLC script
+ */
 bool CScript::IsRedeemScriptReveal(CScript scriptpubkey) const{
     CScript check_spk, redeemScript = scriptpubkey;
     if (

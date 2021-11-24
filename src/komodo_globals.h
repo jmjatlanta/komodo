@@ -28,8 +28,6 @@ int32_t komodo_isrealtime(int32_t *kmdheightp);
 uint64_t komodo_paxtotal();
 int32_t komodo_longestchain();
 uint64_t komodo_maxallowed(int32_t baseid);
-int32_t komodo_bannedset(int32_t *indallvoutsp,uint256 *array,int32_t max);
-int32_t komodo_checkvout(int32_t vout,int32_t k,int32_t indallvouts);
 
 std::mutex komodo_mutex;
 pthread_mutex_t staked_mutex;

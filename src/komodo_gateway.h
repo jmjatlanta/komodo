@@ -59,8 +59,15 @@ int32_t komodo_pending_withdraws(char *opretstr);
 
 int32_t komodo_gateway_deposits(CMutableTransaction *txNew,char *base,int32_t tokomodo);
 
-int32_t komodo_checkvout(int32_t vout,int32_t k,int32_t indallvouts);
+bool komodo_checkvout(int32_t vout,int32_t k,int32_t indallvouts);
 
+/*******
+ * @brief load the set of banned txids
+ * @param indallvoutsp number of elements stored here minus 2
+ * @param array the array to fill
+ * @param max the max size of the array
+ * @returns the number of elements stored in array
+ */
 int32_t komodo_bannedset(int32_t *indallvoutsp,uint256 *array,int32_t max);
 
 void komodo_passport_iteration();

@@ -136,28 +136,6 @@ public:
     virtual bool lookup(uint256 key, CTransaction &value) const = 0;
 };
 
-class TransactionPool : public TxPool
-{
-public:
-    virtual bool lookup(uint256 key, CTransaction &value) const override
-    {
-        auto itr = transactions.find(key);
-        if (itr == transactions.end())
-            return false;
-        value = *((*itr).second);
-        return true;
-    }
-    bool add(CTransaction *tx)
-    {
-        if(transactions.find(tx->GetHash()) != transactions.end())
-            return false;
-        transactions[tx->GetHash()] = tx;
-        return true;
-    }
-protected:
-    std::map<uint256, const CTransaction *> transactions;
-};
-
 /**
  * CTxMemPool stores valid-according-to-the-current-best-chain
  * transactions that may be included in the next block.
@@ -476,6 +454,36 @@ public:
     uint32_t GetCheckFrequency() const {
         return nCheckFrequency;
     }
+};
+
+class TransactionPool : public TxPool
+{
+public:
+    TransactionPool(const std::vector<CTransaction> txs, CTxMemPool* actualMempool) : mempool(actualMempool)
+    {
+        for(const auto& tx : txs)
+        {
+            transactions[tx.GetHash()] = &tx;
+        }
+    }
+    ~TransactionPool()
+    {
+        if (blockPassed)
+        {
+        }
+    }
+    virtual bool lookup(uint256 key, CTransaction &value) const override
+    {
+        auto itr = transactions.find(key);
+        if (itr == transactions.end())
+            return false;
+        value = *((*itr).second);
+        return true;
+    }
+    bool blockPassed; // true if destructor should merge the collection with the mempool
+protected:
+    std::map<uint256, const CTransaction *> transactions;
+    CTxMemPool* mempool;
 };
 
 /** 

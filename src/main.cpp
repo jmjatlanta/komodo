@@ -55,6 +55,7 @@
 #include "komodo_utils.h"
 #include "komodo_notary.h"
 #include "komodo_interest.h" // KOMODO_ENDOFERA
+#include "komodo_gateway.h" // komodo_bannedset()
 
 #include <cstring>
 #include <algorithm>
@@ -1172,19 +1173,26 @@ bool ContextualCheckCoinbaseTransaction(int32_t slowflag,const CBlock *block,CBl
 }
 
 /**
- * Check a transaction contextually against a set of consensus rules valid at a given block height.
+ * @brief Check a transaction contextually against a set of consensus rules valid at a given block height.
  *
  * Notes:
  * 1. AcceptToMemoryPool calls CheckTransaction and this function.
  * 2. ProcessNewBlock calls AcceptBlock, which calls CheckBlock (which calls CheckTransaction)
  *    and ContextualCheckBlock (which calls this function).
  * 3. The isInitBlockDownload argument is only to assist with testing.
+ * @param slowflag
+ * @param block
+ * @param previndex
+ * @param tx
+ * @param state
+ * @param nheight
+ * @param dosLevel
+ * @param isInitBlockDownload
+ * @param validateprices
+ * @returns
  */
 bool ContextualCheckTransaction(int32_t slowflag,const CBlock *block, CBlockIndex * const previndex,
-        const CTransaction& tx,
-        CValidationState &state,
-        const int nHeight,
-        const int dosLevel,
+        const CTransaction& tx, CValidationState &state, const int nHeight, const int dosLevel,
         bool (*isInitBlockDownload)(),int32_t validateprices)
 {
     bool overwinterActive = NetworkUpgradeActive(nHeight, Params().GetConsensus(), Consensus::UPGRADE_OVERWINTER);
@@ -1192,15 +1200,20 @@ bool ContextualCheckTransaction(int32_t slowflag,const CBlock *block, CBlockInde
     bool isSprout = !overwinterActive;
 
     // If Sprout rules apply, reject transactions which are intended for Overwinter and beyond
-    if (isSprout && tx.fOverwintered) {
+    if (isSprout && tx.fOverwintered) 
+    {
         int32_t ht = Params().GetConsensus().vUpgrades[Consensus::UPGRADE_OVERWINTER].nActivationHeight;
-        return state.DoS((ht < 0 || nHeight < ht) ? 0 : dosLevel,error("ContextualCheckTransaction(): ht.%d activates.%d dosLevel.%d overwinter is not active yet",nHeight, Params().GetConsensus().vUpgrades[Consensus::UPGRADE_OVERWINTER].nActivationHeight, dosLevel),REJECT_INVALID, "tx-overwinter-not-active");
-        //return state.DoS(isInitBlockDownload() ? 0 : dosLevel,error("ContextualCheckTransaction(): ht.%d activates.%d dosLevel.%d overwinter is not active yet",nHeight, Params().GetConsensus().vUpgrades[Consensus::UPGRADE_OVERWINTER].nActivationHeight, dosLevel),REJECT_INVALID, "tx-overwinter-not-active");
+        return state.DoS((ht < 0 || nHeight < ht) ? 0 : dosLevel,
+                error("ContextualCheckTransaction(): ht.%d activates.%d dosLevel.%d overwinter is not active yet",
+                        nHeight, Params().GetConsensus().vUpgrades[Consensus::UPGRADE_OVERWINTER].nActivationHeight,
+                        dosLevel),REJECT_INVALID, "tx-overwinter-not-active");
     }
 
-    if (saplingActive) {
+    if (saplingActive) 
+    {
         // Reject transactions with valid version but missing overwintered flag
-        if (tx.nVersion >= SAPLING_MIN_TX_VERSION && !tx.fOverwintered) {
+        if (tx.nVersion >= SAPLING_MIN_TX_VERSION && !tx.fOverwintered) 
+        {
             return state.DoS(dosLevel, error("ContextualCheckTransaction(): overwintered flag must be set"),
                             REJECT_INVALID, "tx-overwintered-flag-not-set");
         }
@@ -1208,53 +1221,51 @@ bool ContextualCheckTransaction(int32_t slowflag,const CBlock *block, CBlockInde
         // Reject transactions with non-Sapling version group ID
         if (tx.fOverwintered && tx.nVersionGroupId != SAPLING_VERSION_GROUP_ID)
         {
-            //return state.DoS(dosLevel, error("CheckTransaction(): invalid Sapling tx version"),REJECT_INVALID, "bad-sapling-tx-version-group-id");
-            if ( 0 )
-            {
-                string strHex = EncodeHexTx(tx);
-                fprintf(stderr,"invalid Sapling rawtx.%s\n",strHex.c_str());
-            }
             return state.DoS(isInitBlockDownload() ? 0 : dosLevel,
-                             error("CheckTransaction(): invalid Sapling tx version"),
-                             REJECT_INVALID, "bad-sapling-tx-version-group-id");
+                    error("CheckTransaction(): invalid Sapling tx version"),
+                    REJECT_INVALID, "bad-sapling-tx-version-group-id");
         }
 
         // Reject transactions with invalid version
-        if (tx.fOverwintered && tx.nVersion < SAPLING_MIN_TX_VERSION ) {
+        if (tx.fOverwintered && tx.nVersion < SAPLING_MIN_TX_VERSION ) 
+        {
             return state.DoS(100, error("CheckTransaction(): Sapling version too low"),
-                REJECT_INVALID, "bad-tx-sapling-version-too-low");
+                    REJECT_INVALID, "bad-tx-sapling-version-too-low");
         }
 
         // Reject transactions with invalid version
-        if (tx.fOverwintered && tx.nVersion > SAPLING_MAX_TX_VERSION ) {
+        if (tx.fOverwintered && tx.nVersion > SAPLING_MAX_TX_VERSION ) 
+        {
             return state.DoS(100, error("CheckTransaction(): Sapling version too high"),
-                REJECT_INVALID, "bad-tx-sapling-version-too-high");
+                    REJECT_INVALID, "bad-tx-sapling-version-too-high");
         }
-    } else if (overwinterActive) {
+    } 
+    else if (overwinterActive) 
+    {
         // Reject transactions with valid version but missing overwinter flag
-        if (tx.nVersion >= OVERWINTER_MIN_TX_VERSION && !tx.fOverwintered) {
+        if (tx.nVersion >= OVERWINTER_MIN_TX_VERSION && !tx.fOverwintered) 
+        {
             return state.DoS(dosLevel, error("ContextualCheckTransaction(): overwinter flag must be set"),
-                             REJECT_INVALID, "tx-overwinter-flag-not-set");
+                    REJECT_INVALID, "tx-overwinter-flag-not-set");
         }
 
         // Reject transactions with non-Overwinter version group ID
         if (tx.fOverwintered && tx.nVersionGroupId != OVERWINTER_VERSION_GROUP_ID)
         {
-            //return state.DoS(dosLevel, error("CheckTransaction(): invalid Overwinter tx version"),REJECT_INVALID, "bad-overwinter-tx-version-group-id");
             return state.DoS(isInitBlockDownload() ? 0 : dosLevel,
-                             error("CheckTransaction(): invalid Overwinter tx version"),
-                             REJECT_INVALID, "bad-overwinter-tx-version-group-id");
+                    error("CheckTransaction(): invalid Overwinter tx version"),
+                    REJECT_INVALID, "bad-overwinter-tx-version-group-id");
         }
 
         // Reject transactions with invalid version
-        if (tx.fOverwintered && tx.nVersion > OVERWINTER_MAX_TX_VERSION ) {
+        if (tx.fOverwintered && tx.nVersion > OVERWINTER_MAX_TX_VERSION ) 
+        {
             return state.DoS(100, error("CheckTransaction(): overwinter version too high"),
-                             REJECT_INVALID, "bad-tx-overwinter-version-too-high");
+                    REJECT_INVALID, "bad-tx-overwinter-version-too-high");
         }
     }
 
     // Rules that apply to Overwinter or later:
-    //fprintf(stderr,"ht.%d overwinterActive.%d tx.overwintered.%d\n",nHeight,overwinterActive,overwinterActive);
     if (overwinterActive)
     {
         // Reject transactions intended for Sprout
@@ -1262,23 +1273,25 @@ bool ContextualCheckTransaction(int32_t slowflag,const CBlock *block, CBlockInde
         {
             int32_t ht = Params().GetConsensus().vUpgrades[Consensus::UPGRADE_OVERWINTER].nActivationHeight;
             fprintf(stderr,"overwinter is active tx.%s not, ht.%d vs %d\n",tx.GetHash().ToString().c_str(),nHeight,ht);
-            return state.DoS((ASSETCHAINS_PRIVATE != 0 || ht < 0 || nHeight < ht) ? 0 : dosLevel, error("ContextualCheckTransaction: overwinter is active"),REJECT_INVALID, "tx-overwinter-active");
+            return state.DoS((ASSETCHAINS_PRIVATE != 0 || ht < 0 || nHeight < ht) ? 0 : dosLevel, 
+                    error("ContextualCheckTransaction: overwinter is active"),REJECT_INVALID, "tx-overwinter-active");
         }
 
         // Check that all transactions are unexpired
-        if (IsExpiredTx(tx, nHeight)) {
+        if (IsExpiredTx(tx, nHeight)) 
+        {
             // Don't increase banscore if the transaction only just expired
             int expiredDosLevel = IsExpiredTx(tx, nHeight - 1) ? (dosLevel > 10 ? dosLevel : 10) : 0;
-            //string strHex = EncodeHexTx(tx);
-            //fprintf(stderr, "transaction exipred.%s\n",strHex.c_str());
-            return state.DoS(expiredDosLevel, error("ContextualCheckTransaction(): transaction %s is expired, expiry block %i vs current block %i\n",tx.GetHash().ToString(),tx.nExpiryHeight,nHeight), REJECT_INVALID, "tx-overwinter-expired");
+            return state.DoS(expiredDosLevel, 
+                    error("ContextualCheckTransaction(): transaction %s is expired, expiry block %i vs current block %i\n",
+                    tx.GetHash().ToString(),tx.nExpiryHeight,nHeight), REJECT_INVALID, "tx-overwinter-expired");
         }
     }
 
     // Rules that apply before Sapling:
-    if (!saplingActive) {
+    if (!saplingActive) 
+    {
         // Size limits
-        //BOOST_STATIC_ASSERT(MAX_BLOCK_SIZE(chainActive.LastTip()->GetHeight()+1) > MAX_TX_SIZE_BEFORE_SAPLING); // sanity
         if (::GetSerializeSize(tx, SER_NETWORK, PROTOCOL_VERSION) > MAX_TX_SIZE_BEFORE_SAPLING)
             return state.DoS(100, error("ContextualCheckTransaction(): size limits failed"),
                             REJECT_INVALID, "bad-txns-oversize");
@@ -1294,9 +1307,11 @@ bool ContextualCheckTransaction(int32_t slowflag,const CBlock *block, CBlockInde
         auto consensusBranchId = CurrentEpochBranchId(nHeight, Params().GetConsensus());
         // Empty output script.
         CScript scriptCode;
-        try {
+        try 
+        {
             dataToBeSigned = SignatureHash(scriptCode, tx, NOT_AN_INPUT, SIGHASH_ALL, 0, consensusBranchId);
-        } catch (std::logic_error ex) {
+        } catch (std::logic_error ex) 
+        {
             return state.DoS(100, error("CheckTransaction(): error computing signature hash"),
                              REJECT_INVALID, "error-computing-signature-hash");
         }
@@ -1309,13 +1324,12 @@ bool ContextualCheckTransaction(int32_t slowflag,const CBlock *block, CBlockInde
 
         // We rely on libsodium to check that the signature is canonical.
         // https://github.com/jedisct1/libsodium/commit/62911edb7ff2275cccd74bf1c8aefcc4d76924e0
-        if (crypto_sign_verify_detached(&tx.joinSplitSig[0],
-                                        dataToBeSigned.begin(), 32,
-                                        tx.joinSplitPubKey.begin()
-                                        ) != 0) {
+        if (crypto_sign_verify_detached(&tx.joinSplitSig[0], dataToBeSigned.begin(), 32,
+                tx.joinSplitPubKey.begin() ) != 0)
+        {
             return state.DoS(isInitBlockDownload() ? 0 : 100,
-                                error("CheckTransaction(): invalid joinsplit signature"),
-                                REJECT_INVALID, "bad-txns-invalid-joinsplit-signature");
+                    error("CheckTransaction(): invalid joinsplit signature"),
+                    REJECT_INVALID, "bad-txns-invalid-joinsplit-signature");
         }
     }
 
@@ -1323,57 +1337,41 @@ bool ContextualCheckTransaction(int32_t slowflag,const CBlock *block, CBlockInde
     {
         if (!ContextualCheckCoinbaseTransaction(slowflag,block,previndex,tx, nHeight,validateprices))
             return state.DoS(100, error("CheckTransaction(): invalid script data for coinbase time lock"),
-                                REJECT_INVALID, "bad-txns-invalid-script-data-for-coinbase-time-lock");
+                    REJECT_INVALID, "bad-txns-invalid-script-data-for-coinbase-time-lock");
     }
 
-    if (!tx.vShieldedSpend.empty() ||
-        !tx.vShieldedOutput.empty())
+    if (!tx.vShieldedSpend.empty() || !tx.vShieldedOutput.empty())
     {
         auto ctx = librustzcash_sapling_verification_ctx_init();
 
-        for (const SpendDescription &spend : tx.vShieldedSpend) {
-            if (!librustzcash_sapling_check_spend(
-                ctx,
-                spend.cv.begin(),
-                spend.anchor.begin(),
-                spend.nullifier.begin(),
-                spend.rk.begin(),
-                spend.zkproof.begin(),
-                spend.spendAuthSig.begin(),
-                dataToBeSigned.begin()
-            ))
+        for (const SpendDescription &spend : tx.vShieldedSpend) 
+        {
+            if (!librustzcash_sapling_check_spend( ctx, spend.cv.begin(), spend.anchor.begin(),
+                    spend.nullifier.begin(), spend.rk.begin(), spend.zkproof.begin(), 
+                    spend.spendAuthSig.begin(), dataToBeSigned.begin() ))
             {
                 librustzcash_sapling_verification_ctx_free(ctx);
                 return state.DoS(100, error("ContextualCheckTransaction(): Sapling spend description invalid"),
-                                      REJECT_INVALID, "bad-txns-sapling-spend-description-invalid");
+                        REJECT_INVALID, "bad-txns-sapling-spend-description-invalid");
             }
         }
 
         for (const OutputDescription &output : tx.vShieldedOutput) {
-            if (!librustzcash_sapling_check_output(
-                ctx,
-                output.cv.begin(),
-                output.cm.begin(),
-                output.ephemeralKey.begin(),
-                output.zkproof.begin()
-            ))
+            if (!librustzcash_sapling_check_output( ctx, output.cv.begin(), output.cm.begin(),
+                    output.ephemeralKey.begin(), output.zkproof.begin() ))
             {
                 librustzcash_sapling_verification_ctx_free(ctx);
                 return state.DoS(100, error("ContextualCheckTransaction(): Sapling output description invalid"),
-                                      REJECT_INVALID, "bad-txns-sapling-output-description-invalid");
+                        REJECT_INVALID, "bad-txns-sapling-output-description-invalid");
             }
         }
 
-        if (!librustzcash_sapling_final_check(
-            ctx,
-            tx.valueBalance,
-            tx.bindingSig.begin(),
-            dataToBeSigned.begin()
-        ))
+        if (!librustzcash_sapling_final_check( ctx, tx.valueBalance, tx.bindingSig.begin(),
+                dataToBeSigned.begin() ))
         {
             librustzcash_sapling_verification_ctx_free(ctx);
             return state.DoS(100, error("ContextualCheckTransaction(): Sapling binding signature invalid"),
-                                  REJECT_INVALID, "bad-txns-sapling-binding-signature-invalid");
+                    REJECT_INVALID, "bad-txns-sapling-binding-signature-invalid");
         }
 
         librustzcash_sapling_verification_ctx_free(ctx);
@@ -1381,32 +1379,48 @@ bool ContextualCheckTransaction(int32_t slowflag,const CBlock *block, CBlockInde
     return true;
 }
 
+/*****
+ * @brief transaction validation
+ * @param tiptime current chain time
+ * @param tx what to validate
+ * @param state details of any error
+ * @param verifier the validation logic to use
+ * @param txIndex
+ * @param numTxs
+ * @returns true on success
+ */
 bool CheckTransaction(uint32_t tiptime,const CTransaction& tx, CValidationState &state,
                       libzcash::ProofVerifier& verifier,int32_t txIndex, int32_t numTxs)
 {
-    static uint256 array[64]; static int32_t numbanned,indallvouts; int32_t j,k,n; uint256 merkleroot;
-    if ( *(int32_t *)&array[0] == 0 )
-        numbanned = komodo_bannedset(&indallvouts,array,(int32_t)(sizeof(array)/sizeof(*array)));
-    n = tx.vin.size();
+    static uint256 array[64]; 
+    static int32_t numbanned;
+    static int32_t indallvouts; 
+    uint256 merkleroot;
+
     if ( ASSETCHAINS_SYMBOL[0] == 0 )
     {
-        for (j=0; j<n; j++)
+        int32_t n = tx.vin.size();
+        for (int32_t j=0; j<n; j++)
         {
-            for (k=0; k<numbanned; k++)
+            if ( *(int32_t *)&array[0] == 0 )
+                numbanned = komodo_bannedset(&indallvouts,array,(int32_t)(sizeof(array)/sizeof(*array)));
+
+            for (int32_t k=0; k<numbanned; k++)
             {
-                if ( tx.vin[j].prevout.hash == array[k] && komodo_checkvout(tx.vin[j].prevout.n,k,indallvouts) != 0 ) //(tx.vin[j].prevout.n == 1 || k >= indallvouts) )
+                if ( tx.vin[j].prevout.hash == array[k] && komodo_checkvout(tx.vin[j].prevout.n,k,indallvouts) )
                 {
                     static uint32_t counter;
                     if ( counter++ < 100 )
-                        printf("MEMPOOL: banned tx.%d being used at ht.%d vout.%d\n",k,(int32_t)chainActive.Tip()->GetHeight(),j);
-                    return(false);
+                        printf("MEMPOOL: banned tx.%d being used at ht.%d vout.%d\n",
+                                k,(int32_t)chainActive.Tip()->GetHeight(),j);
+                    return false;
                 }
             }
         }
     }
     
-    
-    if ( ASSETCHAINS_STAKED != 0 && komodo_newStakerActive(0, tiptime) != 0 && tx.vout.size() == 2 && DecodeStakingOpRet(tx.vout[1].scriptPubKey, merkleroot) != 0 )
+    if ( ASSETCHAINS_STAKED != 0 && komodo_newStakerActive(0, tiptime) != 0 
+            && tx.vout.size() == 2 && DecodeStakingOpRet(tx.vout[1].scriptPubKey, merkleroot) != 0 )
     {
         if ( numTxs == 0 || txIndex != numTxs-1 ) 
         {
@@ -1449,7 +1463,6 @@ int32_t komodo_isnotaryvout(char *coinaddr,uint32_t tiptime) // from ac_private 
     {
         if ( strcmp(coinaddr,NOTARY_ADDRESSES[season-1][i]) == 0 )
         {
-            //fprintf(stderr, "coinaddr.%s notaryaddress[%i].%s\n",coinaddr,i,NOTARY_ADDRESSES[season-1][i]);
             return(1);
         }
     }
@@ -1458,10 +1471,20 @@ int32_t komodo_isnotaryvout(char *coinaddr,uint32_t tiptime) // from ac_private 
 
 int32_t komodo_acpublic(uint32_t tiptime);
 
+/*****
+ * @brief basic tx checks that do not depend on any context
+ * @param tiptime chain time
+ * @param tx the transaction to check
+ * @param state error details
+ * @returns true if tx seems valid
+ */
 bool CheckTransactionWithoutProofVerification(uint32_t tiptime,const CTransaction& tx, CValidationState &state)
 {
-    // Basic checks that don't depend on any context
-    int32_t invalid_private_taddr=0,z_z=0,z_t=0,t_z=0,acpublic = komodo_acpublic(tiptime), current_season = getacseason(tiptime);
+    int32_t z_z=0; // z to z counter
+    int32_t z_t=0; // z to t counter
+    int32_t t_z=0; // t to z counter
+    int32_t acpublic = komodo_acpublic(tiptime);
+    int32_t current_season = getacseason(tiptime);
     /**
      * Previously:
      * 1. The consensus rule below was:
@@ -1526,7 +1549,8 @@ bool CheckTransactionWithoutProofVerification(uint32_t tiptime,const CTransactio
     // Check for negative or overflow output values
     CAmount nValueOut = 0;
     int32_t iscoinbase = tx.IsCoinBase();
-    BOOST_FOREACH(const CTxOut& txout, tx.vout)
+    bool invalid_private_taddr = false;
+    for(const CTxOut& txout : tx.vout)
     {
         if (txout.nValue < 0)
             return state.DoS(100, error("CheckTransaction(): txout.nValue negative"),
@@ -1534,11 +1558,11 @@ bool CheckTransactionWithoutProofVerification(uint32_t tiptime,const CTransactio
         if (txout.nValue > MAX_MONEY)
         {
             fprintf(stderr,"%.8f > max %.8f\n",(double)txout.nValue/COIN,(double)MAX_MONEY/COIN);
-            return state.DoS(100, error("CheckTransaction(): txout.nValue too high"),REJECT_INVALID, "bad-txns-vout-toolarge");
+            return state.DoS(100, error("CheckTransaction(): txout.nValue too high"),
+                    REJECT_INVALID, "bad-txns-vout-toolarge");
         }
         if ( ASSETCHAINS_PRIVATE != 0 )
         {
-            //fprintf(stderr,"private chain nValue %.8f iscoinbase.%d\n",(double)txout.nValue/COIN,iscoinbase);
             if (iscoinbase == 0 && txout.nValue > 0)
             {
                 // TODO: if we are upgraded to Sapling, we can allow Sprout sourced funds to sit in a transparent address
@@ -1547,13 +1571,13 @@ bool CheckTransactionWithoutProofVerification(uint32_t tiptime,const CTransactio
                 Getscriptaddress(destaddr,txout.scriptPubKey);
                 if ( komodo_isnotaryvout(destaddr,tiptime) == 0 )
                 {
-                    invalid_private_taddr = 1;
-                    //return state.DoS(100, error("CheckTransaction(): this is a private chain, no public allowed"),REJECT_INVALID, "bad-txns-acprivacy-chain");
+                    invalid_private_taddr = true;
                 }
             }
         }
         if ( txout.scriptPubKey.size() > IGUANA_MAXSCRIPTSIZE )
-            return state.DoS(100, error("CheckTransaction(): txout.scriptPubKey.size() too big"),REJECT_INVALID, "bad-txns-opret-too-big");
+            return state.DoS(100, error("CheckTransaction(): txout.scriptPubKey.size() too big"),
+                    REJECT_INVALID, "bad-txns-opret-too-big");
         nValueOut += txout.nValue;
         if (!MoneyRange(nValueOut))
             return state.DoS(100, error("CheckTransaction(): txout total out of range"),
@@ -1570,7 +1594,7 @@ bool CheckTransactionWithoutProofVerification(uint32_t tiptime,const CTransactio
         return state.DoS(100, error("CheckTransaction(): this is a public chain, no sapling allowed"),
                          REJECT_INVALID, "bad-txns-acpublic-chain");
     }
-    if ( ASSETCHAINS_PRIVATE != 0 && invalid_private_taddr != 0 && tx.vShieldedSpend.empty() == 0 )
+    if ( ASSETCHAINS_PRIVATE != 0 && invalid_private_taddr && tx.vShieldedSpend.empty() == 0 )
     {
         if ( !( current_season > 5 &&
                 tx.vin.size() == 0 &&
@@ -1601,7 +1625,7 @@ bool CheckTransactionWithoutProofVerification(uint32_t tiptime,const CTransactio
     }
 
     // Ensure that joinsplit values are well-formed
-    BOOST_FOREACH(const JSDescription& joinsplit, tx.vjoinsplit)
+    for(const JSDescription& joinsplit : tx.vjoinsplit)
     {
         if ( acpublic != 0 )
         {
@@ -1654,9 +1678,12 @@ bool CheckTransactionWithoutProofVerification(uint32_t tiptime,const CTransactio
     {
         static uint32_t counter;
         if ( counter++ < 10 )
-            fprintf(stderr,"found taddr in private chain: z_z.%d z_t.%d t_z.%d vinsize.%d\n",z_z,z_t,t_z,(int32_t)tx.vin.size());
+            fprintf(stderr,"found taddr in private chain: z_z.%d z_t.%d t_z.%d vinsize.%d\n",
+                    z_z,z_t,t_z,(int32_t)tx.vin.size());
         if ( z_t == 0 || z_z != 0 || t_z != 0 || tx.vin.size() != 0 )
-            return state.DoS(100, error("CheckTransaction(): this is a private chain, only sprout -> taddr allowed until deadline"),REJECT_INVALID, "bad-txns-acprivacy-chain");
+            return state.DoS(100, 
+                    error("CheckTransaction(): this is a private chain, only sprout -> taddr allowed until deadline"),
+                    REJECT_INVALID, "bad-txns-acprivacy-chain");
     }
     if ( ASSETCHAINS_TXPOW != 0 )
     {
@@ -1669,8 +1696,10 @@ bool CheckTransactionWithoutProofVerification(uint32_t tiptime,const CTransactio
                 uint256 genesistxid = uint256S("4a5e1e4baab89f3a32518a88c31bc87f618f76673e2cc77ab2127b7afdeda33b");
                 if ( txid != genesistxid )
                 {
-                    fprintf(stderr,"private chain iscoinbase.%d invalid txpow.%d txid.%s\n",iscoinbase,ASSETCHAINS_TXPOW,txid.GetHex().c_str());
-                    return state.DoS(100, error("CheckTransaction(): this is a txpow chain, must have 0x00 ends"),REJECT_INVALID, "bad-txns-actxpow-chain");
+                    fprintf(stderr,"private chain iscoinbase.%d invalid txpow.%d txid.%s\n",
+                            iscoinbase,ASSETCHAINS_TXPOW,txid.GetHex().c_str());
+                    return state.DoS(100, error("CheckTransaction(): this is a txpow chain, must have 0x00 ends"),
+                            REJECT_INVALID, "bad-txns-actxpow-chain");
                 }
             }
         }
@@ -1706,7 +1735,7 @@ bool CheckTransactionWithoutProofVerification(uint32_t tiptime,const CTransactio
 
     // Check for duplicate inputs
     set<COutPoint> vInOutPoints;
-    BOOST_FOREACH(const CTxIn& txin, tx.vin)
+    for(const CTxIn& txin : tx.vin)
     {
         if (vInOutPoints.count(txin.prevout))
             return state.DoS(100, error("CheckTransaction(): duplicate inputs"),
@@ -1717,9 +1746,9 @@ bool CheckTransactionWithoutProofVerification(uint32_t tiptime,const CTransactio
     // Check for duplicate joinsplit nullifiers in this transaction
     {
         set<uint256> vJoinSplitNullifiers;
-        BOOST_FOREACH(const JSDescription& joinsplit, tx.vjoinsplit)
+        for(const JSDescription& joinsplit : tx.vjoinsplit)
         {
-            BOOST_FOREACH(const uint256& nf, joinsplit.nullifiers)
+            for(const uint256& nf : joinsplit.nullifiers)
             {
                 if (vJoinSplitNullifiers.count(nf))
                     return state.DoS(100, error("CheckTransaction(): duplicate nullifiers"),
@@ -1733,7 +1762,7 @@ bool CheckTransactionWithoutProofVerification(uint32_t tiptime,const CTransactio
     // Check for duplicate sapling nullifiers in this transaction
     {
         set<uint256> vSaplingNullifiers;
-        BOOST_FOREACH(const SpendDescription& spend_desc, tx.vShieldedSpend)
+        for(const SpendDescription& spend_desc : tx.vShieldedSpend)
         {
             if (vSaplingNullifiers.count(spend_desc.nullifier))
                 return state.DoS(100, error("CheckTransaction(): duplicate nullifiers"),
@@ -1764,10 +1793,10 @@ bool CheckTransactionWithoutProofVerification(uint32_t tiptime,const CTransactio
     }
     else
     {
-        BOOST_FOREACH(const CTxIn& txin, tx.vin)
-        if (txin.prevout.IsNull())
-            return state.DoS(10, error("CheckTransaction(): prevout is null"),
-                             REJECT_INVALID, "bad-txns-prevout-null");
+        for(const CTxIn& txin : tx.vin)
+            if (txin.prevout.IsNull())
+                return state.DoS(10, error("CheckTransaction(): prevout is null"),
+                        REJECT_INVALID, "bad-txns-prevout-null");
     }
 
     return true;
@@ -1841,8 +1870,8 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
     }
     auto verifier = libzcash::ProofVerifier::Strict();
     if ( ASSETCHAINS_SYMBOL[0] == 0 && chainActive.LastTip() != nullptr
-            && komodo_validate_interest(tx,chainActive.LastTip()->GetHeight()+1,
-            chainActive.LastTip()->GetMedianTimePast() + 777,0) < 0 )
+            && !komodo_validate_interest(tx,chainActive.LastTip()->GetHeight()+1,
+            chainActive.LastTip()->GetMedianTimePast() + 777) )
     {
         fprintf(stderr,"AcceptToMemoryPool komodo_validate_interest failure\n");
         return error("AcceptToMemoryPool: komodo_validate_interest failed");
@@ -2236,9 +2265,10 @@ bool myAddtomempool(const CTransaction &tx, CValidationState *pstate, bool fSkip
  * @param[in] hash what to look for
  * @param[out] txOut the found transaction
  * @param[out] hashBlock the hash of the block (all zeros if still in mempool)
+ * @param[in] transPool the transaction pool to look in for transactions not already in a block
  * @returns true if found
  */
-bool myGetTransaction(const uint256 &hash, CTransaction &txOut, uint256 &hashBlock)
+bool myGetTransaction(const uint256 &hash, CTransaction &txOut, uint256 &hashBlock, const TxPool& transPool)
 {
     memset(&hashBlock,0,sizeof(hashBlock));
     if ( KOMODO_NSPV_SUPERLITE )
@@ -2256,7 +2286,7 @@ bool myGetTransaction(const uint256 &hash, CTransaction &txOut, uint256 &hashBlo
     }
     // need a GetTransaction without lock so the validation code for assets can run without deadlock
     {
-        if (mempool.lookup(hash, txOut))
+        if (transPool.lookup(hash, txOut))
         {
             return true;
         }
@@ -2288,6 +2318,19 @@ bool myGetTransaction(const uint256 &hash, CTransaction &txOut, uint256 &hashBlo
     }
     return false;
 }
+
+/*****
+ * @brief get a transaction by its hash (without locks)
+ * @param[in] hash what to look for
+ * @param[out] txOut the found transaction
+ * @param[out] hashBlock the hash of the block (all zeros if still in mempool)
+ * @returns true if found
+ */
+bool myGetTransaction(const uint256 &hash, CTransaction &txOut, uint256 &hashBlock)
+{
+    return myGetTransaction(hash, txOut, hashBlock, mempool);
+}
+
 
 bool NSPV_myGetTransaction(const uint256 &hash, CTransaction &txOut, uint256 &hashBlock, int32_t &txheight, int32_t &currentheight)
 {
@@ -5335,7 +5378,7 @@ bool CheckBlock(int32_t *futureblockp, int32_t height, CBlockIndex *pindex, cons
     for (uint32_t i = 0; i < block.vtx.size(); i++)
     {
         const CTransaction& tx = block.vtx[i];
-        if ( komodo_validate_interest(tx,height == 0 ? komodo_block2height((CBlock *)&block) : height,block.nTime,0) < 0 )
+        if ( !komodo_validate_interest(tx,height == 0 ? komodo_block2height((CBlock *)&block) : height,block.nTime) )
         {
             fprintf(stderr, "validate intrest failed for txnum.%i tx.%s\n", i, tx.ToString().c_str());
             return error("CheckBlock: komodo_validate_interest failed");

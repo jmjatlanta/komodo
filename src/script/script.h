@@ -598,7 +598,11 @@ public:
     bool IsCoinImport() const;
     bool MayAcceptCryptoCondition() const;
 
-    // zHLTC
+    /****
+     * @brief see if the script is an HTLC script
+     * @param scriptpubkey the script pubkey
+     * @returns true if matches the atomicdex HTLC script
+     */
     bool IsRedeemScriptReveal(CScript scriptpubkey) const;
 
     /** Called by IsStandardTx and P2SH/BIP62 VerifyScript (which makes it consensus-critical). */
