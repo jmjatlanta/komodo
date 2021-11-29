@@ -307,10 +307,14 @@ bool myIsutxo_spentinmempool(uint256 &spenttxid,int32_t &spentvini,uint256 txid,
  * @brief add a transaction to the mempool
  * @param[in] tx the transaction
  * @param pstate where to store any error (can be nullptr)
- * @param fSkipExpiry
+ * @param fSkipExpiry skip expiry checks
+ * @param pool the mempool to be added to
  * @returns true on success
  */
-bool myAddtomempool(const CTransaction &tx, CValidationState *pstate = nullptr, bool fSkipExpiry = false);
+bool myAddtomempool(const CTransaction &tx, CValidationState *pstate, 
+        bool fSkipExpiry, CTxMemPool& pool);
+bool myAddtomempool(const CTransaction &tx);
+
 bool mytxid_inmempool(uint256 txid);
 int32_t myIsutxo_spent(uint256 &spenttxid,uint256 txid,int32_t vout);
 int32_t myGet_mempool_txs(std::vector<CTransaction> &txs,uint8_t evalcode,uint8_t funcid);

@@ -128,7 +128,6 @@ unsigned int expiryDelta = DEFAULT_TX_EXPIRY_DELTA;
 CFeeRate minRelayTxFee = CFeeRate(DEFAULT_MIN_RELAY_TX_FEE);
 
 CTxMemPool mempool(::minRelayTxFee);
-CTxMemPool tmpmempool(::minRelayTxFee);
 
 struct COrphanTx {
     CTransaction tx;
@@ -2232,6 +2231,10 @@ struct CompareBlocksByHeightMain
     }
 };
 
+bool myAddtomempool(const CTransaction& tx)
+{
+    return myAddtomempool(tx, nullptr, false, mempool);
+}
 /****
  * @brief add a transaction to the mempool
  * @param[in] tx the transaction
@@ -2239,23 +2242,21 @@ struct CompareBlocksByHeightMain
  * @param fSkipExpiry set to false to add to pool without many checks
  * @returns true on success
  */
-bool myAddtomempool(const CTransaction &tx, CValidationState *pstate, bool fSkipExpiry)
+bool myAddtomempool(const CTransaction &tx, CValidationState *pstate, bool fSkipExpiry, CTxMemPool& pool)
 {
-    CValidationState state;
-    if (pstate == nullptr)
-        pstate = &state;
-
     CTransaction Ltx; 
-    if ( mempool.lookup(tx.GetHash(),Ltx) == false ) // does not already exist
+    if ( pool.lookup(tx.GetHash(),Ltx) == false ) // does not already exist
     {
-        if ( !fSkipExpiry )
-        {
-            bool fMissingInputs;
-            bool fOverrideFees = false;
-            return(AcceptToMemoryPool(mempool, *pstate, tx, false, &fMissingInputs, !fOverrideFees, -1));
-        }
+        if ( fSkipExpiry )
+            return CCTxFixAcceptToMemPoolUnchecked(pool,tx);
         else 
-            return(CCTxFixAcceptToMemPoolUnchecked(mempool,tx));
+        {
+            CValidationState state;
+            if (pstate == nullptr)
+                pstate = &state;
+            bool fMissingInputs;
+            return AcceptToMemoryPool(pool, *pstate, tx, false, &fMissingInputs, true, -1);
+        }
     }
     return true;
 }
@@ -5310,45 +5311,28 @@ bool CheckBlock(int32_t *futureblockp, int32_t height, CBlockIndex *pindex, cons
     if ( ASSETCHAINS_CC != 0 && !fCheckPOW )
         return true;
 
-    CTransaction sTx;
-    CTransaction *ptx = nullptr;
+    CTransaction stakingTx; // stores a staking transaction (if found)
 
     // CC contracts might refer to transactions in the current block, from a 
     // CC spend within the same block and out of order
+    CTxMemPool blockPool(::minRelayTxFee);
+    list<CTransaction> toBeRemoved; // tx that should be removed from mempool if block is successful
     if ( ASSETCHAINS_CC != 0 ) 
     {
-        int32_t i,j,rejects=0,lastrejects=0;
-        // Copy all non Z-txs in mempool to temporary mempool because there can 
-        // be tx in local mempool that make the block invalid.
-        LOCK2(cs_main,mempool.cs);
-        list<CTransaction> transactionsToRemove;
-        for(const CTxMemPoolEntry& e : mempool.mapTx) 
-        {
-            const CTransaction &tx = e.GetTx();
-            if ( tx.vjoinsplit.empty() && tx.vShieldedSpend.empty()) 
-            {
-                transactionsToRemove.push_back(tx);
-                tmpmempool.addUnchecked(tx.GetHash(),e,true);
-            }
-        }
-        for(const CTransaction& tx : transactionsToRemove) {
-            list<CTransaction> removed;
-            mempool.remove(tx, removed, false);
-        }
-        // add all the txs in the block to the (somewhat) empty mempool.
+        // add all the txs in the block to a temporary mempool
         // CC validation shouldn't (can't) depend on the state of mempool!
+        int32_t lastrejects = 0;
         while ( true )
         {
-            list<CTransaction> removed;
-            for (i=0; i<block.vtx.size(); i++)
+            int32_t rejects = 0;
+            for (std::size_t i=0; i<block.vtx.size(); i++) // iterate through block's transactions
             {
-                CValidationState state; CTransaction Tx; 
+                CValidationState state;
                 const CTransaction &tx = (CTransaction)block.vtx[i];
                 if ( tx.IsCoinBase() || !tx.vjoinsplit.empty() || !tx.vShieldedSpend.empty() 
                         || (i == block.vtx.size()-1 && komodo_isPoS((CBlock *)&block,height,0) ) )
-                    continue;
-                Tx = tx;
-                if ( myAddtomempool(Tx, &state, true) == false ) 
+                    continue; // Do not add certain types of transactions to the block's mempool
+                if ( !myAddtomempool(tx, &state, true, blockPool) ) 
                 {
                     // This happens with out of order tx in block on resync.
 
@@ -5356,22 +5340,22 @@ bool CheckBlock(int32_t *futureblockp, int32_t height, CBlockIndex *pindex, cons
                     // staking transaction, sync with wallets and don't mark as a reject
                     if (i == (block.vtx.size() - 1) && ASSETCHAINS_LWMAPOS && block.IsVerusPOSBlock() 
                             && state.GetRejectReason() == "staking")
-                    {
-                        sTx = Tx;
-                        ptx = &sTx;
-                    } 
+                        stakingTx = tx;
                     else 
                         rejects++;
                 }
-                // here we remove any txs in the temp mempool that were included in the block.
-                tmpmempool.remove(tx, removed, false);
-            }
+                // here we mark for removal any txs in the mempool that were included in the block.
+                toBeRemoved.push_back(tx);
+            } // end of looping through transactions of the block
+
             if ( rejects == 0 || rejects == lastrejects )
             {
+                // we either don't have rejects or we have tried 
+                // going through the txs again and still have the 
+                // same number of rejects
                 break;
             }
             lastrejects = rejects;
-            rejects = 0;
         }
     }
 
@@ -5401,23 +5385,20 @@ bool CheckBlock(int32_t *futureblockp, int32_t height, CBlockIndex *pindex, cons
         return(false);
     }
 
-    if (ptx)
+    if (stakingTx.vin.size() != 0) // we found a staking transaction earlier
     {
-        SyncWithWallets(*ptx, &block);
+        SyncWithWallets(stakingTx, &block);
     }
 
     if ( ASSETCHAINS_CC != 0 )
     {
         LOCK2(cs_main,mempool.cs);
-        // here we add back all txs from the temp mempool to the main mempool.
-        for(const CTxMemPoolEntry& e : tmpmempool.mapTx)
-        {
-            const CTransaction &tx = e.GetTx();
-            const uint256 &hash = tx.GetHash();
-            mempool.addUnchecked(hash,e,true);
-        }
-        // empty the temp mempool for next time.
-        tmpmempool.clear();
+       // remove block's transactions from mempool
+       list<CTransaction> ignore;
+       for(auto toRemove : toBeRemoved)
+       {
+           mempool.remove(toRemove, ignore, false);
+       }
     }
     return true;
 }
