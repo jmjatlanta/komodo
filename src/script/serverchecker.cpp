@@ -118,5 +118,5 @@ bool ServerTransactionSignatureChecker::VerifySignature(const std::vector<unsign
  */
 int ServerTransactionSignatureChecker::CheckEvalCondition(const CC *cond) const
 {
-    return RunCCEval(cond, *txTo, nIn, pool);
+    return RunCCEval(cond, *txTo, nIn, eval);
 }

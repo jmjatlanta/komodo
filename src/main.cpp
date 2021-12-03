@@ -2792,7 +2792,7 @@ void UpdateCoins(const CTransaction& tx, CCoinsViewCache& inputs, int nHeight)
 
 bool CScriptCheck::operator()() {
     const CScript &scriptSig = ptxTo->vin[nIn].scriptSig;
-    ServerTransactionSignatureChecker checker(ptxTo, nIn, amount, cacheStore, *pool, *txdata);
+    ServerTransactionSignatureChecker checker(ptxTo, nIn, amount, cacheStore, pEval, *txdata);
     if (!VerifyScript(scriptSig, scriptPubKey, nFlags, checker, consensusBranchId, &error)) {
         return ::error("CScriptCheck(): %s:%d VerifySignature failed: %s", ptxTo->GetHash().ToString(), nIn, ScriptErrorString(error));
     }
@@ -2927,6 +2927,7 @@ bool ContextualCheckInputs( const CTransaction& tx, CValidationState &state, con
         const Consensus::Params& consensusParams, uint32_t consensusBranchId, CTxMemPool& pool,
         std::vector<CScriptCheck> *pvChecks)
 {
+    std::unique_ptr<Eval> eval(new Eval(pool));
     if (!tx.IsMint())
     {
         if (!Consensus::CheckTxInputs(tx, state, inputs, GetSpendHeight(inputs), consensusParams)) {
@@ -2954,7 +2955,7 @@ bool ContextualCheckInputs( const CTransaction& tx, CValidationState &state, con
                 assert(coins);
 
                 // Verify signature
-                CScriptCheck check(*coins, tx, i, flags, cacheStore, consensusBranchId, &txdata, &pool);
+                CScriptCheck check(*coins, tx, i, flags, cacheStore, consensusBranchId, &txdata, eval.get());
                 if (pvChecks) 
                 {
                     pvChecks->push_back(CScriptCheck());
@@ -2972,7 +2973,7 @@ bool ContextualCheckInputs( const CTransaction& tx, CValidationState &state, con
                         // non-upgraded nodes.
                         CScriptCheck check2(*coins, tx, i,
                                 flags & ~STANDARD_NOT_MANDATORY_VERIFY_FLAGS, cacheStore, 
-                                consensusBranchId, &txdata, &pool);
+                                consensusBranchId, &txdata, eval.get());
                         if (check2())
                             return state.Invalid(false, REJECT_NONSTANDARD, 
                                     strprintf("non-mandatory-script-verify-flag (%s)", 
@@ -2996,7 +2997,8 @@ bool ContextualCheckInputs( const CTransaction& tx, CValidationState &state, con
     if (tx.IsCoinImport() || tx.IsPegsImport())
     {
         LOCK(cs_main);
-        ServerTransactionSignatureChecker checker(&tx, 0, 0, false, pool, txdata);
+        std::unique_ptr<Eval> eval( new Eval(pool) );
+        ServerTransactionSignatureChecker checker(&tx, 0, 0, false, eval.get(), txdata);
         return VerifyCoinImport(tx.vin[0].scriptSig, checker, state);
     }
 

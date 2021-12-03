@@ -77,6 +77,7 @@ class Eval
 public:
     Eval(CTxMemPool &pool) : pool(pool) {}
     CValidationState state;
+    CTxMemPool &pool;
 
     bool Invalid(std::string s) { return state.Invalid(false, 0, s); }
     bool Error(std::string s) { return state.Error(s); }
@@ -116,11 +117,9 @@ public:
     virtual bool CheckNotaryInputs(const CTransaction &tx, uint32_t height, uint32_t timestamp) const;
     virtual uint32_t GetAssetchainsCC() const;
     virtual std::string GetAssetchainsSymbol() const;    
-private:
-    CTxMemPool &pool;
 };
 
-bool RunCCEval(const CC *cond, const CTransaction &tx, unsigned int nIn, CTxMemPool& pool);
+bool RunCCEval(const CC *cond, const CTransaction &tx, unsigned int nIn, Eval* eval);
 
 /*
  * Virtual machine to use in the case of on-chain app evaluation

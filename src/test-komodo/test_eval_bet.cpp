@@ -13,12 +13,7 @@
 
 #include "testutils.h"
 
-
-extern Eval* EVAL_TEST;
-
-
 namespace TestBet {
-
 
 static std::vector<CKey> playerSecrets;
 static std::vector<CPubKey> players;
@@ -37,13 +32,13 @@ int CCSign(CMutableTransaction &tx, unsigned int nIn, CC *cond, std::vector<int>
 }
 
 
-int TestCC(CMutableTransaction &mtxTo, unsigned int nIn, CC *cond)
+int TestCC(CMutableTransaction &mtxTo, unsigned int nIn, CC *cond, Eval* eval)
 {
     CAmount amount;
     ScriptError error;
     CTransaction txTo(mtxTo);
     PrecomputedTransactionData txdata(txTo);
-    auto checker = ServerTransactionSignatureChecker(&txTo, nIn, amount, false, mempool, txdata);
+    auto checker = ServerTransactionSignatureChecker(&txTo, nIn, amount, false, eval, txdata);
     return VerifyScript(txTo.vin[nIn].scriptSig, CCPubKey(cond), 0, checker, 0, &error);
 }
 
@@ -241,7 +236,6 @@ public:
         MoMProof proof = GetMoMProof();
         eval.MoM = proof.branch.Exec(DisputeTx(Player2).GetHash());
 
-        EVAL_TEST = &eval;
         return eval;
     }
 };
@@ -265,7 +259,6 @@ protected:
         ASSETCHAINS_CC = 1;
     }
     virtual void SetUp() {
-        EVAL_TEST = 0;
         ebet = ExampleBet();
     }
 };
@@ -324,13 +317,13 @@ TEST_F(TestBet, testDispute)
     EXPECT_EQ(1, CCSign(disputeTx, 0, disputeCond, {Player2}));
 
     // Success
-    EXPECT_TRUE(TestCC(disputeTx, 0, disputeCond));
+    EXPECT_TRUE(TestCC(disputeTx, 0, disputeCond, &eval));
 
     // Set result hash to 0 and check false
     uint256 nonsense;
     disputeTx.vout[0].scriptPubKey = CScript() << OP_RETURN << E_MARSHAL(ss << nonsense);
     EXPECT_EQ(1, CCSign(disputeTx, 0, disputeCond, {Player2}));
-    EXPECT_FALSE(TestCC(disputeTx, 0, disputeCond));
+    EXPECT_FALSE(TestCC(disputeTx, 0, disputeCond, &eval));
     EXPECT_EQ("wrong-payout", eval.state.GetRejectReason());
 }
 
@@ -347,13 +340,13 @@ TEST_F(TestBet, testDisputeInvalidOutput)
     std::vector<unsigned char> invalidHash = {0,1,2};
     disputeTx.vout[0].scriptPubKey = CScript() << OP_RETURN << invalidHash;
     ASSERT_EQ(1, CCSign(disputeTx, 0, disputeCond, {Player1}));
-    EXPECT_FALSE(TestCC(disputeTx, 0, disputeCond));
+    EXPECT_FALSE(TestCC(disputeTx, 0, disputeCond, &eval));
     EXPECT_EQ("invalid-payout-hash", eval.state.GetRejectReason());
 
     // no vout at all
     disputeTx.vout.resize(0);
     ASSERT_EQ(1, CCSign(disputeTx, 0, disputeCond, {Player1}));
-    EXPECT_FALSE(TestCC(disputeTx, 0, disputeCond));
+    EXPECT_FALSE(TestCC(disputeTx, 0, disputeCond, &eval));
     EXPECT_EQ("no-vouts", eval.state.GetRejectReason());
 }
 
@@ -367,7 +360,7 @@ TEST_F(TestBet, testDisputeEarly)
     CC *disputeCond = ebet.DisputeCond();
     EXPECT_EQ(1, CCSign(disputeTx, 0, disputeCond, {Player1}));
 
-    EXPECT_FALSE(TestCC(disputeTx, 0, disputeCond));
+    EXPECT_FALSE(TestCC(disputeTx, 0, disputeCond, &eval));
     EXPECT_EQ("dispute-too-soon", eval.state.GetRejectReason());
 }
 
@@ -383,21 +376,21 @@ TEST_F(TestBet, testDisputeInvalidParams)
     // too long
     evalCond->code = (unsigned char*) realloc(evalCond->code, ++evalCond->codeLength);
     ASSERT_EQ(1, CCSign(disputeTx, 0, disputeCond, {Player2}));
-    EXPECT_FALSE(TestCC(disputeTx, 0, disputeCond));
+    EXPECT_FALSE(TestCC(disputeTx, 0, disputeCond, &eval));
     EXPECT_EQ("malformed-params", eval.state.GetRejectReason());
 
     // too short
     eval.state = CValidationState();
     evalCond->codeLength = 1;
     ASSERT_EQ(1, CCSign(disputeTx, 0, disputeCond, {Player2}));
-    EXPECT_FALSE(TestCC(disputeTx, 0, disputeCond));
+    EXPECT_FALSE(TestCC(disputeTx, 0, disputeCond, &eval));
     EXPECT_EQ("malformed-params", eval.state.GetRejectReason());
 
     // is fine
     eval.state = CValidationState();
     evalCond->codeLength = 12;
     ASSERT_EQ(1, CCSign(disputeTx, 0, disputeCond, {Player2}));
-    EXPECT_TRUE(TestCC(disputeTx, 0, disputeCond));
+    EXPECT_TRUE(TestCC(disputeTx, 0, disputeCond, &eval));
 }
 
 
@@ -414,19 +407,19 @@ TEST_F(TestBet, testDisputeInvalidEvidence)
     mtx.vout.resize(1);
     mtx.vout[0].scriptPubKey = CScript();
     eval.spends[ebet.SessionTx().GetHash()][1] = CTransaction(mtx);
-    ASSERT_TRUE(TestCC(disputeTx, 0, disputeCond));
+    ASSERT_TRUE(TestCC(disputeTx, 0, disputeCond, &eval));
 
     mtx.vout[0].scriptPubKey << OP_RETURN;
     eval.spends[ebet.SessionTx().GetHash()][1] = CTransaction(mtx);
-    ASSERT_TRUE(TestCC(disputeTx, 0, disputeCond));
+    ASSERT_TRUE(TestCC(disputeTx, 0, disputeCond, &eval));
 
     mtx.vout[0].scriptPubKey = CScript() << 0;
     eval.spends[ebet.SessionTx().GetHash()][1] = CTransaction(mtx);
-    ASSERT_TRUE(TestCC(disputeTx, 0, disputeCond));
+    ASSERT_TRUE(TestCC(disputeTx, 0, disputeCond, &eval));
 
     eval.spends[ebet.SessionTx().GetHash()].resize(1);
     eval.spends[ebet.SessionTx().GetHash()][0] = CTransaction();
-    ASSERT_FALSE(TestCC(disputeTx, 0, disputeCond));
+    ASSERT_FALSE(TestCC(disputeTx, 0, disputeCond, &eval));
     EXPECT_EQ("no-evidence", eval.state.GetRejectReason());
 }
 
@@ -481,17 +474,17 @@ TEST_F(TestBet, testAgreePayout)
     CC *payoutCond = ebet.PayoutCond();
 
     EXPECT_EQ(2, CCSign(payoutTx, 0, payoutCond, {Dealer}));
-    EXPECT_FALSE(TestCC(payoutTx, 0, payoutCond));
+    EXPECT_FALSE(TestCC(payoutTx, 0, payoutCond, &eval));
     EXPECT_EQ("(1 of (2 of (1 of 5,A5,A5),15),A2)",
              CCShowStructure(CCPrune(payoutCond)));
 
     EXPECT_EQ(2, CCSign(payoutTx, 0, payoutCond, {Player1}));
-    EXPECT_FALSE(TestCC(payoutTx, 0, payoutCond));
+    EXPECT_FALSE(TestCC(payoutTx, 0, payoutCond, &eval));
     EXPECT_EQ("(1 of (2 of (1 of 5,A5,A5),15),A2)",
              CCShowStructure(CCPrune(payoutCond)));
 
     EXPECT_EQ(2, CCSign(payoutTx, 0, payoutCond, {Player2}));
-    EXPECT_TRUE( TestCC(payoutTx, 0, payoutCond));
+    EXPECT_TRUE( TestCC(payoutTx, 0, payoutCond, &eval));
     EXPECT_EQ("(1 of (3 of 5,5,5),A2)",
              CCShowStructure(CCPrune(payoutCond)));
 }
@@ -504,7 +497,7 @@ TEST_F(TestBet, testImportPayout)
     CMutableTransaction importTx = ebet.ImportPayoutTx();
     CC *payoutCond = ebet.PayoutCond();
     EXPECT_EQ(2, CCSign(importTx, 0, payoutCond, {Player2}));
-    EXPECT_TRUE(TestCC(importTx, 0, payoutCond));
+    EXPECT_TRUE(TestCC(importTx, 0, payoutCond, &eval));
 }
 
 
@@ -516,7 +509,7 @@ TEST_F(TestBet, testImportPayoutFewVouts)
     importTx.vout.resize(0);
     CC *payoutCond = ebet.PayoutCond();
     EXPECT_EQ(2, CCSign(importTx, 0, payoutCond, {Player2}));
-    EXPECT_FALSE(TestCC(importTx, 0, payoutCond));
+    EXPECT_FALSE(TestCC(importTx, 0, payoutCond, &eval));
     EXPECT_EQ("no-vouts", eval.state.GetRejectReason());
 }
 
@@ -529,7 +522,7 @@ TEST_F(TestBet, testImportPayoutInvalidPayload)
     importTx.vout[0].scriptPubKey.pop_back();
     CC *payoutCond = ebet.PayoutCond();
     EXPECT_EQ(2, CCSign(importTx, 0, payoutCond, {Player2}));
-    EXPECT_FALSE(TestCC(importTx, 0, payoutCond));
+    EXPECT_FALSE(TestCC(importTx, 0, payoutCond, &eval));
     EXPECT_EQ("invalid-payload", eval.state.GetRejectReason());
 }
 
@@ -542,7 +535,7 @@ TEST_F(TestBet, testImportPayoutWrongPayouts)
     importTx.vout[1].nValue = 7;
     CC *payoutCond = ebet.PayoutCond();
     EXPECT_EQ(2, CCSign(importTx, 0, payoutCond, {Player2}));
-    ASSERT_FALSE(TestCC(importTx, 0, payoutCond));
+    ASSERT_FALSE(TestCC(importTx, 0, payoutCond, &eval));
     EXPECT_EQ("wrong-payouts", eval.state.GetRejectReason());
 }
 
@@ -555,13 +548,13 @@ TEST_F(TestBet, testImportPayoutMangleSessionId)
     CC *payoutCond = ebet.PayoutCond();
     payoutCond->subconditions[1]->subconditions[1]->codeLength = 31;
     EXPECT_EQ(2, CCSign(importTx, 0, payoutCond, {Player2}));
-    ASSERT_FALSE(TestCC(importTx, 0, payoutCond));
+    ASSERT_FALSE(TestCC(importTx, 0, payoutCond, &eval));
     EXPECT_EQ("malformed-params", eval.state.GetRejectReason());
 
     payoutCond = ebet.PayoutCond();
     memset(payoutCond->subconditions[1]->subconditions[1]->code+1, 1, 32);
     EXPECT_EQ(2, CCSign(importTx, 0, payoutCond, {Player2}));
-    ASSERT_FALSE(TestCC(importTx, 0, payoutCond));
+    ASSERT_FALSE(TestCC(importTx, 0, payoutCond, &eval));
     EXPECT_EQ("wrong-session", eval.state.GetRejectReason());
 }
 
@@ -577,7 +570,7 @@ TEST_F(TestBet, testImportPayoutInvalidNotarisationHash)
 
     CC *payoutCond = ebet.PayoutCond();
     EXPECT_EQ(2, CCSign(importTx, 0, payoutCond, {Player2}));
-    EXPECT_FALSE(TestCC(importTx, 0, payoutCond));
+    EXPECT_FALSE(TestCC(importTx, 0, payoutCond, &eval));
     EXPECT_EQ("coudnt-load-mom", eval.state.GetRejectReason());
 }
 
@@ -593,7 +586,7 @@ TEST_F(TestBet, testImportPayoutMomFail)
 
     CC *payoutCond = ebet.PayoutCond();
     EXPECT_EQ(2, CCSign(importTx, 0, payoutCond, {Player2}));
-    EXPECT_FALSE(TestCC(importTx, 0, payoutCond));
+    EXPECT_FALSE(TestCC(importTx, 0, payoutCond, &eval));
     EXPECT_EQ("mom-check-fail", eval.state.GetRejectReason());
 }
 

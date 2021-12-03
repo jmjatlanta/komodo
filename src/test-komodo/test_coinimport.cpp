@@ -16,13 +16,9 @@
 
 #include "testutils.h"
 
-
-extern Eval* EVAL_TEST;
-
 std::shared_ptr<TestChain> testChain;
 
 namespace TestCoinImport {
-
 
 static uint8_t testNum = 0;
 
@@ -38,7 +34,7 @@ public:
     CAmount amount = 100;
 
     TestCoinImport() : Eval(mempool) {}
-    
+
     void SetImportTx() {
         burnTx.vout.resize(0);
         burnTx.vout.push_back(MakeBurnOutput(amount, testCcid, testSymbol, payouts,rawproof));
@@ -63,7 +59,6 @@ protected:
 
     virtual void SetUp() {
         ASSETCHAINS_CC = 1;
-        EVAL_TEST = this;
         
         std::vector<uint8_t> fakepk;
         fakepk.resize(33);
@@ -77,7 +72,7 @@ protected:
     {
         CTransaction importTx(mtx);
         PrecomputedTransactionData txdata(importTx);
-        ServerTransactionSignatureChecker checker(&importTx, 0, 0, false, mempool, txdata);
+        ServerTransactionSignatureChecker checker(&importTx, 0, 0, false, this, txdata);
         CValidationState verifystate;
         if (!VerifyCoinImport(importTx.vin[0].scriptSig, checker, verifystate))
             printf("TestRunCCEval: %s\n", verifystate.GetRejectReason().data());

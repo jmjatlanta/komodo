@@ -30,13 +30,11 @@
 bool CClib_Dispatch(const CC *cond,Eval *eval,std::vector<uint8_t> paramsNull,const CTransaction &txTo,unsigned int nIn);
 char *CClib_name();
 
-Eval* EVAL_TEST = 0;
 struct CCcontract_info CCinfos[0x100];
 extern pthread_mutex_t KOMODO_CC_mutex;
 
-bool RunCCEval(const CC *cond, const CTransaction &tx, unsigned int nIn, CTxMemPool& pool)
+bool RunCCEval(const CC *cond, const CTransaction &tx, unsigned int nIn, Eval* eval)
 {
-    std::unique_ptr<Eval> eval( new Eval(pool));
     pthread_mutex_lock(&KOMODO_CC_mutex);
     bool out = eval->Dispatch(cond, tx, nIn);
     pthread_mutex_unlock(&KOMODO_CC_mutex);
@@ -54,13 +52,13 @@ bool RunCCEval(const CC *cond, const CTransaction &tx, unsigned int nIn, CTxMemP
             tx.vin[nIn].prevout.hash.GetHex().data());
     if (eval->state.IsError()) fprintf(stderr, "Culprit: %s\n", EncodeHexTx(tx).data());
     CTransaction tmp; 
-    if (mempool.lookup(tx.GetHash(), tmp))
+    if (eval->pool.lookup(tx.GetHash(), tmp))
     {
         // This is to remove a payments airdrop if it gets stuck in the mempool. 
         // Miner will mine 1 invalid block, but doesnt stop them mining until a restart.
         // This would almost never happen in normal use.
         std::list<CTransaction> dummy;
-        mempool.remove(tx,dummy,true);
+        eval->pool.remove(tx,dummy,true);
     }
     return false;
 }
