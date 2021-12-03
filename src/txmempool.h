@@ -128,14 +128,6 @@ public:
     size_t DynamicMemoryUsage() const { return 0; }
 };
 
-class TxPool
-{
-public:
-    TxPool() {}
-    virtual ~TxPool() {}
-    virtual bool lookup(uint256 key, CTransaction &value) const = 0;
-};
-
 /**
  * CTxMemPool stores valid-according-to-the-current-best-chain
  * transactions that may be included in the next block.
@@ -146,7 +138,7 @@ public:
  * an input of a transaction in the pool, it is dropped,
  * as are non-standard transactions.
  */
-class CTxMemPool : public TxPool
+class CTxMemPool
 {
 private:
     uint32_t nCheckFrequency; //! Value n means that n times in 2^32 we check.
@@ -414,7 +406,7 @@ public:
      * @param result the result
      * @returns true if found
      */
-    bool lookup(uint256 hash, CTransaction& result) const override;
+    bool lookup(uint256 hash, CTransaction& result) const;
 
     /**
      * @brief Estimate fee needed to get into next nBlocks blocks
@@ -454,36 +446,6 @@ public:
     uint32_t GetCheckFrequency() const {
         return nCheckFrequency;
     }
-};
-
-class TransactionPool : public TxPool
-{
-public:
-    TransactionPool(const std::vector<CTransaction> txs, CTxMemPool* actualMempool) : mempool(actualMempool)
-    {
-        for(const auto& tx : txs)
-        {
-            transactions[tx.GetHash()] = &tx;
-        }
-    }
-    ~TransactionPool()
-    {
-        if (blockPassed)
-        {
-        }
-    }
-    virtual bool lookup(uint256 key, CTransaction &value) const override
-    {
-        auto itr = transactions.find(key);
-        if (itr == transactions.end())
-            return false;
-        value = *((*itr).second);
-        return true;
-    }
-    bool blockPassed; // true if destructor should merge the collection with the mempool
-protected:
-    std::map<uint256, const CTransaction *> transactions;
-    CTxMemPool* mempool;
 };
 
 /** 

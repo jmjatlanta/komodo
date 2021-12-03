@@ -409,14 +409,6 @@ namespace {
 
     void LimitMempoolSize(CTxMemPool& pool, size_t limit, unsigned long age)
     {
-        /*    int expired = pool.Expire(GetTime() - age);
-         if (expired != 0)
-         LogPrint("mempool", "Expired %i transactions from the memory pool\n", expired);
-
-         std::vector<uint256> vNoSpendsRemaining;
-         pool.TrimToSize(limit, &vNoSpendsRemaining);
-         BOOST_FOREACH(const uint256& removed, vNoSpendsRemaining)
-         pcoinsTip->Uncache(removed);*/
     }
 
     // Requires cs_main.
@@ -2164,7 +2156,7 @@ bool CCTxFixAcceptToMemPoolUnchecked(CTxMemPool& pool, const CTransaction &tx)
     // called from CheckBlock which is in cs_main and mempool.cs locks already. 
     auto consensusBranchId = CurrentEpochBranchId(chainActive.Height() + 1, Params().GetConsensus());
     CTxMemPoolEntry entry(tx, 0, GetTime(), 0, chainActive.Height(), 
-            mempool.HasNoInputsOf(tx), false, consensusBranchId);
+            pool.HasNoInputsOf(tx), false, consensusBranchId);
     pool.addUnchecked(tx.GetHash(), entry, false);
     return true;
 }
@@ -2266,10 +2258,9 @@ bool myAddtomempool(const CTransaction &tx, CValidationState *pstate, bool fSkip
  * @param[in] hash what to look for
  * @param[out] txOut the found transaction
  * @param[out] hashBlock the hash of the block (all zeros if still in mempool)
- * @param[in] transPool the transaction pool to look in for transactions not already in a block
  * @returns true if found
  */
-bool myGetTransaction(const uint256 &hash, CTransaction &txOut, uint256 &hashBlock, const TxPool& transPool)
+bool myGetTransaction(const uint256 &hash, CTransaction &txOut, uint256 &hashBlock)
 {
     memset(&hashBlock,0,sizeof(hashBlock));
     if ( KOMODO_NSPV_SUPERLITE )
@@ -2287,7 +2278,7 @@ bool myGetTransaction(const uint256 &hash, CTransaction &txOut, uint256 &hashBlo
     }
     // need a GetTransaction without lock so the validation code for assets can run without deadlock
     {
-        if (transPool.lookup(hash, txOut))
+        if (mempool.lookup(hash, txOut))
         {
             return true;
         }
@@ -2319,19 +2310,6 @@ bool myGetTransaction(const uint256 &hash, CTransaction &txOut, uint256 &hashBlo
     }
     return false;
 }
-
-/*****
- * @brief get a transaction by its hash (without locks)
- * @param[in] hash what to look for
- * @param[out] txOut the found transaction
- * @param[out] hashBlock the hash of the block (all zeros if still in mempool)
- * @returns true if found
- */
-bool myGetTransaction(const uint256 &hash, CTransaction &txOut, uint256 &hashBlock)
-{
-    return myGetTransaction(hash, txOut, hashBlock, mempool);
-}
-
 
 bool NSPV_myGetTransaction(const uint256 &hash, CTransaction &txOut, uint256 &hashBlock, int32_t &txheight, int32_t &currentheight)
 {
@@ -2928,17 +2906,24 @@ namespace Consensus {
     }
 }// namespace Consensus
 
-bool ContextualCheckInputs(
-                           const CTransaction& tx,
-                           CValidationState &state,
-                           const CCoinsViewCache &inputs,
-                           bool fScriptChecks,
-                           unsigned int flags,
-                           bool cacheStore,
-                           PrecomputedTransactionData& txdata,
-                           const Consensus::Params& consensusParams,
-                           uint32_t consensusBranchId,
-                           std::vector<CScriptCheck> *pvChecks)
+/*****
+ * @brief Check a transaction using the current status of the node and chain
+ * @param tx the transaction to check
+ * @param state error will be placed here
+ * @param inputs view of the chain
+ * @param fScriptChecks
+ * @param flags
+ * @param cacheStore
+ * @param txdata
+ * @param consensusParams chain parameters
+ * @param consensusBranchId
+ * @param pvChecks
+ * @returns
+ */
+bool ContextualCheckInputs( const CTransaction& tx, CValidationState &state, const CCoinsViewCache &inputs,
+        bool fScriptChecks, unsigned int flags, bool cacheStore, PrecomputedTransactionData& txdata,
+        const Consensus::Params& consensusParams, uint32_t consensusBranchId, 
+        std::vector<CScriptCheck> *pvChecks)
 {
     if (!tx.IsMint())
     {
@@ -2956,20 +2941,27 @@ bool ContextualCheckInputs(
         // Skip ECDSA signature verification when connecting blocks
         // before the last block chain checkpoint. This is safe because block merkle hashes are
         // still computed and checked, and any change will be caught at the next checkpoint.
-        if (fScriptChecks) {
-            for (unsigned int i = 0; i < tx.vin.size(); i++) {
-                if (tx.IsPegsImport() && i==0) continue;
+        if (fScriptChecks) 
+        {
+            for (unsigned int i = 0; i < tx.vin.size(); i++) 
+            {
+                if (tx.IsPegsImport() && i==0) 
+                    continue;
                 const COutPoint &prevout = tx.vin[i].prevout;
                 const CCoins* coins = inputs.AccessCoins(prevout.hash);
                 assert(coins);
 
                 // Verify signature
                 CScriptCheck check(*coins, tx, i, flags, cacheStore, consensusBranchId, &txdata);
-                if (pvChecks) {
+                if (pvChecks) 
+                {
                     pvChecks->push_back(CScriptCheck());
                     check.swap(pvChecks->back());
-                } else if (!check()) {
-                    if (flags & STANDARD_NOT_MANDATORY_VERIFY_FLAGS) {
+                } 
+                else if (!check()) 
+                {
+                    if (flags & STANDARD_NOT_MANDATORY_VERIFY_FLAGS) 
+                    {
                         // Check whether the failure was caused by a
                         // non-mandatory script verification check, such as
                         // non-standard DER encodings or non-null dummy
@@ -2977,9 +2969,12 @@ bool ContextualCheckInputs(
                         // avoid splitting the network between upgraded and
                         // non-upgraded nodes.
                         CScriptCheck check2(*coins, tx, i,
-                                            flags & ~STANDARD_NOT_MANDATORY_VERIFY_FLAGS, cacheStore, consensusBranchId, &txdata);
+                                flags & ~STANDARD_NOT_MANDATORY_VERIFY_FLAGS, cacheStore, 
+                                consensusBranchId, &txdata);
                         if (check2())
-                            return state.Invalid(false, REJECT_NONSTANDARD, strprintf("non-mandatory-script-verify-flag (%s)", ScriptErrorString(check.GetScriptError())));
+                            return state.Invalid(false, REJECT_NONSTANDARD, 
+                                    strprintf("non-mandatory-script-verify-flag (%s)", 
+                                    ScriptErrorString(check.GetScriptError())));
                     }
                     // Failures of other flags indicate a transaction that is
                     // invalid in new blocks, e.g. a invalid P2SH. We DoS ban
@@ -2988,7 +2983,9 @@ bool ContextualCheckInputs(
                     // as to the correct behavior - we may want to continue
                     // peering with non-upgraded nodes even after a soft-fork
                     // super-majority vote has passed.
-                    return state.DoS(100,false, REJECT_INVALID, strprintf("mandatory-script-verify-flag-failed (%s)", ScriptErrorString(check.GetScriptError())));
+                    return state.DoS(100,false, REJECT_INVALID, 
+                            strprintf("mandatory-script-verify-flag-failed (%s)", 
+                            ScriptErrorString(check.GetScriptError())));
                 }
             }
         }
@@ -3003,45 +3000,6 @@ bool ContextualCheckInputs(
 
     return true;
 }
-
-
-/*bool ContextualCheckInputs(const CTransaction& tx, CValidationState &state, const CCoinsViewCache &inputs, bool fScriptChecks, unsigned int flags, bool cacheStore, const Consensus::Params& consensusParams, std::vector<CScriptCheck> *pvChecks)
- {
- if (!NonContextualCheckInputs(tx, state, inputs, fScriptChecks, flags, cacheStore, consensusParams, pvChecks)) {
- fprintf(stderr,"ContextualCheckInputs failure.0\n");
- return false;
- }
-
- if (!tx.IsCoinBase())
- {
- // While checking, GetBestBlock() refers to the parent block.
- // This is also true for mempool checks.
- CBlockIndex *pindexPrev = mapBlockIndex.find(inputs.GetBestBlock())->second;
- int nSpendHeight = pindexPrev->GetHeight() + 1;
- for (unsigned int i = 0; i < tx.vin.size(); i++)
- {
- const COutPoint &prevout = tx.vin[i].prevout;
- const CCoins *coins = inputs.AccessCoins(prevout.hash);
- // Assertion is okay because NonContextualCheckInputs ensures the inputs
- // are available.
- assert(coins);
-
- // If prev is coinbase, check that it's matured
- if (coins->IsCoinBase()) {
- if ( ASSETCHAINS_SYMBOL[0] == 0 )
- COINBASE_MATURITY = _COINBASE_MATURITY;
- if (nSpendHeight - coins->nHeight < COINBASE_MATURITY) {
- fprintf(stderr,"ContextualCheckInputs failure.1 i.%d of %d\n",i,(int32_t)tx.vin.size());
-
- return state.Invalid(
- error("CheckInputs(): tried to spend coinbase at depth %d", nSpendHeight - coins->nHeight),REJECT_INVALID, "bad-txns-premature-spend-of-coinbase");
- }
- }
- }
- }
-
- return true;
- }*/
 
 namespace {
 
@@ -3465,6 +3423,53 @@ static int64_t nTimeTotal = 0;
 bool FindBlockPos(int32_t tmpflag,CValidationState &state, CDiskBlockPos &pos, unsigned int nAddSize, unsigned int nHeight, uint64_t nTime, bool fKnown = false);
 bool ReceivedBlockTransactions(const CBlock &block, CValidationState& state, CBlockIndex *pindexNew, const CDiskBlockPos& pos);
 
+/****
+ * Add transactions to a pool
+ * @param pool the mempool to fill
+ * @param block the block with transactions
+ * @param height the proposed new block height
+ * @param stakingTx if a staking transaction is found, it will be put here
+ * @returns true
+ */
+bool FillPool(CTxMemPool& pool, const CBlock& block, int32_t height, CTransaction& stakingTx)
+{
+    int32_t lastrejects = 0;
+    while ( true )
+    {
+        int32_t rejects = 0;
+        for (std::size_t i=0; i<block.vtx.size(); i++) // iterate through block's transactions
+        {
+            CValidationState state;
+            const CTransaction &tx = (CTransaction)block.vtx[i];
+            if ( tx.IsCoinBase() || !tx.vjoinsplit.empty() || !tx.vShieldedSpend.empty() 
+                    || (i == block.vtx.size()-1 && komodo_isPoS((CBlock *)&block,height,0) ) )
+                continue; // Do not add certain types of transactions to the block's mempool
+            if ( !myAddtomempool(tx, &state, true, pool) ) 
+            {
+                // This happens with out of order tx in block on resync.
+
+                // take advantage of other checks, but if we were only rejected because it is a valid 
+                // staking transaction, sync with wallets and don't mark as a reject
+                if (i == (block.vtx.size() - 1) && ASSETCHAINS_LWMAPOS && block.IsVerusPOSBlock() 
+                        && state.GetRejectReason() == "staking")
+                    stakingTx = tx;
+                else 
+                    rejects++;
+            }
+        }
+
+        if ( rejects == 0 || rejects == lastrejects )
+        {
+            // we either don't have rejects or we have tried 
+            // going through the txs again and still have the 
+            // same number of rejects
+            break;
+        }
+        lastrejects = rejects;
+    }
+    return true;
+}
+
 // uncomment to add benchmark timings
 // #define BENCHMARK_CONNECT_BLOCK
 
@@ -3503,6 +3508,10 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
     auto verifierStrict = libzcash::ProofVerifier::Strict();
     auto verifierDisabled = libzcash::ProofVerifier::Disabled();
     int32_t futureblock;
+
+    CTxMemPool blockPool(::minRelayTxFee);
+    CTransaction stakingTx;
+    FillPool(blockPool, block, pindex->GetHeight(), stakingTx);
     // Check it again to verify JoinSplit proofs, and in case a previous version let a bad block in
     if ( !CheckBlock(&futureblock,pindex->GetHeight(),pindex,block, state, 
             fExpensiveChecks ? verifierStrict : verifierDisabled, fCheckPOW, !fJustCheck) || futureblock != 0 )
@@ -3977,6 +3986,21 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
     {
       // Update the notary pay with the latest payment.
       pindex->nNotaryPay = pindex->pprev->nNotaryPay + notarypaycheque;
+    }
+
+    {
+        LOCK2(cs_main,mempool.cs);
+        // remove block's transactions from mempool
+        list<CTransaction> ignore;
+        for(auto toRemove : block.vtx)
+        {
+            mempool.remove(toRemove, ignore, false);
+        }
+    }
+
+    if (stakingTx.vin.size() != 0) // we found a staking transaction earlier
+    {
+        SyncWithWallets(stakingTx, &block);
     }
 
     return true;
@@ -5311,54 +5335,6 @@ bool CheckBlock(int32_t *futureblockp, int32_t height, CBlockIndex *pindex, cons
     if ( ASSETCHAINS_CC != 0 && !fCheckPOW )
         return true;
 
-    CTransaction stakingTx; // stores a staking transaction (if found)
-
-    // CC contracts might refer to transactions in the current block, from a 
-    // CC spend within the same block and out of order
-    CTxMemPool blockPool(::minRelayTxFee);
-    list<CTransaction> toBeRemoved; // tx that should be removed from mempool if block is successful
-    if ( ASSETCHAINS_CC != 0 ) 
-    {
-        // add all the txs in the block to a temporary mempool
-        // CC validation shouldn't (can't) depend on the state of mempool!
-        int32_t lastrejects = 0;
-        while ( true )
-        {
-            int32_t rejects = 0;
-            for (std::size_t i=0; i<block.vtx.size(); i++) // iterate through block's transactions
-            {
-                CValidationState state;
-                const CTransaction &tx = (CTransaction)block.vtx[i];
-                if ( tx.IsCoinBase() || !tx.vjoinsplit.empty() || !tx.vShieldedSpend.empty() 
-                        || (i == block.vtx.size()-1 && komodo_isPoS((CBlock *)&block,height,0) ) )
-                    continue; // Do not add certain types of transactions to the block's mempool
-                if ( !myAddtomempool(tx, &state, true, blockPool) ) 
-                {
-                    // This happens with out of order tx in block on resync.
-
-                    // take advantage of other checks, but if we were only rejected because it is a valid 
-                    // staking transaction, sync with wallets and don't mark as a reject
-                    if (i == (block.vtx.size() - 1) && ASSETCHAINS_LWMAPOS && block.IsVerusPOSBlock() 
-                            && state.GetRejectReason() == "staking")
-                        stakingTx = tx;
-                    else 
-                        rejects++;
-                }
-                // here we mark for removal any txs in the mempool that were included in the block.
-                toBeRemoved.push_back(tx);
-            } // end of looping through transactions of the block
-
-            if ( rejects == 0 || rejects == lastrejects )
-            {
-                // we either don't have rejects or we have tried 
-                // going through the txs again and still have the 
-                // same number of rejects
-                break;
-            }
-            lastrejects = rejects;
-        }
-    }
-
     for (uint32_t i = 0; i < block.vtx.size(); i++)
     {
         const CTransaction& tx = block.vtx[i];
@@ -5385,21 +5361,6 @@ bool CheckBlock(int32_t *futureblockp, int32_t height, CBlockIndex *pindex, cons
         return(false);
     }
 
-    if (stakingTx.vin.size() != 0) // we found a staking transaction earlier
-    {
-        SyncWithWallets(stakingTx, &block);
-    }
-
-    if ( ASSETCHAINS_CC != 0 )
-    {
-        LOCK2(cs_main,mempool.cs);
-       // remove block's transactions from mempool
-       list<CTransaction> ignore;
-       for(auto toRemove : toBeRemoved)
-       {
-           mempool.remove(toRemove, ignore, false);
-       }
-    }
     return true;
 }
 
@@ -5497,7 +5458,8 @@ bool ContextualCheckBlockHeader(const CBlockHeader& block, CValidationState& sta
     return true;
 }
 
-bool ContextualCheckBlock(int32_t slowflag,const CBlock& block, CValidationState& state, CBlockIndex * const pindexPrev)
+bool ContextualCheckBlock(int32_t slowflag,const CBlock& block, CValidationState& state, 
+        CBlockIndex * const pindexPrev)
 {
     const int nHeight = pindexPrev == NULL ? 0 : pindexPrev->GetHeight() + 1;
     const Consensus::Params& consensusParams = Params().GetConsensus();

@@ -31,26 +31,32 @@ Details.
 /// this script's hash is what the p2sh address was.
 /// All of the above are the standard bitcoin vout types and there should be plenty of materials about it.
 ///
-/// What I did with the cryptoconditions (CC) contracts (now rebranded as Antara modules) is created a fourth type of vout, the CC vout. This is using the cryptoconditions standard and it is even a different signature mechanism,
-/// ed25519 instead of secp256k1. It is basically a big extension to the bitcoin script. There is a special opcode that is added that says it is a CC script.
+/// What I did with the cryptoconditions (CC) contracts (now rebranded as Antara modules) is created a fourth 
+/// type of vout, the CC vout. This is using the cryptoconditions standard and it is even a different 
+/// signature mechanism, ed25519 instead of secp256k1. It is basically a big extension to the bitcoin 
+/// script. There is a special opcode that is added that says it is a CC script.
 ///
 /// But it gets more interesting. Each CC script has an evalcode. 
-/// This is just an arbitrary number but what it does is allows to create a self-contained universe of CC utxo that all have the same evalcode and that is 
-/// how a faucet CC contract differentiates itself from a dice CC contract, the eval code is different.
+/// This is just an arbitrary number but what it does is allows to create a self-contained universe of CC utxo 
+/// that all have the same evalcode and that is how a faucet CC contract differentiates itself from a dice 
+/// CC contract, the eval code is different.
 ///
-/// One effect from using a different eval code is that even if the rest of the CC script is the same, the bitcoin address that is calculated is different. 
+/// One effect from using a different eval code is that even if the rest of the CC script is the same, 
+/// the bitcoin address that is calculated is different. 
 /// What this means is that for each pubkey, there is a unique address for each different eval code!
 /// And this allows efficient segregation of one CC contracts transactions from another.
 /// The final part that will make it all clear how the funds can be locked inside the contract. 
 /// This is what makes a contract, a contract. 
 /// I put both the privkey and pubkey for a randomly chosen address and associate it with each CC contract. 
 /// That means anybody can sign outputs for that privkey. 
-/// However, it is a CC output, so in addition to the signature, whatever constraints a CC contract implements must also be satistifed. 
-/// This allows funds to be locked and yet anybody is able to spend it, assuming they satisfy the CC's rules.
+/// However, it is a CC output, so in addition to the signature, whatever constraints a CC contract 
+/// implements must also be satistifed. This allows funds to be locked and yet anybody is able to 
+/// spend it, assuming they satisfy the CC's rules.
 ///
 /// One other technical note is that komodod has the insight-explorer extensions built in 
 /// so it can lookup directly all transactions to any address. 
-/// This is a key performance boosting thing as if it wasnt there, trying to get all the utxo for an address not in the wallet is quite time consuming.
+/// This is a key performance boosting thing as if it wasnt there, trying to get all the utxo for 
+/// an address not in the wallet is quite time consuming.
 ///
 /// More information about Antara framework:
 /// https://developers.komodoplatform.com/basic-docs/start-here/about-komodo-platform/product-introductions.html#smart-chains-antara
@@ -274,16 +280,6 @@ static int32_t ignorevin;
  * @returns true if found
  */
 bool myGetTransaction(const uint256 &hash, CTransaction &txOut, uint256 &hashBlock);
-
-/*****
- * @brief get a transaction by its hash (without locks)
- * @param[in] hash what to look for
- * @param[out] txOut the found transaction
- * @param[out] hashBlock the hash of the block (all zeros if still in mempool)
- * @param[in] transPool the transaction pool to look in for transactions not already in a block
- * @returns true if found
- */
-bool myGetTransaction(const uint256 &hash, CTransaction &txOut, uint256 &hashBlock, const TxPool& transPool);
 
 /// NSPV_myGetTransaction is called in NSPV mode
 /// @param hash hash of transaction to get (txid)
