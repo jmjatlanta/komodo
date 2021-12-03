@@ -22,8 +22,10 @@
 #include "chain.h"
 #include "streams.h"
 #include "version.h"
+#include "crosschain.h"
 #include "consensus/validation.h"
 #include "primitives/transaction.h"
+#include "txmempool.h"
 
 #define KOMODO_FIRSTFUNGIBLEID 100
 
@@ -73,6 +75,7 @@ class NotarisationData;
 class Eval
 {
 public:
+    Eval(CTxMemPool &pool) : pool(pool) {}
     CValidationState state;
 
     bool Invalid(std::string s) { return state.Invalid(false, 0, s); }
@@ -98,6 +101,7 @@ public:
      * Import coin from another chain with same symbol
      */
     bool ImportCoin(std::vector<uint8_t> params, const CTransaction &importTx, unsigned int nIn);
+    bool CheckTxAuthority(const CTransaction &tx, CrosschainAuthority auth) const;
 
     /*
      * IO functions
@@ -111,29 +115,12 @@ public:
     virtual bool GetNotarisationData(uint256 notarisationHash, NotarisationData &data) const;
     virtual bool CheckNotaryInputs(const CTransaction &tx, uint32_t height, uint32_t timestamp) const;
     virtual uint32_t GetAssetchainsCC() const;
-    virtual std::string GetAssetchainsSymbol() const;
+    virtual std::string GetAssetchainsSymbol() const;    
+private:
+    CTxMemPool &pool;
 };
 
-
-extern Eval* EVAL_TEST;
-
-
-/*
- * Get a pointer to an Eval to use
- */
-typedef std::unique_ptr<Eval,void(*)(Eval*)> EvalRef_;
-class EvalRef : public EvalRef_
-{
-public:
-    EvalRef() : EvalRef_(
-            EVAL_TEST ? EVAL_TEST : new Eval(),
-            [](Eval* e){if (e!=EVAL_TEST) delete e;}) { }
-};
-
-
-
-bool RunCCEval(const CC *cond, const CTransaction &tx, unsigned int nIn);
-
+bool RunCCEval(const CC *cond, const CTransaction &tx, unsigned int nIn, CTxMemPool& pool);
 
 /*
  * Virtual machine to use in the case of on-chain app evaluation
@@ -249,43 +236,6 @@ FOREACH_EVAL(EVAL_GENERATE_DEF);
 std::string EvalToStr(EvalCode c);
 
 
-/*
- * Merkle stuff
- */
-uint256 SafeCheckMerkleBranch(uint256 hash, const std::vector<uint256>& vMerkleBranch, int nIndex);
-
-
-class MerkleBranch
-{
-public:
-    int nIndex;
-    std::vector<uint256> branch;
-
-    MerkleBranch() {}
-    MerkleBranch(int i, std::vector<uint256> b) : nIndex(i), branch(b) {}
-    uint256 Exec(uint256 hash) const { return SafeCheckMerkleBranch(hash, branch, nIndex); }
-
-    MerkleBranch& operator<<(MerkleBranch append)
-    {
-        nIndex += append.nIndex << branch.size();
-        branch.insert(branch.end(), append.branch.begin(), append.branch.end());
-        return *this;
-    }
-
-    ADD_SERIALIZE_METHODS;
-    
-    template <typename Stream, typename Operation>
-    inline void SerializationOp(Stream& s, Operation ser_action) {
-        READWRITE(VARINT(nIndex));
-        READWRITE(branch);
-    }
-};
-
-
-typedef std::pair<uint256,MerkleBranch> TxProof;
-
-
-uint256 GetMerkleRoot(const std::vector<uint256>& vLeaves);
 struct CCcontract_info *CCinit(struct CCcontract_info *cp,uint8_t evalcode);
 bool ProcessCC(struct CCcontract_info *cp,Eval* eval, std::vector<uint8_t> paramsNull, const CTransaction &tx, unsigned int nIn);
 

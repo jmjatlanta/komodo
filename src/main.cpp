@@ -2093,7 +2093,8 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
         // Check against previous transactions
         // This is done last to help prevent CPU exhaustion denial-of-service attacks.
         PrecomputedTransactionData txdata(tx);
-        if (!ContextualCheckInputs(tx, state, view, true, STANDARD_SCRIPT_VERIFY_FLAGS, true, txdata, Params().GetConsensus(), consensusBranchId))
+        if (!ContextualCheckInputs(tx, state, view, true, STANDARD_SCRIPT_VERIFY_FLAGS, true, 
+                txdata, Params().GetConsensus(), consensusBranchId, mempool))
         {
             //fprintf(stderr,"accept failure.9\n");
             return error("AcceptToMemoryPool: ConnectInputs failed %s", hash.ToString());
@@ -2115,7 +2116,8 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
             KOMODO_CONNECTING = (1<<30) + (int32_t)chainActive.LastTip()->GetHeight() + 1;
         }
 
-        if (!ContextualCheckInputs(tx, state, view, true, MANDATORY_SCRIPT_VERIFY_FLAGS, true, txdata, Params().GetConsensus(), consensusBranchId))
+        if (!ContextualCheckInputs(tx, state, view, true, MANDATORY_SCRIPT_VERIFY_FLAGS, true, 
+                txdata, Params().GetConsensus(), consensusBranchId, mempool))
         {
             if ( flag != 0 )
                 KOMODO_CONNECTING = -1;
@@ -2790,7 +2792,7 @@ void UpdateCoins(const CTransaction& tx, CCoinsViewCache& inputs, int nHeight)
 
 bool CScriptCheck::operator()() {
     const CScript &scriptSig = ptxTo->vin[nIn].scriptSig;
-    ServerTransactionSignatureChecker checker(ptxTo, nIn, amount, cacheStore, *txdata);
+    ServerTransactionSignatureChecker checker(ptxTo, nIn, amount, cacheStore, *pool, *txdata);
     if (!VerifyScript(scriptSig, scriptPubKey, nFlags, checker, consensusBranchId, &error)) {
         return ::error("CScriptCheck(): %s:%d VerifySignature failed: %s", ptxTo->GetHash().ToString(), nIn, ScriptErrorString(error));
     }
@@ -2922,7 +2924,7 @@ namespace Consensus {
  */
 bool ContextualCheckInputs( const CTransaction& tx, CValidationState &state, const CCoinsViewCache &inputs,
         bool fScriptChecks, unsigned int flags, bool cacheStore, PrecomputedTransactionData& txdata,
-        const Consensus::Params& consensusParams, uint32_t consensusBranchId, 
+        const Consensus::Params& consensusParams, uint32_t consensusBranchId, CTxMemPool& pool,
         std::vector<CScriptCheck> *pvChecks)
 {
     if (!tx.IsMint())
@@ -2952,7 +2954,7 @@ bool ContextualCheckInputs( const CTransaction& tx, CValidationState &state, con
                 assert(coins);
 
                 // Verify signature
-                CScriptCheck check(*coins, tx, i, flags, cacheStore, consensusBranchId, &txdata);
+                CScriptCheck check(*coins, tx, i, flags, cacheStore, consensusBranchId, &txdata, &pool);
                 if (pvChecks) 
                 {
                     pvChecks->push_back(CScriptCheck());
@@ -2970,7 +2972,7 @@ bool ContextualCheckInputs( const CTransaction& tx, CValidationState &state, con
                         // non-upgraded nodes.
                         CScriptCheck check2(*coins, tx, i,
                                 flags & ~STANDARD_NOT_MANDATORY_VERIFY_FLAGS, cacheStore, 
-                                consensusBranchId, &txdata);
+                                consensusBranchId, &txdata, &pool);
                         if (check2())
                             return state.Invalid(false, REJECT_NONSTANDARD, 
                                     strprintf("non-mandatory-script-verify-flag (%s)", 
@@ -2994,7 +2996,7 @@ bool ContextualCheckInputs( const CTransaction& tx, CValidationState &state, con
     if (tx.IsCoinImport() || tx.IsPegsImport())
     {
         LOCK(cs_main);
-        ServerTransactionSignatureChecker checker(&tx, 0, 0, false, txdata);
+        ServerTransactionSignatureChecker checker(&tx, 0, 0, false, pool, txdata);
         return VerifyCoinImport(tx.vin[0].scriptSig, checker, state);
     }
 
@@ -3110,10 +3112,10 @@ static bool ApplyTxInUndo(const CTxInUndo& undo, CCoinsViewCache& view, const CO
 }
 
 
-void ConnectNotarisations(const CBlock &block, int height)
+void ConnectNotarisations(const CBlock &block, int height, CTxMemPool& pool)
 {
     // Record Notarisations
-    NotarisationsInBlock notarisations = ScanBlockNotarisations(block, height);
+    NotarisationsInBlock notarisations = ScanBlockNotarisations(block, height, pool);
     if (notarisations.size() > 0) {
         CDBBatch batch = CDBBatch(*pnotarisations);
         batch.Write(block.GetHash(), notarisations);
@@ -3752,7 +3754,9 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
             sum += interest;
 
             std::vector<CScriptCheck> vChecks;
-            if (!ContextualCheckInputs(tx, state, view, fExpensiveChecks, flags, false, txdata[i], chainparams.GetConsensus(), consensusBranchId, nScriptCheckThreads ? &vChecks : NULL))
+            if (!ContextualCheckInputs(tx, state, view, fExpensiveChecks, flags, false, txdata[i], 
+                    chainparams.GetConsensus(), consensusBranchId, blockPool,
+                    nScriptCheckThreads ? &vChecks : NULL))
                 return false;
             control.Add(vChecks);
         }
@@ -3924,7 +3928,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
         setDirtyBlockIndex.insert(pindex);
     } // done with writing undo information to disk
 
-    ConnectNotarisations(block, pindex->GetHeight()); // update MoMoM notarisation DB.
+    ConnectNotarisations(block, pindex->GetHeight(), blockPool); // update MoMoM notarisation DB.
 
     if (fTxIndex && !pblocktree->WriteTxIndex(vPos))
         return AbortNode(state, "Failed to write transaction index");

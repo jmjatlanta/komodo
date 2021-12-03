@@ -88,7 +88,7 @@ static bool CCVerify(const CMutableTransaction &mtxTo, const CC *cond) {
     ScriptError error;
     CTransaction txTo(mtxTo);
     PrecomputedTransactionData txdata(txTo);
-    auto checker = ServerTransactionSignatureChecker(&txTo, 0, amount, false, txdata);
+    auto checker = ServerTransactionSignatureChecker(&txTo, 0, amount, false, mempool, txdata);
     return VerifyScript(CCSig(cond), CCPubKey(cond), 0, checker, 0, &error);
 };
 
@@ -141,13 +141,12 @@ TEST_F(CCTest, testVerifyEvalCondition)
     class EvalMock : public Eval
     {
     public:
+        EvalMock(CTxMemPool& pool) : Eval(pool) {}
         bool Dispatch(const CC *cond, const CTransaction &txTo, unsigned int nIn)
         { return cond->code[0] ? Valid() : Invalid(""); }
     };
 
-    EvalMock eval;
-    EVAL_TEST = &eval;
-
+    EvalMock eval(mempool);
 
     CC *cond;
     CMutableTransaction mtxTo;

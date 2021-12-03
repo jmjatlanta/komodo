@@ -37,6 +37,8 @@ public:
     std::string testSymbol = "PIZZA";
     CAmount amount = 100;
 
+    TestCoinImport() : Eval(mempool) {}
+    
     void SetImportTx() {
         burnTx.vout.resize(0);
         burnTx.vout.push_back(MakeBurnOutput(amount, testCcid, testSymbol, payouts,rawproof));
@@ -75,7 +77,7 @@ protected:
     {
         CTransaction importTx(mtx);
         PrecomputedTransactionData txdata(importTx);
-        ServerTransactionSignatureChecker checker(&importTx, 0, 0, false, txdata);
+        ServerTransactionSignatureChecker checker(&importTx, 0, 0, false, mempool, txdata);
         CValidationState verifystate;
         if (!VerifyCoinImport(importTx.vin[0].scriptSig, checker, verifystate))
             printf("TestRunCCEval: %s\n", verifystate.GetRejectReason().data());

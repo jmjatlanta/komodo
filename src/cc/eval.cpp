@@ -25,7 +25,7 @@
 #include "main.h"
 #include "chain.h"
 #include "core_io.h"
-#include "crosschain.h"
+#include <memory>
 
 bool CClib_Dispatch(const CC *cond,Eval *eval,std::vector<uint8_t> paramsNull,const CTransaction &txTo,unsigned int nIn);
 char *CClib_name();
@@ -34,9 +34,9 @@ Eval* EVAL_TEST = 0;
 struct CCcontract_info CCinfos[0x100];
 extern pthread_mutex_t KOMODO_CC_mutex;
 
-bool RunCCEval(const CC *cond, const CTransaction &tx, unsigned int nIn)
+bool RunCCEval(const CC *cond, const CTransaction &tx, unsigned int nIn, CTxMemPool& pool)
 {
-    EvalRef eval;
+    std::unique_ptr<Eval> eval( new Eval(pool));
     pthread_mutex_lock(&KOMODO_CC_mutex);
     bool out = eval->Dispatch(cond, tx, nIn);
     pthread_mutex_unlock(&KOMODO_CC_mutex);
@@ -168,6 +168,44 @@ int32_t Eval::GetNotaries(uint8_t pubkeys[64][33], int32_t height, uint32_t time
     return komodo_notaries(pubkeys, height, timestamp);
 }
 
+bool Eval::CheckTxAuthority(const CTransaction &tx, CrosschainAuthority auth) const
+{
+    if (tx.vin.size() < auth.requiredSigs) return false;
+
+    uint8_t seen[64] = {0};
+
+    BOOST_FOREACH(const CTxIn &txIn, tx.vin)
+    {
+        // Get notary pubkey
+        CTransaction tx;
+        uint256 hashBlock;
+        if (!this->GetTxUnconfirmed(txIn.prevout.hash, tx, hashBlock)) return false;
+        if (tx.vout.size() < txIn.prevout.n) return false;
+        CScript spk = tx.vout[txIn.prevout.n].scriptPubKey;
+        if (spk.size() != 35) return false;
+        const unsigned char *pk = &spk[0];
+        if (pk++[0] != 33) return false;
+        if (pk[33] != OP_CHECKSIG) return false;
+
+        // Check it's a notary
+        for (int i=0; i<auth.size; i++) {
+            if (!seen[i]) {
+                if (memcmp(pk, auth.notaries[i], 33) == 0) {
+                    seen[i] = 1;
+                    goto found;
+                } else {
+                    //printf("notary.%i is not valid!\n",i);
+                }
+            }
+        }
+
+        return false;
+        found:;
+    }
+
+    return true;
+}
+
 bool Eval::CheckNotaryInputs(const CTransaction &tx, uint32_t height, uint32_t timestamp) const
 {
     if (tx.vin.size() < 11) return false;
@@ -228,33 +266,4 @@ std::string EvalToStr(EvalCode c)
     sprintf(s, "0x%x", c);
     return std::string(s);
 
-}
-
-
-uint256 SafeCheckMerkleBranch(uint256 hash, const std::vector<uint256>& vMerkleBranch, int nIndex)
-{
-    if (nIndex == -1)
-        return uint256();
-    for (auto it(vMerkleBranch.begin()); it != vMerkleBranch.end(); ++it)
-    {
-        if (nIndex & 1) {
-            if (*it == hash) {
-                // non canonical. hash may be equal to node but never on the right.
-                return uint256();
-            }
-            hash = Hash(BEGIN(*it), END(*it), BEGIN(hash), END(hash));
-        }
-        else
-            hash = Hash(BEGIN(hash), END(hash), BEGIN(*it), END(*it));
-        nIndex >>= 1;
-    }
-    return hash;
-}
-
-
-uint256 GetMerkleRoot(const std::vector<uint256>& vLeaves)
-{
-    bool fMutated;
-    std::vector<uint256> vMerkleTree;
-    return BuildMerkleTree(&fMutated, vLeaves, vMerkleTree);
 }

@@ -15,9 +15,9 @@ NotarisationDB *pnotarisations;
 NotarisationDB::NotarisationDB(size_t nCacheSize, bool fMemory, bool fWipe) : CDBWrapper(GetDataDir() / "notarisations", nCacheSize, fMemory, fWipe, false, 64) { }
 
 
-NotarisationsInBlock ScanBlockNotarisations(const CBlock &block, int nHeight)
+NotarisationsInBlock ScanBlockNotarisations(const CBlock &block, int nHeight, CTxMemPool& pool)
 {
-    EvalRef eval;
+    std::unique_ptr<Eval> eval(new Eval(pool));
     NotarisationsInBlock vNotarisations;
     CrosschainAuthority auth_STAKED;
     int timestamp = block.nTime;
@@ -51,7 +51,7 @@ NotarisationsInBlock ScanBlockNotarisations(const CBlock &block, int nHeight)
               // pass era slection off to notaries_staked.cpp file
               auth_STAKED = Choose_auth_STAKED(staked_era);
             }
-            if (!CheckTxAuthority(tx, auth_STAKED))
+            if (!eval->CheckTxAuthority(tx, auth_STAKED))
                 continue;
         }
 

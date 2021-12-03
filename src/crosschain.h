@@ -16,7 +16,12 @@
 #ifndef CROSSCHAIN_H
 #define CROSSCHAIN_H
 
-#include "cc/eval.h"
+#include "uint256.h"
+#include "serialize.h"
+#include "primitives/transaction.h"
+
+#include <cstdint>
+#include <vector>
 
 const int CROSSCHAIN_KOMODO = 1;
 const int CROSSCHAIN_TXSCL = 2;
@@ -28,8 +33,41 @@ typedef struct CrosschainAuthority {
     int8_t requiredSigs;
 } CrosschainAuthority;
 
+/*
+ * Merkle stuff
+ */
+uint256 SafeCheckMerkleBranch(uint256 hash, const std::vector<uint256>& vMerkleBranch, int nIndex);
+uint256 GetMerkleRoot(const std::vector<uint256>& vLeaves);
+
+class MerkleBranch
+{
+public:
+    int nIndex;
+    std::vector<uint256> branch;
+
+    MerkleBranch() {}
+    MerkleBranch(int i, std::vector<uint256> b) : nIndex(i), branch(b) {}
+    uint256 Exec(uint256 hash) const { return SafeCheckMerkleBranch(hash, branch, nIndex); }
+
+    MerkleBranch& operator<<(MerkleBranch append)
+    {
+        nIndex += append.nIndex << branch.size();
+        branch.insert(branch.end(), append.branch.begin(), append.branch.end());
+        return *this;
+    }
+
+    ADD_SERIALIZE_METHODS;
+    
+    template <typename Stream, typename Operation>
+    inline void SerializationOp(Stream& s, Operation ser_action) {
+        READWRITE(VARINT(nIndex));
+        READWRITE(branch);
+    }
+};
+
+typedef std::pair<uint256,MerkleBranch> TxProof;
+
 int GetSymbolAuthority(const char* symbol);
-bool CheckTxAuthority(const CTransaction &tx, CrosschainAuthority auth);
 
 /* On assetchain */
 TxProof GetAssetchainProof(uint256 hash,CTransaction burnTx);

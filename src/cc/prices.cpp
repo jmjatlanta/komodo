@@ -73,6 +73,7 @@ GetKomodoEarlytxidScriptPub is on line #2080 of komodo_bitcoind.h
 #include "CCPrices.h"
 
 #include <cstdlib>
+#include <memory>
 #include <gmp.h>
 
 #define IS_CHARINSTR(c, str) (std::string(str).find((char)(c)) != std::string::npos)
@@ -1425,7 +1426,7 @@ int64_t prices_enumaddedbets(uint256 &batontxid, std::vector<OneBetData> &bets, 
         bool isLoaded = false;
         uint8_t funcId = 0;
         int64_t amount;
-        EvalRef eval;
+        std::unique_ptr<Eval> eval(new Eval(mempool));
 
         if ((isLoaded = eval->GetTxConfirmed(batontxid, txBaton, blockIdx)) &&
             blockIdx.IsValid() &&
@@ -1652,61 +1653,6 @@ UniValue PricesSetcostbasis(int64_t txfee, uint256 bettxid)
     int32_t i, firstheight = 0, height, numvouts; int16_t leverage = 0;
     std::vector<uint16_t> vec;
     CPubKey pk, mypk, pricespk; std::string rawtx;
-/*
-    cp = CCinit(&C, EVAL_PRICES);
-    if (txfee == 0)
-        txfee = PRICES_TXFEE;
-
-    mypk = pubkey2pk(Mypubkey());
-    pricespk = GetUnspendable(cp, 0);
-    if (myGetTransaction(bettxid, bettx, hashBlock) != 0 && (numvouts = bettx.vout.size()) > 3)
-    {
-        if (prices_betopretdecode(bettx.vout[numvouts - 1].scriptPubKey, pk, firstheight, positionsize, leverage, firstprice, vec, tokenid) == 'B')
-        {
-            if (nextheight <= firstheight + PRICES_DAYWINDOW + 1) {
-                result.push_back(Pair("result", "error"));
-                result.push_back(Pair("error", "cannot calculate costbasis yet"));
-                return(result);
-            }
-
-            addedbets = prices_enumaddedbets(batontxid, bettx, bettxid);
-            mtx.vin.push_back(CTxIn(bettxid, 1, CScript()));              // spend vin1 with betamount
-            //for (i = 0; i < PRICES_DAYWINDOW + 1; i++)   // the last datum for 24h is the actual costbasis value
-            //{
-                int32_t retcode = prices_syntheticprofits(costbasis, firstheight, firstheight + PRICES_DAYWINDOW, leverage, vec, positionsize, addedbets, profits, lastprice);
-                if (retcode < 0) {
-                    result.push_back(Pair("result", "error"));
-                    result.push_back(Pair("error", "cannot calculate costbasis error getting price"));
-                    return(result);
-                }
-                equity = positionsize + addedbets + profits;
-                //if (equity < 0)
-                //{   // we are in loss
-                //    result.push_back(Pair("rekt", (int64_t)1));
-                //    result.push_back(Pair("rektheight", (int64_t)firstheight + i));
-                //    break;
-                //}
-            //}
-            //if (i == PRICES_DAYWINDOW + 1)
-            //    result.push_back(Pair("rekt", 0));
-
-            prices_betjson(result, profits, costbasis, positionsize, addedbets, leverage, firstheight, firstprice, lastprice, equity);
-
-            if (AddNormalinputs(mtx, mypk, txfee, 4) >= txfee)
-            {
-                myfee = bettx.vout[1].nValue / 10;   // fee for setting costbasis
-                result.push_back(Pair("myfee", myfee));
-
-                mtx.vout.push_back(CTxOut(myfee, CScript() << ParseHex(HexStr(mypk)) << OP_CHECKSIG));
-                mtx.vout.push_back(MakeCC1vout(cp->evalcode, bettx.vout[1].nValue - myfee, pricespk));
-                rawtx = FinalizeCCTx(0, cp, mtx, mypk, txfee, prices_costbasisopret(bettxid, mypk, firstheight + PRICES_DAYWINDOW , costbasis));  // -1
-                return(prices_rawtxresult(result, rawtx, 0));
-            }
-            result.push_back(Pair("result", "error"));
-            result.push_back(Pair("error", "not enough funds"));
-            return(result);
-        }
-    } */
     result.push_back(Pair("result", "error"));
     result.push_back(Pair("error", "deprecated")); 
     return(result);

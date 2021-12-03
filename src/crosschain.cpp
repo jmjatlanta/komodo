@@ -155,7 +155,6 @@ TxProof GetCrossChainProof(const uint256 txid, const char* targetSymbol, uint32_
      * backnotarisation for B (given by kmdheight of notarisation), find the MoM within the MoMs for
      * that range, and finally extend the proof to lead to the MoMoM (proof root).
      */
-    EvalRef eval;
     uint256 MoM = assetChainProof.second.Exec(txid);
 
     // Get a kmd height for given notarisation Txid
@@ -164,6 +163,7 @@ TxProof GetCrossChainProof(const uint256 txid, const char* targetSymbol, uint32_
         CTransaction sourceNotarisation;
         uint256 hashBlock;
         CBlockIndex blockIdx;
+        std::unique_ptr<Eval> eval(new Eval(mempool));
         if (!eval->GetTxConfirmed(assetChainProof.first, sourceNotarisation, blockIdx))
             throw std::runtime_error("Notarisation not found");
         kmdHeight = blockIdx.GetHeight();
@@ -270,9 +270,9 @@ bool GetNextBacknotarisation(uint256 kmdNotarisationTxid, Notarisation &out)
         return false;
 
     // Need to get block height of that backnotarisation
-    EvalRef eval;
     CBlockIndex block;
     CTransaction tx;
+    std::unique_ptr<Eval> eval(new Eval(mempool));
     if (!eval->GetTxConfirmed(bn.first, tx, block)){
         fprintf(stderr, "Can't get height of backnotarisation, this should not happen\n");
         return false;
@@ -296,9 +296,9 @@ bool CheckMoMoM(uint256 kmdNotarisationHash, uint256 momom)
         return false;
 
     // Need to get block height of that backnotarisation
-    EvalRef eval;
     CBlockIndex block;
     CTransaction tx;
+    std::unique_ptr<Eval> eval(new Eval(mempool));
     if (!eval->GetTxConfirmed(bn.first, tx, block)){
         fprintf(stderr, "Can't get height of backnotarisation, this should not happen\n");
         return false;
@@ -330,9 +330,9 @@ bool CheckNotariesApproval(uint256 burntxid, const std::vector<uint256> & notary
 
     //unmarshal notaries approval txids
     for(auto notarytxid : notaryTxids ) {
-        EvalRef eval;
         CBlockIndex block;
         CTransaction notarytx;  // tx with notary approval of txproof existence
+        std::unique_ptr<Eval> eval(new Eval(mempool));
 
         // get notary approval tx
         if (eval->GetTxConfirmed(notarytxid, notarytx, block)) {
@@ -510,4 +510,32 @@ TxProof GetAssetchainProof(uint256 hash,CTransaction burnTx)
     // All done!
     CDataStream ssProof(SER_NETWORK, PROTOCOL_VERSION);
     return std::make_pair(nota.second.txHash, MerkleBranch(nIndex, branch));
+}
+
+uint256 SafeCheckMerkleBranch(uint256 hash, const std::vector<uint256>& vMerkleBranch, int nIndex)
+{
+    if (nIndex == -1)
+        return uint256();
+    for (auto it(vMerkleBranch.begin()); it != vMerkleBranch.end(); ++it)
+    {
+        if (nIndex & 1) {
+            if (*it == hash) {
+                // non canonical. hash may be equal to node but never on the right.
+                return uint256();
+            }
+            hash = Hash(BEGIN(*it), END(*it), BEGIN(hash), END(hash));
+        }
+        else
+            hash = Hash(BEGIN(hash), END(hash), BEGIN(*it), END(*it));
+        nIndex >>= 1;
+    }
+    return hash;
+}
+
+
+uint256 GetMerkleRoot(const std::vector<uint256>& vLeaves)
+{
+    bool fMutated;
+    std::vector<uint256> vMerkleTree;
+    return BuildMerkleTree(&fMutated, vLeaves, vMerkleTree);
 }

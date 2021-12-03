@@ -24,6 +24,7 @@ namespace TestEvalNotarisation {
     class EvalMock : public Eval
     {
         public:
+            EvalMock(CTxMemPool& pool) : Eval(pool) {}
             uint32_t nNotaries;
             uint8_t notaries[64][33];
             std::map<uint256, CTransaction> txs;
@@ -129,8 +130,7 @@ TEST(TestEvalNotarisation, testInvalidNotaryPubkey)
 
 TEST(TestEvalNotarisation, testInvalidNotarisationBadOpReturn)
 {
-    EvalMock eval;
-    EVAL_TEST = &eval;
+    EvalMock eval(mempool);
     CMutableTransaction notary(notaryTx);
 
     notary.vout[1].scriptPubKey = CScript() << OP_RETURN << 0;
@@ -143,8 +143,7 @@ TEST(TestEvalNotarisation, testInvalidNotarisationBadOpReturn)
 
 TEST(TestEvalNotarisation, testInvalidNotarisationTxNotEnoughSigs)
 {
-    EvalMock eval;
-    EVAL_TEST = &eval;
+    EvalMock eval(mempool);
     CMutableTransaction notary(notaryTx);
 
     SetupEval(eval, notary, [](CMutableTransaction &tx) {
@@ -158,8 +157,7 @@ TEST(TestEvalNotarisation, testInvalidNotarisationTxNotEnoughSigs)
 
 TEST(TestEvalNotarisation, testInvalidNotarisationTxDoesntExist)
 {
-    EvalMock eval;
-    EVAL_TEST = &eval;
+    EvalMock eval(mempool);
     CMutableTransaction notary(notaryTx);
 
     SetupEval(eval, notary, noop);
@@ -171,8 +169,7 @@ TEST(TestEvalNotarisation, testInvalidNotarisationTxDoesntExist)
 
 TEST(TestEvalNotarisation, testInvalidNotarisationDupeNotary)
 {
-    EvalMock eval;
-    EVAL_TEST = &eval;
+    EvalMock eval(mempool);
     CMutableTransaction notary(notaryTx);
 
     SetupEval(eval, notary, [](CMutableTransaction &tx) {
@@ -186,8 +183,7 @@ TEST(TestEvalNotarisation, testInvalidNotarisationDupeNotary)
 
 TEST(TestEvalNotarisation, testInvalidNotarisationInputNotCheckSig)
 {
-    EvalMock eval;
-    EVAL_TEST = &eval;
+    EvalMock eval(mempool);
     CMutableTransaction notary(notaryTx);
 
     SetupEval(eval, notary, [&](CMutableTransaction &tx) {

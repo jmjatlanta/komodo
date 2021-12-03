@@ -43,7 +43,7 @@ int TestCC(CMutableTransaction &mtxTo, unsigned int nIn, CC *cond)
     ScriptError error;
     CTransaction txTo(mtxTo);
     PrecomputedTransactionData txdata(txTo);
-    auto checker = ServerTransactionSignatureChecker(&txTo, nIn, amount, false, txdata);
+    auto checker = ServerTransactionSignatureChecker(&txTo, nIn, amount, false, mempool, txdata);
     return VerifyScript(txTo.vin[nIn].scriptSig, CCPubKey(cond), 0, checker, 0, &error);
 }
 
@@ -77,6 +77,8 @@ public:
     std::map<uint256, CTransaction> txs;
     std::map<uint256, CBlockIndex> blocks;
     std::map<uint256, std::vector<CTransaction>> spends;
+
+    EvalMock() : Eval(mempool) {}
 
     bool Dispatch(const CC *cond, const CTransaction &txTo, unsigned int nIn)
     {
