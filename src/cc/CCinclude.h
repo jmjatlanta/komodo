@@ -281,6 +281,16 @@ static int32_t ignorevin;
  */
 bool myGetTransaction(const uint256 &hash, CTransaction &txOut, uint256 &hashBlock);
 
+/*****
+ * @brief get a transaction by its hash (without locks)
+ * @param[in] hash what to look for
+ * @param[out] txOut the found transaction
+ * @param[out] hashBlock the hash of the block (all zeros if still in mempool)
+ * @param[in] pool the memory pool to look in
+ * @returns true if found
+ */
+bool myGetTransaction(const uint256 &hash, CTransaction &txOut, uint256 &hashBlock, CTxMemPool& pool);
+
 /// NSPV_myGetTransaction is called in NSPV mode
 /// @param hash hash of transaction to get (txid)
 /// @param[out] txOut returned transaction object

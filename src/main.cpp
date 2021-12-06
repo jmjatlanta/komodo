@@ -2264,6 +2264,19 @@ bool myAddtomempool(const CTransaction &tx, CValidationState *pstate, bool fSkip
  */
 bool myGetTransaction(const uint256 &hash, CTransaction &txOut, uint256 &hashBlock)
 {
+    return myGetTransaction(hash, txOut, hashBlock, mempool);
+}
+
+/*****
+ * @brief get a transaction by its hash (without locks)
+ * @param[in] hash what to look for
+ * @param[out] txOut the found transaction
+ * @param[out] hashBlock the hash of the block (all zeros if still in mempool)
+ * @param[in] pool the mempool to use
+ * @returns true if found
+ */
+bool myGetTransaction(const uint256 &hash, CTransaction &txOut, uint256 &hashBlock, CTxMemPool& pool)
+{
     memset(&hashBlock,0,sizeof(hashBlock));
     if ( KOMODO_NSPV_SUPERLITE )
     {
@@ -2280,7 +2293,7 @@ bool myGetTransaction(const uint256 &hash, CTransaction &txOut, uint256 &hashBlo
     }
     // need a GetTransaction without lock so the validation code for assets can run without deadlock
     {
-        if (mempool.lookup(hash, txOut))
+        if (pool.lookup(hash, txOut))
         {
             return true;
         }
