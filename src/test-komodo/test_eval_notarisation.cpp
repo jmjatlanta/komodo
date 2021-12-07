@@ -62,25 +62,25 @@ namespace TestEvalNotarisation {
 
 
     template<typename Modifier>
-        void SetupEval(EvalMock &eval, CMutableTransaction &notary, Modifier modify)
+        void SetupEval(std::shared_ptr<EvalMock> eval, CMutableTransaction &notary, Modifier modify)
         {
-            eval.nNotaries = komodo_notaries(eval.notaries, 780060, 1522946781);
+            eval->nNotaries = komodo_notaries(eval->notaries, 780060, 1522946781);
 
             // make fake notary inputs
             notary.vin.resize(11);
             for (int i=0; i<notary.vin.size(); i++) {
                 CMutableTransaction txIn;
                 txIn.vout.resize(1);
-                txIn.vout[0].scriptPubKey << VCH(eval.notaries[i*2], 33) << OP_CHECKSIG;
+                txIn.vout[0].scriptPubKey << VCH(eval->notaries[i*2], 33) << OP_CHECKSIG;
                 notary.vin[i].prevout = COutPoint(txIn.GetHash(), 0);
-                eval.txs[txIn.GetHash()] = CTransaction(txIn);
+                eval->txs[txIn.GetHash()] = CTransaction(txIn);
             }
 
             modify(notary);
 
-            eval.txs[notary.GetHash()] = CTransaction(notary);
-            eval.blocks[notary.GetHash()].SetHeight(780060);
-            eval.blocks[notary.GetHash()].nTime = 1522946781;
+            eval->txs[notary.GetHash()] = CTransaction(notary);
+            eval->blocks[notary.GetHash()].SetHeight(780060);
+            eval->blocks[notary.GetHash()].nTime = 1522946781;
         }
 
 
@@ -96,7 +96,7 @@ namespace TestEvalNotarisation {
     /*
        TEST(TestEvalNotarisation, testGetNotarisation)
        {
-       EvalMock eval;
+       std::shared_ptr<EvalMock> eval;
        CMutableTransaction notary(notaryTx);
        SetupEval(eval, notary, noop);
 
@@ -116,7 +116,7 @@ namespace TestEvalNotarisation {
 
 TEST(TestEvalNotarisation, testInvalidNotaryPubkey)
 {
-    EvalMock eval;
+    std::shared_ptr<EvalMock> eval;
     CMutableTransaction notary(notaryTx);
     SetupEval(eval, notary, noop);
 
@@ -130,20 +130,20 @@ TEST(TestEvalNotarisation, testInvalidNotaryPubkey)
 
 TEST(TestEvalNotarisation, testInvalidNotarisationBadOpReturn)
 {
-    EvalMock eval(mempool);
+    std::shared_ptr<EvalMock> eval = std::make_shared<EvalMock>(mempool);
     CMutableTransaction notary(notaryTx);
 
     notary.vout[1].scriptPubKey = CScript() << OP_RETURN << 0;
     SetupEval(eval, notary, noop);
 
     NotarisationData data(0);
-    ASSERT_FALSE(eval.GetNotarisationData(notary.GetHash(), data));
+    ASSERT_FALSE(eval->GetNotarisationData(notary.GetHash(), data));
 }
 
 
 TEST(TestEvalNotarisation, testInvalidNotarisationTxNotEnoughSigs)
 {
-    EvalMock eval(mempool);
+    std::shared_ptr<EvalMock> eval = std::make_shared<EvalMock>(mempool);
     CMutableTransaction notary(notaryTx);
 
     SetupEval(eval, notary, [](CMutableTransaction &tx) {
@@ -151,25 +151,25 @@ TEST(TestEvalNotarisation, testInvalidNotarisationTxNotEnoughSigs)
     });
 
     NotarisationData data(0);
-    ASSERT_FALSE(eval.GetNotarisationData(notary.GetHash(), data));
+    ASSERT_FALSE(eval->GetNotarisationData(notary.GetHash(), data));
 }
 
 
 TEST(TestEvalNotarisation, testInvalidNotarisationTxDoesntExist)
 {
-    EvalMock eval(mempool);
+    std::shared_ptr<EvalMock> eval = std::make_shared<EvalMock>(mempool);
     CMutableTransaction notary(notaryTx);
 
     SetupEval(eval, notary, noop);
 
     NotarisationData data(0);
-    ASSERT_FALSE(eval.GetNotarisationData(uint256(), data));
+    ASSERT_FALSE(eval->GetNotarisationData(uint256(), data));
 }
 
 
 TEST(TestEvalNotarisation, testInvalidNotarisationDupeNotary)
 {
-    EvalMock eval(mempool);
+    std::shared_ptr<EvalMock> eval = std::make_shared<EvalMock>(mempool);
     CMutableTransaction notary(notaryTx);
 
     SetupEval(eval, notary, [](CMutableTransaction &tx) {
@@ -177,26 +177,26 @@ TEST(TestEvalNotarisation, testInvalidNotarisationDupeNotary)
     });
 
     NotarisationData data(0);
-    ASSERT_FALSE(eval.GetNotarisationData(notary.GetHash(), data));
+    ASSERT_FALSE(eval->GetNotarisationData(notary.GetHash(), data));
 }
 
 
 TEST(TestEvalNotarisation, testInvalidNotarisationInputNotCheckSig)
 {
-    EvalMock eval(mempool);
+    std::shared_ptr<EvalMock> eval = std::make_shared<EvalMock>(mempool);
     CMutableTransaction notary(notaryTx);
 
     SetupEval(eval, notary, [&](CMutableTransaction &tx) {
         int i = 1;
         CMutableTransaction txIn;
         txIn.vout.resize(1);
-        txIn.vout[0].scriptPubKey << VCH(eval.notaries[i*2], 33) << OP_RETURN;
+        txIn.vout[0].scriptPubKey << VCH(eval->notaries[i*2], 33) << OP_RETURN;
         notary.vin[i].prevout = COutPoint(txIn.GetHash(), 0);
-        eval.txs[txIn.GetHash()] = CTransaction(txIn);
+        eval->txs[txIn.GetHash()] = CTransaction(txIn);
     });
 
     NotarisationData data(0);
-    ASSERT_FALSE(eval.GetNotarisationData(notary.GetHash(), data));
+    ASSERT_FALSE(eval->GetNotarisationData(notary.GetHash(), data));
 }
 
 

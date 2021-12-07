@@ -33,7 +33,7 @@ char *CClib_name();
 struct CCcontract_info CCinfos[0x100];
 extern pthread_mutex_t KOMODO_CC_mutex;
 
-bool RunCCEval(const CC *cond, const CTransaction &tx, unsigned int nIn, Eval* eval)
+bool RunCCEval(const CC *cond, const CTransaction &tx, unsigned int nIn, std::shared_ptr<Eval> eval)
 {
     pthread_mutex_lock(&KOMODO_CC_mutex);
     bool out = eval->Dispatch(cond, tx, nIn);

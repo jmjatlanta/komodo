@@ -32,14 +32,14 @@ class ServerTransactionSignatureChecker : public TransactionSignatureChecker
 {
 private:
     bool store;
-    Eval* eval;
+    std::shared_ptr<Eval> eval;
 
 public:
     ServerTransactionSignatureChecker(const CTransaction* txToIn, unsigned int nIn, const CAmount& amount, 
-            bool storeIn, Eval* eval, const PrecomputedTransactionData& txdataIn) 
+            bool storeIn, std::shared_ptr<Eval> eval, const PrecomputedTransactionData& txdataIn) 
             : TransactionSignatureChecker(txToIn, nIn, amount, txdataIn), store(storeIn), eval(eval) {}
     ServerTransactionSignatureChecker(const CTransaction* txToIn, unsigned int nIn, const CAmount& amount, 
-            bool storeIn, Eval* eval) 
+            bool storeIn, std::shared_ptr<Eval> eval) 
             : TransactionSignatureChecker(txToIn, nIn, amount), store(storeIn), eval(eval) {}
 
     bool VerifySignature(const std::vector<unsigned char>& vchSig, const CPubKey& vchPubKey, const uint256& sighash) const;

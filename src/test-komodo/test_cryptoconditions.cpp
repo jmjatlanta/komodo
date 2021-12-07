@@ -88,8 +88,8 @@ static bool CCVerify(const CMutableTransaction &mtxTo, const CC *cond) {
     ScriptError error;
     CTransaction txTo(mtxTo);
     PrecomputedTransactionData txdata(txTo);
-    std::unique_ptr<Eval> eval(new Eval(mempool));
-    auto checker = ServerTransactionSignatureChecker(&txTo, 0, amount, false, eval.get(), txdata);
+    std::shared_ptr<Eval> eval(new Eval(mempool));
+    auto checker = ServerTransactionSignatureChecker(&txTo, 0, amount, false, eval, txdata);
     return VerifyScript(CCSig(cond), CCPubKey(cond), 0, checker, 0, &error);
 };
 
@@ -145,7 +145,7 @@ TEST_F(CCTest, testVerifyEvalCondition)
         { return cond->code[0] ? Valid() : Invalid(""); }
     };
 
-    EvalMock eval(mempool);
+    std::shared_ptr<EvalMock> eval = std::make_shared<EvalMock>(mempool);
 
     CC *cond;
     CMutableTransaction mtxTo;

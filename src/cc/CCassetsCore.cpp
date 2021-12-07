@@ -609,7 +609,8 @@ bool AssetCalcAmounts(struct CCcontract_info *cpAssets, int64_t &inputs, int64_t
 		{
 			//std::cerr << indentStr << "AssetExactAmounts() eval is true=" << (eval != NULL) << " ismyvin=ok for_i=" << i << std::endl;
 			// we are not inside the validation code -- dimxy
-			if ((eval && eval->GetTxUnconfirmed(tx.vin[i].prevout.hash, vinTx, hashBlock) == 0) || (!eval && !myGetTransaction(tx.vin[i].prevout.hash, vinTx, hashBlock)))
+			if ((eval && eval->GetTxUnconfirmed(tx.vin[i].prevout.hash, vinTx, hashBlock) == 0) 
+                    || (!eval && !myGetTransaction(tx.vin[i].prevout.hash, vinTx, hashBlock)))
 			{
 				std::cerr << "AssetCalcAmounts() cannot read vintx for i." << i << " numvins." << numvins << std::endl;
 				return (!eval) ? false : eval->Invalid("always should find vin tx, but didnt");

@@ -136,7 +136,8 @@ bool HeirValidate(struct CCcontract_info* cpHeir, Eval* eval, const CTransaction
         if (fundingTxidInOpret == zeroid) {
             return eval->Invalid("incorrect tx opreturn: no fundingtxid present");
         }
-        latestTxid = FindLatestFundingTx(fundingTxidInOpret, tokenid, fundingTxOpRetScript, hasHeirSpendingBegun);
+        latestTxid = FindLatestFundingTx(fundingTxidInOpret, tokenid, fundingTxOpRetScript, 
+                hasHeirSpendingBegun, eval);
         
         if( tokenid != zeroid && tokenid != tokenidThis )
             return eval->Invalid("incorrect tx tokenid");
@@ -391,7 +392,10 @@ void CheckVinPubkey(std::vector<CTxIn> vins, CPubKey pubkey, bool &hasPubkey, bo
  * find the latest funding tx: it may be the first F tx or one of A or C tx's
  * Note: this function is also called from validation code (use non-locking calls)
  */
-uint256 _FindLatestFundingTx(uint256 fundingtxid, uint8_t& funcId, uint256 &tokenid, CPubKey& ownerPubkey, CPubKey& heirPubkey, int64_t& inactivityTime, std::string& heirName, std::string& memo, CScript& fundingOpretScript, uint8_t &hasHeirSpendingBegun)
+uint256 _FindLatestFundingTx(uint256 fundingtxid, uint8_t& funcId, uint256 &tokenid,
+        CPubKey& ownerPubkey, CPubKey& heirPubkey, int64_t& inactivityTime, 
+        std::string& heirName, std::string& memo, CScript& fundingOpretScript, 
+        uint8_t &hasHeirSpendingBegun, Eval *eval)
 {
     CTransaction fundingtx;
     uint256 hashBlock;
@@ -403,15 +407,20 @@ uint256 _FindLatestFundingTx(uint256 fundingtxid, uint8_t& funcId, uint256 &toke
     
     hasHeirSpendingBegun = 0;
     funcId = 0;
+
+    bool txFound = false;
+    if (eval != nullptr)
+        txFound = myGetTransaction(fundingtxid, fundingtx, hashBlock, eval->pool);
+    else
+        txFound = myGetTransaction(fundingtxid, fundingtx, hashBlock);
     
     // get initial funding tx and set it as initial lasttx:
-    if (myGetTransaction(fundingtxid, fundingtx, hashBlock) && fundingtx.vout.size()) {
+    if (txFound && fundingtx.vout.size()) {
         
         CScript heirScript = (fundingtx.vout.size() > 0) ? fundingtx.vout[fundingtx.vout.size() - 1].scriptPubKey : CScript();
         uint8_t funcId = DecodeHeirEitherOpRet(heirScript, tokenid, ownerPubkey, heirPubkey, inactivityTime, heirName, memo, true);
         if (funcId != 0) {
             // found at least funding tx!
-            //std::cerr << "FindLatestFundingTx() lasttx currently is fundingtx, txid=" << fundingtxid.GetHex() << " opreturn type=" << (char)funcId << '\n';
             fundingOpretScript = fundingtx.vout[fundingtx.vout.size() - 1].scriptPubKey;
         } else {
             std::cerr << "FindLatestFundingTx() could not decode opreturn for fundingtxid=" << fundingtxid.GetHex() << '\n';
@@ -430,7 +439,6 @@ uint256 _FindLatestFundingTx(uint256 fundingtxid, uint8_t& funcId, uint256 &toke
     GetCCaddress1of2(cp, coinaddr, ownerPubkey, heirPubkey); // get the address of cryptocondition '1 of 2 pubkeys'
     
     SetCCunspents(unspentOutputs, coinaddr,true);				 // get vector with tx's with unspent vouts of 1of2pubkey address:
-    //std::cerr << "FindLatestFundingTx() using 1of2address=" << coinaddr << " unspentOutputs.size()=" << unspentOutputs.size() << '\n';
     
     int32_t maxBlockHeight = 0; // max block height
     uint256 latesttxid = fundingtxid;
@@ -440,14 +448,16 @@ uint256 _FindLatestFundingTx(uint256 fundingtxid, uint8_t& funcId, uint256 &toke
         CTransaction regtx;
         uint256 hash;
         
-        uint256 txid = it->first.txhash;
-        //std::cerr << "FindLatestFundingTx() checking unspents for txid=" << txid.GetHex() << '\n';
-        
+        uint256 txid = it->first.txhash;        
         int32_t blockHeight = (int32_t)it->second.blockHeight;
         
         //NOTE: maybe called from validation code:
-        if (myGetTransaction(txid, regtx, hash)) {
-            //std::cerr << "FindLatestFundingTx() found tx for txid=" << txid.GetHex() << " blockHeight=" << blockHeight << " maxBlockHeight=" << maxBlockHeight << '\n';
+        if (eval != nullptr)
+            txFound = myGetTransaction(txid, regtx, hash, eval->pool);
+        else
+            txFound = myGetTransaction(txid, regtx, hash);
+
+        if (txFound) {
             uint256 fundingTxidInOpret;
             uint256 tokenidInOpret;  // not to contaminate the tokenid from the params!
             uint8_t tmpFuncId;
@@ -472,9 +482,6 @@ uint256 _FindLatestFundingTx(uint256 fundingtxid, uint8_t& funcId, uint256 &toke
 						latesttxid = txid;
 						funcId = tmpFuncId;
 					}
-                    
-                    //std::cerr << "FindLatestFundingTx() txid=" << latesttxid.GetHex() << " at blockHeight=" << maxBlockHeight
-                    //	<< " opreturn type=" << (char)(funcId ? funcId : ' ') << " hasHeirSpendingBegun=" << (int)hasHeirSpendingBegun << " - set as current lasttxid" << '\n';
                 }
             }
         }
@@ -483,8 +490,17 @@ uint256 _FindLatestFundingTx(uint256 fundingtxid, uint8_t& funcId, uint256 &toke
     return latesttxid;
 }
 
-// overload for validation code
-uint256 FindLatestFundingTx(uint256 fundingtxid, uint256 &tokenid, CScript& opRetScript, uint8_t &hasHeirSpendingBegun)
+/****
+ * @brief find the latest funding tx: it may be the first F tx or one of A or C tx's
+ * @note overload for validation code
+ * @param fundingtxid
+ * @param tokenid
+ * @param opRetScript
+ * @param isHeirSpendingBegan
+ * @returns the txid of the funding tx
+ */
+uint256 FindLatestFundingTx(uint256 fundingtxid, uint256 &tokenid, CScript& opRetScript, 
+        uint8_t &hasHeirSpendingBegun, Eval *eval)
 {
     uint8_t funcId;
     CPubKey ownerPubkey;
@@ -492,15 +508,32 @@ uint256 FindLatestFundingTx(uint256 fundingtxid, uint256 &tokenid, CScript& opRe
     int64_t inactivityTime;
     std::string heirName, memo;
     
-    return _FindLatestFundingTx(fundingtxid, funcId, tokenid, ownerPubkey, heirPubkey, inactivityTime, heirName, memo, opRetScript, hasHeirSpendingBegun);
+    return _FindLatestFundingTx(fundingtxid, funcId, tokenid, ownerPubkey, 
+            heirPubkey, inactivityTime, heirName, memo, opRetScript, hasHeirSpendingBegun, eval);
 }
 
-// overload for transaction creation code
-uint256 FindLatestFundingTx(uint256 fundingtxid, uint8_t& funcId, uint256 &tokenid, CPubKey& ownerPubkey, CPubKey& heirPubkey, int64_t& inactivityTime, std::string& heirName, std::string& memo, uint8_t &hasHeirSpendingBegun)
+/****
+ * @brief find the latest funding tx: it may be the first F tx or one of A or C tx's
+ * @note overload for transaction creation code
+ * @param fundingtxid
+ * @param funcId
+ * @param tokenid
+ * @param ownerPubkey
+ * @param heirPubkey
+ * @param inactivityTime
+ * @param heirName
+ * @param memo
+ * @param isHeirSpendingBegan
+ * @returns the txid of the funding tx
+ */
+uint256 FindLatestFundingTx(uint256 fundingtxid, uint8_t& funcId, uint256 &tokenid, 
+        CPubKey& ownerPubkey, CPubKey& heirPubkey, int64_t& inactivityTime, 
+        std::string& heirName, std::string& memo, uint8_t &hasHeirSpendingBegun)
 {
     CScript opRetScript;
     
-    return _FindLatestFundingTx(fundingtxid, funcId, tokenid, ownerPubkey, heirPubkey, inactivityTime, heirName, memo, opRetScript, hasHeirSpendingBegun);
+    return _FindLatestFundingTx(fundingtxid, funcId, tokenid, ownerPubkey, heirPubkey, 
+            inactivityTime, heirName, memo, opRetScript, hasHeirSpendingBegun, nullptr);
 }
 
 // add inputs of 1 of 2 cc address
@@ -844,7 +877,9 @@ UniValue HeirAddCaller(uint256 fundingtxid, int64_t txfee, std::string strAmount
     uint8_t hasHeirSpendingBegun = 0;
     
     // get latest tx to see if it is a token or coin
-    if ((latesttxid = FindLatestFundingTx(fundingtxid, funcId, tokenid, ownerPubkey, heirPubkey, inactivityTimeSec, heirName, memo, hasHeirSpendingBegun)) != zeroid) 
+    if ((latesttxid = FindLatestFundingTx(fundingtxid, funcId, tokenid, ownerPubkey, 
+            heirPubkey, inactivityTimeSec, heirName, memo, 
+            hasHeirSpendingBegun)) != zeroid) 
     {
 		if (tokenid == zeroid) {
 			int64_t amount = 0;
@@ -1017,7 +1052,9 @@ UniValue HeirClaimCaller(uint256 fundingtxid, int64_t txfee, std::string strAmou
     uint8_t hasHeirSpendingBegun = 0;
     
     // find latest tx to see if it is a token or coin:
-    if ((latesttxid = FindLatestFundingTx(fundingtxid, funcId, tokenid, ownerPubkey, heirPubkey, inactivityTimeSec, heirName, memo, hasHeirSpendingBegun)) != zeroid) 
+    if ((latesttxid = FindLatestFundingTx(fundingtxid, funcId, tokenid, ownerPubkey, 
+            heirPubkey, inactivityTimeSec, heirName, memo, 
+            hasHeirSpendingBegun)) != zeroid) 
     {
 		if (tokenid == zeroid) 
         {

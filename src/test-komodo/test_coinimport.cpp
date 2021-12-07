@@ -22,7 +22,7 @@ namespace TestCoinImport {
 
 static uint8_t testNum = 0;
 
-class TestCoinImport : public ::testing::Test, public Eval {
+class TestCoinImport : public ::testing::Test {
 public:
     CMutableTransaction burnTx; std::vector<uint8_t> rawproof;
     std::vector<CTxOut> payouts;
@@ -32,8 +32,9 @@ public:
     uint32_t testCcid = 2;
     std::string testSymbol = "PIZZA";
     CAmount amount = 100;
+    std::shared_ptr<Eval> eval = nullptr;
 
-    TestCoinImport() : Eval(mempool) {}
+    TestCoinImport() : eval(std::make_shared<Eval>(mempool)) { }
 
     void SetImportTx() {
         burnTx.vout.resize(0);
@@ -72,7 +73,7 @@ protected:
     {
         CTransaction importTx(mtx);
         PrecomputedTransactionData txdata(importTx);
-        ServerTransactionSignatureChecker checker(&importTx, 0, 0, false, this, txdata);
+        ServerTransactionSignatureChecker checker(&importTx, 0, 0, false, eval, txdata);
         CValidationState verifystate;
         if (!VerifyCoinImport(importTx.vin[0].scriptSig, checker, verifystate))
             printf("TestRunCCEval: %s\n", verifystate.GetRejectReason().data());
@@ -148,7 +149,7 @@ TEST_F(TestCoinImport, testNoVouts)
 {
     importTx.vout.resize(0);
     TestRunCCEval(importTx);
-    EXPECT_EQ("too-few-vouts", state.GetRejectReason());
+    EXPECT_EQ("too-few-vouts", eval->state.GetRejectReason());
 }
 
 
@@ -157,7 +158,7 @@ TEST_F(TestCoinImport, testInvalidParams)
     std::vector<uint8_t> payload = E_MARSHAL(ss << EVAL_IMPORTCOIN; ss << 'a');
     importTx.vin[0].scriptSig = CScript() << payload;
     TestRunCCEval(importTx);
-    EXPECT_EQ("invalid-params", state.GetRejectReason());
+    EXPECT_EQ("invalid-params", eval->state.GetRejectReason());
 }
 
 
@@ -165,7 +166,7 @@ TEST_F(TestCoinImport, testNonCanonical)
 {
     importTx.nLockTime = 10;
     TestRunCCEval(importTx);
-    EXPECT_EQ("non-canonical", state.GetRejectReason());
+    EXPECT_EQ("non-canonical", eval->state.GetRejectReason());
 }
 
 
@@ -175,7 +176,7 @@ TEST_F(TestCoinImport, testInvalidBurnOutputs)
     MoMoM = burnTx.GetHash();  // TODO: an actual branch
     CTransaction tx = MakeImportCoinTransaction(proof, CTransaction(burnTx), payouts);
     TestRunCCEval(tx);
-    EXPECT_EQ("invalid-burn-tx", state.GetRejectReason());
+    EXPECT_EQ("invalid-burn-tx", eval->state.GetRejectReason());
 }
 
 
@@ -185,7 +186,7 @@ TEST_F(TestCoinImport, testInvalidBurnParams)
     MoMoM = burnTx.GetHash();  // TODO: an actual branch
     CTransaction tx = MakeImportCoinTransaction(proof, CTransaction(burnTx), payouts);
     TestRunCCEval(tx);
-    EXPECT_EQ("invalid-burn-tx", state.GetRejectReason());
+    EXPECT_EQ("invalid-burn-tx", eval->state.GetRejectReason());
 }
 
 
@@ -193,7 +194,7 @@ TEST_F(TestCoinImport, DISABLED_testWrongChainId)
 {
     testCcid = 0;
     TestRunCCEval(importTx);
-    EXPECT_EQ("importcoin-wrong-chain", state.GetRejectReason());
+    EXPECT_EQ("importcoin-wrong-chain", eval->state.GetRejectReason());
 }
 
 
@@ -203,7 +204,7 @@ TEST_F(TestCoinImport, testInvalidBurnAmount)
     MoMoM = burnTx.GetHash();  // TODO: an actual branch
     CTransaction tx = MakeImportCoinTransaction(proof, CTransaction(burnTx), payouts);
     TestRunCCEval(tx);
-    EXPECT_EQ("invalid-burn-amount", state.GetRejectReason());
+    EXPECT_EQ("invalid-burn-amount", eval->state.GetRejectReason());
 }
 
 
@@ -211,7 +212,7 @@ TEST_F(TestCoinImport, DISABLED_testPayoutTooHigh)
 {
     importTx.vout[1].nValue = 101;
     TestRunCCEval(importTx);
-    EXPECT_EQ("payout-too-high", state.GetRejectReason());
+    EXPECT_EQ("payout-too-high", eval->state.GetRejectReason());
 }
 
 
@@ -219,7 +220,7 @@ TEST_F(TestCoinImport, DISABLED_testAmountInOpret)
 {
     importTx.vout[0].nValue = 1;
     TestRunCCEval(importTx);
-    EXPECT_EQ("non-canonical", state.GetRejectReason());
+    EXPECT_EQ("non-canonical", eval->state.GetRejectReason());
 }
 
 
@@ -229,7 +230,7 @@ TEST_F(TestCoinImport, DISABLED_testInvalidPayouts)
     importTx.vout[1].nValue = 40;
     importTx.vout.push_back(importTx.vout[0]);
     TestRunCCEval(importTx);
-    EXPECT_EQ("wrong-payouts", state.GetRejectReason());
+    EXPECT_EQ("wrong-payouts", eval->state.GetRejectReason());
 }
 
 
@@ -237,7 +238,7 @@ TEST_F(TestCoinImport, DISABLED_testCouldntLoadMomom)
 {
     MoMoM.SetNull();
     TestRunCCEval(importTx);
-    EXPECT_EQ("coudnt-load-momom", state.GetRejectReason());
+    EXPECT_EQ("coudnt-load-momom", eval->state.GetRejectReason());
 }
 
 
@@ -246,7 +247,7 @@ TEST_F(TestCoinImport, DISABLED_testMomomCheckFail)
     MoMoM.SetNull();
     MoMoM.begin()[0] = 1;
     TestRunCCEval(importTx);
-    EXPECT_EQ("momom-check-fail", state.GetRejectReason());
+    EXPECT_EQ("momom-check-fail", eval->state.GetRejectReason());
 }
 
 

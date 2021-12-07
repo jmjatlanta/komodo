@@ -1384,7 +1384,7 @@ int TransactionSignatureChecker::CheckCryptoCondition(
         return 0;
     }
     VerifyEval eval = [] (CC *cond, void *checker) {
-        return ((TransactionSignatureChecker*)checker)->CheckEvalCondition(cond);
+        return reinterpret_cast<TransactionSignatureChecker*>(checker)->CheckEvalCondition(cond);
     };
     int out = cc_verify(cond, (const unsigned char*)&sighash, 32, 0,
                         condBin.data(), condBin.size(), eval, (void*)this);

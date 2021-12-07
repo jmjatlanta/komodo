@@ -19,8 +19,8 @@
  ******************************************************************************/
 
 #include "serverchecker.h"
-#include "script/cc.h"
 #include "cc/eval.h"
+#include "script/cc.h"
 
 #include "pubkey.h"
 #include "random.h"
@@ -31,8 +31,8 @@
 #include <boost/thread.hpp>
 #include <boost/tuple/tuple_comparison.hpp>
 
-namespace {
-
+namespace
+{
 /**
  * Valid signature cache, to avoid doing expensive ECDSA signature checking
  * twice for every transaction (once when accepted into memory pool, and
@@ -41,14 +41,14 @@ namespace {
 class CSignatureCache
 {
 private:
-     //! sigdata_type is (signature hash, signature, public key):
+    //! sigdata_type is (signature hash, signature, public key):
     typedef boost::tuple<uint256, std::vector<unsigned char>, CPubKey> sigdata_type;
-    std::set< sigdata_type> setValid;
+    std::set<sigdata_type> setValid;
     boost::shared_mutex cs_serverchecker;
 
 public:
     bool
-    Get(const uint256 &hash, const std::vector<unsigned char>& vchSig, const CPubKey& pubKey)
+    Get(const uint256& hash, const std::vector<unsigned char>& vchSig, const CPubKey& pubKey)
     {
         boost::shared_lock<boost::shared_mutex> lock(cs_serverchecker);
 
@@ -59,19 +59,19 @@ public:
         return false;
     }
 
-    void Set(const uint256 &hash, const std::vector<unsigned char>& vchSig, const CPubKey& pubKey)
+    void Set(const uint256& hash, const std::vector<unsigned char>& vchSig, const CPubKey& pubKey)
     {
         // DoS prevention: limit cache size to less than 10MB
         // (~200 bytes per cache entry times 50,000 entries)
         // Since there can be no more than 20,000 signature operations per block
         // 50,000 is a reasonable default.
         int64_t nMaxCacheSize = GetArg("-maxservercheckersize", 50000);
-        if (nMaxCacheSize <= 0) return;
+        if (nMaxCacheSize <= 0)
+            return;
 
         boost::unique_lock<boost::shared_mutex> lock(cs_serverchecker);
 
-        while (static_cast<int64_t>(setValid.size()) > nMaxCacheSize)
-        {
+        while (static_cast<int64_t>(setValid.size()) > nMaxCacheSize) {
             // Evict a random entry. Random because that helps
             // foil would-be DoS attackers who might try to pre-generate
             // and re-use a set of valid signatures just-slightly-greater
@@ -90,7 +90,7 @@ public:
     }
 };
 
-}
+} // namespace
 
 bool ServerTransactionSignatureChecker::VerifySignature(const std::vector<unsigned char>& vchSig, const CPubKey& pubkey, const uint256& sighash) const
 {
@@ -116,7 +116,7 @@ bool ServerTransactionSignatureChecker::VerifySignature(const std::vector<unsign
  * code without pulling the whole bitcoin server code into bitcoin common was
  * using this class. Thus it has been renamed to ServerTransactionSignatureChecker.
  */
-int ServerTransactionSignatureChecker::CheckEvalCondition(const CC *cond) const
+int ServerTransactionSignatureChecker::CheckEvalCondition(const CC* cond) const
 {
     return RunCCEval(cond, *txTo, nIn, eval);
 }

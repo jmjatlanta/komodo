@@ -119,7 +119,7 @@ public:
     virtual std::string GetAssetchainsSymbol() const;    
 };
 
-bool RunCCEval(const CC *cond, const CTransaction &tx, unsigned int nIn, Eval* eval);
+bool RunCCEval(const CC *cond, const CTransaction &tx, unsigned int nIn, std::shared_ptr<Eval> eval);
 
 /*
  * Virtual machine to use in the case of on-chain app evaluation

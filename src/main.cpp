@@ -2940,7 +2940,7 @@ bool ContextualCheckInputs( const CTransaction& tx, CValidationState &state, con
         const Consensus::Params& consensusParams, uint32_t consensusBranchId, CTxMemPool& pool,
         std::vector<CScriptCheck> *pvChecks)
 {
-    std::unique_ptr<Eval> eval(new Eval(pool));
+    std::shared_ptr<Eval> eval = std::make_shared<Eval>( pool );
     if (!tx.IsMint())
     {
         if (!Consensus::CheckTxInputs(tx, state, inputs, GetSpendHeight(inputs), consensusParams)) {
@@ -2968,7 +2968,7 @@ bool ContextualCheckInputs( const CTransaction& tx, CValidationState &state, con
                 assert(coins);
 
                 // Verify signature
-                CScriptCheck check(*coins, tx, i, flags, cacheStore, consensusBranchId, &txdata, eval.get());
+                CScriptCheck check(*coins, tx, i, flags, cacheStore, consensusBranchId, &txdata, eval);
                 if (pvChecks) 
                 {
                     pvChecks->push_back(CScriptCheck());
@@ -2986,7 +2986,7 @@ bool ContextualCheckInputs( const CTransaction& tx, CValidationState &state, con
                         // non-upgraded nodes.
                         CScriptCheck check2(*coins, tx, i,
                                 flags & ~STANDARD_NOT_MANDATORY_VERIFY_FLAGS, cacheStore, 
-                                consensusBranchId, &txdata, eval.get());
+                                consensusBranchId, &txdata, eval);
                         if (check2())
                             return state.Invalid(false, REJECT_NONSTANDARD, 
                                     strprintf("non-mandatory-script-verify-flag (%s)", 
@@ -3010,8 +3010,8 @@ bool ContextualCheckInputs( const CTransaction& tx, CValidationState &state, con
     if (tx.IsCoinImport() || tx.IsPegsImport())
     {
         LOCK(cs_main);
-        std::unique_ptr<Eval> eval( new Eval(pool) );
-        ServerTransactionSignatureChecker checker(&tx, 0, 0, false, eval.get(), txdata);
+        std::shared_ptr<Eval> eval = std::make_shared<Eval>( pool );
+        ServerTransactionSignatureChecker checker(&tx, 0, 0, false, eval, txdata);
         return VerifyCoinImport(tx.vin[0].scriptSig, checker, state);
     }
 
