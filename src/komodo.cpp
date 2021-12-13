@@ -596,13 +596,22 @@ int32_t komodo_notarycmp(uint8_t *scriptPubKey,int32_t scriptlen,uint8_t pubkeys
     return(-1);
 }
 
+static int32_t hwmheight;
+
+/****
+ * @note should only be used for unit tests
+ */
+void adjust_hwmheight(int32_t in)
+{
+    hwmheight = in;
+}
+
 // int32_t (!!!)
 /*
     read blackjok3rtt comments in main.cpp 
 */
 int32_t komodo_connectblock(bool fJustCheck, CBlockIndex *pindex,CBlock& block)
 {
-    static int32_t hwmheight;
     int32_t staked_era; static int32_t lastStakedEra;
     std::vector<int32_t> notarisations;
     uint64_t signedmask,voutmask; char symbol[KOMODO_ASSETCHAIN_MAXLEN],dest[KOMODO_ASSETCHAIN_MAXLEN]; struct komodo_state *sp;
