@@ -579,10 +579,11 @@ template <class Helper> int64_t LifetimeHeirContractFunds(CCcontract_info* cp, u
             CScript heirScript = (heirtx.vout.size() > 0) ? heirtx.vout[heirtx.vout.size() - 1].scriptPubKey : CScript();   // check boundary
             uint8_t funcId = DecodeHeirEitherOpRet(heirScript, tokenid, fundingTxidInOpret, hasHeirSpendingBegunDummy, false);
             
+            CCTokens tokenContract;
             if (funcId != 0 &&
                 (txid == fundingtxid || fundingTxidInOpret == fundingtxid) &&
                 isMyFuncId(funcId) && !isSpendingTx(funcId) &&
-                (typeid(Helper) != typeid(TokenHelper) || (cp->evalcode == EVAL_TOKENS && dynamic_cast<CCTokens*>(cp)->IsTokensvout(true, true, nullptr, heirtx, ivout, tokenid) > 0)) &&
+                (typeid(Helper) != typeid(TokenHelper) || (tokenContract.IsTokensvout(true, true, nullptr, heirtx, ivout, tokenid) > 0)) &&
                 !myIsutxo_spentinmempool(ignoretxid,ignorevin,txid, ivout)) // exclude tx in mempool
             {
                 total += it->second; // dont do this: tx.vout[ivout].nValue; // in vin[0] always is the pay to 1of2 addr (funding or change)
@@ -1064,18 +1065,14 @@ UniValue HeirInfo(uint256 fundingtxid)
         if (latestFundingTxid != zeroid) {
             int32_t numblocks;
             uint64_t durationSec = 0;
-            
-            //std::cerr << "HeirInfo() latesttxid=" << latestFundingTxid.GetHex() << '\n';
-            
             std::ostringstream stream;
             std::string msg;
-            
-			//sleep(10);
 
             result.push_back(Pair("fundingtxid", fundingtxid.GetHex()));
             result.push_back(Pair("name", heirName.c_str()));
             
-            if (tokenid != zeroid) {	// tokens
+            if (tokenid != zeroid) 
+            {	// tokens
                 stream << tokenid.GetHex();
                 msg = "tokenid";
                 result.push_back(Pair(msg, stream.str().c_str()));

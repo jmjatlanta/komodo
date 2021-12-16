@@ -77,6 +77,14 @@ TEST(TestHeir, TestHeirCoin)
     EXPECT_GT(fundResult.get_str().size(), 63);
     chain.generateBlock();
 
+    // get heirinfo
+    {
+        UniValue send(UniValue::VARR);
+        send.push_back( fundResult );
+        UniValue infoResult = heirinfo(send, false, notary->GetPubKey());
+        std::cout << "HeirInfo:\n" << to_string(infoResult) << "\n";
+    }
+
     // Alice tries to get the funds immediately (this should fail)
     alice->SetAsMain();
     UniValue claimHeir(UniValue::VARR);
@@ -146,6 +154,14 @@ TEST(TestHeir, TestHeirToken)
         fundResult = sendrawtransaction(send, false, notary->GetPubKey() );
         EXPECT_GT(fundResult.get_str().size(), 63);
         chain.generateBlock();
+    }
+
+    // get heirinfo
+    {
+        UniValue send(UniValue::VARR);
+        send.push_back( fundResult );
+        UniValue infoResult = heirinfo(send, false, notary->GetPubKey());
+        std::cout << "HeirInfo:\n" << to_string(infoResult) << "\n";
     }
 
     // Alice tries to get the funds immediately (this should fail)
