@@ -26,6 +26,8 @@ std::string notaryPubkey = "0205a8ad0c1dbc515f149af377981aab58b836af008d4d7ab21b
 std::string notarySecret = "UxFWWxsf1d7w7K5TvAWSkeX4H95XQKwdwGv49DXwWUTzPTTjHBbU";
 CKey notaryKey;
 
+extern CWallet* pwalletMain;
+extern uint8_t NOTARY_PUBKEY33[33];
 
 /*
  * We need to have control of clock,
@@ -164,7 +166,8 @@ CTransaction getInputTx(CScript scriptPubKey)
 
 TestChain::TestChain()
 {
-    extern uint8_t NOTARY_PUBKEY33[33];
+    extern Eval* EVAL_TEST;
+    EVAL_TEST = nullptr;
     previousNetwork = Params().NetworkIDString();
     dataDir = GetTempPath() / strprintf("test_komodo_%li_%i", GetTime(), GetRand(100000));
     if (ASSETCHAINS_SYMBOL[0])
@@ -241,14 +244,14 @@ CValidationState TestChain::acceptTx(const CTransaction& tx)
 
 std::shared_ptr<TestWallet> TestChain::AddWallet(const CKey& in)
 {
-    std::shared_ptr<TestWallet> retVal = std::make_shared<TestWallet>(this, in);
+    std::shared_ptr<TestWallet> retVal = std::make_shared<TestWallet>(this, in, "notary");
     toBeNotified.push_back(retVal);
     return retVal;
 }
 
-std::shared_ptr<TestWallet> TestChain::AddWallet()
+std::shared_ptr<TestWallet> TestChain::AddWallet(const std::string& fileName)
 {
-    std::shared_ptr<TestWallet> retVal = std::make_shared<TestWallet>(this);
+    std::shared_ptr<TestWallet> retVal = std::make_shared<TestWallet>(this, fileName);
     toBeNotified.push_back(retVal);
     return retVal;
 }
@@ -260,15 +263,32 @@ std::shared_ptr<TestWallet> TestChain::AddWallet()
  * - Blocks containing vOuts that apply are added to the front of a vector
  */
 
-TestWallet::TestWallet(TestChain* chain) : chain(chain)
+TestWallet::TestWallet(TestChain* chain, const std::string& fileName) : CWallet(fileName), chain(chain)
 {
     key.MakeNewKey(true);
+    bool firstRun;
+    this->LoadWallet(firstRun);
+    bool result = AddKeyPubKey(key, key.GetPubKey());
+    if (!result)
+        std::cerr << "Unable to add key to test wallet\n";
     destScript = GetScriptForDestination(key.GetPubKey());
+    RegisterValidationInterface(this);
 }
 
-TestWallet::TestWallet(TestChain* chain, const CKey& in) : chain(chain), key(in)
+TestWallet::TestWallet(TestChain* chain, const CKey& in, const std::string& fileName) 
+        : CWallet(fileName), chain(chain), key(in)
 {
+    bool firstRun;
+    this->LoadWallet(firstRun);
+    if (!AddKeyPubKey(in, in.GetPubKey()))
+        std::cerr << "Unable to add key to test wallet\n";
     destScript = GetScriptForDestination(key.GetPubKey());
+    RegisterValidationInterface(this);
+}
+
+TestWallet::~TestWallet()
+{
+    UnregisterValidationInterface(this);
 }
 
 /***
@@ -389,4 +409,13 @@ CTransaction TestWallet::CreateSpendTransaction(std::shared_ptr<TestWallet> to, 
     tx.vin[0].scriptSig << Sign(hash, SIGHASH_ALL);
 
     return CTransaction(tx);
+}
+
+bool TestWallet::SetAsMain()
+{
+    pwalletMain = this;
+    CPubKey pubKey = key.GetPubKey();
+    for(uint8_t i = 0; i < 33; ++i)
+        NOTARY_PUBKEY33[i] = pubKey[i];
+    return true;
 }

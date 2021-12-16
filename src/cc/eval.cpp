@@ -31,7 +31,8 @@
 bool CClib_Dispatch(const CC *cond,Eval *eval,std::vector<uint8_t> paramsNull,const CTransaction &txTo,unsigned int nIn);
 char *CClib_name();
 
-Eval* EVAL_TEST = 0;
+Eval* EVAL_TEST = nullptr;
+
 std::shared_ptr<CCcontract_info> CCinfos[0x100]; // holds CCcontract_infos for evalcodes between EVAL_FIRSTUSER and EVAL_LASTUSER
 extern pthread_mutex_t KOMODO_CC_mutex;
 

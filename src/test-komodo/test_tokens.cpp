@@ -10,6 +10,35 @@ extern CWallet *pwalletMain;
 namespace TestTokens
 {
 
+std::string to_string(const UniValue& in)
+{
+    std::stringstream ss;
+    if (in.isObject())
+    {
+        auto keys = in.getKeys();
+        auto values = in.getValues();
+        for(uint32_t i = 0; i < in.size(); ++i)
+        {
+            auto key = keys[i];
+            auto value = values[i];
+            ss << "Key: " << key << " Value: " << to_string(value) << "\n";
+        }
+    }
+    if (in.isStr())
+        ss << in.get_str();
+    if (in.isNum())
+        ss << std::to_string(in.get_real());
+    return ss.str();
+}
+
+std::string to_string(const CPubKey& in)
+{
+    std::stringstream pubkeystream;
+    std::for_each(in.begin(), in.end(), [&pubkeystream](const unsigned char c){ pubkeystream << std::hex << std::setw(2) << std::setfill('0') << (int)c; });
+    return pubkeystream.str();
+}
+
+
 TEST(TestTokens, TestMakeCC1vout)
 {
     // Test equality of a CTxOut
@@ -37,7 +66,7 @@ TEST(TestTokens, TestMakeCC1vout)
     pwalletMain = notaryWallet.get();
     // make some wallets
     std::shared_ptr<TestWallet> notary = chain.AddWallet(chain.getNotaryKey());
-    std::shared_ptr<TestWallet> alice = chain.AddWallet();
+    std::shared_ptr<TestWallet> alice = chain.AddWallet("alice");
     chain.generateBlock();
     notary->Transfer(alice, 100000);
     chain.generateBlock();
@@ -60,6 +89,52 @@ TEST(TestTokens, TestMakeCC1vout)
                 std::vector<unsigned char>());
     }
     EXPECT_EQ(result1, result2);
+}
+
+TEST(TestTokens, CreateToken)
+{
+    ASSETCHAINS_CC = 1;
+    mapArgs["-addressindex"] = "1";
+    mapArgs["-spentindex"] = "1";
+    TestChain chain;
+    // make some test wallets
+    std::shared_ptr<TestWallet> alice = chain.AddWallet("alice");
+    std::shared_ptr<TestWallet> notary = chain.AddWallet(chain.getNotaryKey());
+    notary->SetAsMain();
+    chain.generateBlock();
+    notary->Transfer(alice, 100000);
+    chain.generateBlock();
+
+    // create token
+    UniValue createTokenResult;
+    {
+        UniValue createToken(UniValue::VARR);
+        createToken.push_back( UniValue(UniValue::VSTR, "TESTTOKEN"));
+        createToken.push_back( UniValue(UniValue::VSTR, "100000"));
+        createTokenResult = tokencreate(createToken, false, notary->GetPubKey());
+        EXPECT_EQ(createTokenResult["result"].get_str(), "success");
+        UniValue send(UniValue::VARR);
+        send.push_back( createTokenResult["hex"] );
+        createTokenResult = sendrawtransaction(send, false, notary->GetPubKey());
+        EXPECT_GT(createTokenResult.get_str().size(), 63);
+        std::cout << "createToken txid: " << to_string(createTokenResult) << "\n";
+        chain.generateBlock();
+    }
+
+    // transfer some tokens to Alice
+    {
+        UniValue transfer(UniValue::VARR);
+        transfer.push_back( createTokenResult );
+        transfer.push_back( UniValue(UniValue::VSTR, to_string(alice->GetPubKey())));
+        transfer.push_back( UniValue(UniValue::VSTR, "100000") );
+        UniValue transferResult = tokentransfer(transfer, false, notary->GetPubKey());
+        EXPECT_EQ(transferResult["result"].get_str(), "success");
+        UniValue send(UniValue::VARR);
+        send.push_back( transferResult["hex"] );
+        transferResult = sendrawtransaction(send, false, notary->GetPubKey() );
+        EXPECT_GT( transferResult.get_str().size(), 63 );
+    }
+
 }
 
 } // namespace TestTokens

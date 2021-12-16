@@ -529,10 +529,12 @@ template <class Helper> int64_t Add1of2AddressInputs(struct CCcontract_info* cp,
             CScript heirScript = (heirtx.vout.size() > 0) ? heirtx.vout[heirtx.vout.size() - 1].scriptPubKey : CScript();   // check boundary
             uint8_t funcId = DecodeHeirEitherOpRet(heirScript, tokenid, fundingTxidInOpret, hasHeirSpendingBegunDummy, false);
             
+            CCTokens tokensContract;
+
             if ((txid == fundingtxid || fundingTxidInOpret == fundingtxid) &&
                 funcId != 0 &&
                 isMyFuncId(funcId) &&
-                (typeid(Helper) != typeid(TokenHelper) || ( cp->evalcode == EVAL_TOKENS && dynamic_cast<CCTokens*>(cp)->IsTokensvout(true, true, nullptr, heirtx, voutIndex, tokenid) > 0)) && // token validation logic
+                (typeid(Helper) != typeid(TokenHelper) || ( tokensContract.IsTokensvout(true, true, nullptr, heirtx, voutIndex, tokenid) > 0)) && // token validation logic
                 //(voutValue = IsHeirFundingVout<Helper>(cp, heirtx, voutIndex, ownerPubkey, heirPubkey)) > 0 &&		// heir contract vout validation logic - not used since we moved to 2-eval vouts
                 !myIsutxo_spentinmempool(ignoretxid,ignorevin,txid, voutIndex))
             {
@@ -671,7 +673,8 @@ template <typename Helper> UniValue _HeirFund(int64_t txfee, int64_t amount, std
 
         // add change for txfee and opreturn vouts and sign tx:
         std::string rawhextx = FinalizeCCTx(0, cp.get(), mtx, myPubkey, txfee,
-                                            Helper::makeCreateOpRet(tokenid, voutTokenPubkeys, myPubkey, heirPubkey, inactivityTimeSec, heirName, memo));
+                Helper::makeCreateOpRet(tokenid, voutTokenPubkeys, myPubkey, heirPubkey, inactivityTimeSec, 
+                heirName, memo));
         if (!rawhextx.empty()) {
             result.push_back(Pair("result", "success"));
             result.push_back(Pair("hex", rawhextx));
@@ -887,7 +890,6 @@ template <typename Helper>UniValue _HeirClaim(uint256 fundingtxid, int64_t txfee
     }
     
     // spending is allowed if there is already spending tx or inactivity time
-    //bool isAllowedToHeir = (funcId == 'C' || durationSec > inactivityTimeSec) ? true : false;
     bool isAllowedToHeir = (hasHeirSpendingBegun || durationSec > inactivityTimeSec) ? true : false;
     myPubkey = pubkey2pk(Mypubkey());
     
@@ -898,14 +900,6 @@ template <typename Helper>UniValue _HeirClaim(uint256 fundingtxid, int64_t txfee
         return result;
     }
     
-    // we do not use markers any more:
-    // we allow owner to spend funds at any time:
-    // if it is the owner, check if spending already allowed to heir
-    /* if (myPubkey == ownerPubkey && isAllowedToHeir) {
-     result.push_back(Pair("result", "spending is not already allowed for the owner"));
-     return result;
-     }	*/
-    
     // add spending txfee from the calling user
     if (AddNormalinputs(mtx, myPubkey, txfee, 3) > 0) 
     {
@@ -913,14 +907,6 @@ template <typename Helper>UniValue _HeirClaim(uint256 fundingtxid, int64_t txfee
         // add spending from cc 1of2 address
         if ((inputs = Add1of2AddressInputs<Helper>(&C, fundingtxid, mtx, ownerPubkey, heirPubkey, amount, 60)) >= amount) // TODO: why only 60 inputs?
         {
-            /*if (inputs < amount) {
-             std::cerr << "HeirClaim() cant find enough HeirCC 1of2 inputs, found=" << inputs << " required=" << amount << std::endl;
-             result.push_back(Pair("result", "error"));
-             result.push_back(Pair("error", "can't find heir CC funding"));
-             
-             return result;
-             }*/
-            
             // add vout with amount to claiming address
             mtx.vout.push_back(Helper::makeUserVout(amount, myPubkey));  // vout[0]
             
@@ -934,13 +920,6 @@ template <typename Helper>UniValue _HeirClaim(uint256 fundingtxid, int64_t txfee
             if (change != 0) {											   // vout[1]
                 mtx.vout.push_back(Helper::make1of2Vout(change, ownerPubkey, heirPubkey)); // using always pubkeys from OP_RETURN in order to not mixing them up!
             }
-            
-            // add marker vout:
-            /*char markeraddr[64];
-             CPubKey markerpubkey = CCtxidaddr(markeraddr, fundingtxid);
-             // NOTE: amount = 0 is not working: causes error code: -26, error message : 64 : dust
-             mtx.vout.push_back(CTxOut(txfee, CScript() << ParseHex(HexStr(markerpubkey)) << OP_CHECKSIG)); // txfee 1, txfee 2 - for miners
-             std::cerr << "HeirClaim() adding markeraddr=" << markeraddr << '\n'; */
             
             // get address of 1of2 cond
             char coinaddr[64];
@@ -973,17 +952,20 @@ template <typename Helper>UniValue _HeirClaim(uint256 fundingtxid, int64_t txfee
                 result.push_back(Pair("error", "sign error"));
             }
             
-        } else {
+        } 
+        else 
+        {
             fprintf(stderr, "HeirClaim() cant find Heir CC inputs\n");
             result.push_back(Pair("result", "error"));
             result.push_back(Pair("error", "can't find heir CC funding"));
         }
-    } else {
+    } 
+    else 
+    {
         fprintf(stderr, "HeirClaim() cant find sufficient user inputs for tx fee\n");
         result.push_back(Pair("result", "error"));
         result.push_back(Pair("error", "can't find sufficient user inputs to pay transaction fee"));
     }
-    
     
     return result;
 }

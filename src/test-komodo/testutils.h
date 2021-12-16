@@ -1,6 +1,7 @@
 #pragma once
 
 #include "main.h"
+#include "wallet/wallet.h"
 
 #define VCH(a,b) std::vector<unsigned char>(a, a + b)
 
@@ -89,7 +90,7 @@ public:
      * Create a wallet
      * @returns the wallet
      */
-    std::shared_ptr<TestWallet> AddWallet();
+    std::shared_ptr<TestWallet> AddWallet(const std::string& fileName);
 private:
     std::vector<std::shared_ptr<TestWallet>> toBeNotified;
     boost::filesystem::path dataDir;
@@ -101,11 +102,12 @@ private:
  * - It does not keep track of spent transactions
  * - Blocks containing vOuts that apply are added to the front of a vector
  */
-class TestWallet
+class TestWallet : public CWallet
 {
 public:
-    TestWallet(TestChain* chain);
-    TestWallet(TestChain* chain, const CKey& in);
+    TestWallet(TestChain* chain, const std::string& fileName);
+    TestWallet(TestChain* chain, const CKey& in, const std::string& fileName);
+    ~TestWallet();
     /***
      * @returns the public key
      */
@@ -160,6 +162,7 @@ public:
      * @returns the results
      */
     CValidationState Transfer(std::shared_ptr<TestWallet> to, CAmount amount, CAmount fee = 0);
+    bool SetAsMain();
 private:
     TestChain *chain;
     CKey key;

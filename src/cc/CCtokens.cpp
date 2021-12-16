@@ -82,7 +82,8 @@ bool CCTokens::validate(Eval* eval, const CTransaction &tx, uint32_t nIn)
 	{
         if (tokenid == zeroid)
             return eval->Invalid("illegal tokenid");
-		else if (AmountsExact(true, inputs, outputs, eval, tx, tokenid)) {
+		else if (!AmountsExact(true, inputs, outputs, eval, tx, tokenid)) 
+        {
 			if (!eval->Valid())
 				return false;  //TokenExactAmounts must call eval->Invalid()!
 			else
@@ -536,11 +537,11 @@ bool CCTokens::AmountsExact(bool goDeeper, int64_t &inputs, int64_t &outputs,
 
 	for (int32_t i = 0; i<numvins; i++)
 	{												  // check for additional contracts which may send tokens to the Tokens contract
-		if (ismyvin(tx.vin[i].scriptSig) /*|| IsVinAllowed(tx.vin[i].scriptSig) != 0*/)
+		if (ismyvin(tx.vin[i].scriptSig))
 		{
-			//std::cerr << indentStr << "Tokens::AmountsExact() eval is true=" << (eval != NULL) << " ismyvin=ok for_i=" << i << std::endl;
 			// we are not inside the validation code -- dimxy
-			if ((eval && eval->GetTxUnconfirmed(tx.vin[i].prevout.hash, vinTx, hashBlock) == 0) || (!eval && !myGetTransaction(tx.vin[i].prevout.hash, vinTx, hashBlock)))
+			if ((eval && !eval->GetTxUnconfirmed(tx.vin[i].prevout.hash, vinTx, hashBlock)) 
+                    || (!eval && !myGetTransaction(tx.vin[i].prevout.hash, vinTx, hashBlock)))
 			{
                 LOGSTREAM((char *)"cctokens", CCLOG_INFO, stream << indentStr << "Tokens::AmountsExact() cannot read vintx for i." << i << " numvins." << numvins << std::endl);
 				return (!eval) ? false : eval->Invalid("always should find vin tx, but didnt");
@@ -578,16 +579,12 @@ bool CCTokens::AmountsExact(bool goDeeper, int64_t &inputs, int64_t &outputs,
 		}
 	}
 
-	//std::cerr << indentStr << "Tokens::AmountsExact() inputs=" << inputs << " outputs=" << outputs << " for txid=" << tx.GetHash().GetHex() << std::endl;
-
 	if (inputs != outputs) {
 		if (tx.GetHash() != reftokenid)
             LOGSTREAM((char *)"cctokens", CCLOG_DEBUG1, stream << indentStr << "TokenExactAmounts() found unequal token cc inputs=" << inputs << " vs cc outputs=" << outputs << " for txid=" << tx.GetHash().GetHex() << " and this is not the create tx" << std::endl);
-        //fprintf(stderr,"inputs %llu vs outputs %llu\n",(long long)inputs,(long long)outputs);
 		return false;  // do not call eval->Invalid() here!
 	}
-	else
-		return true;
+	return true;
 }
 
 
