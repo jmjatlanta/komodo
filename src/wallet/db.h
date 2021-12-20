@@ -47,68 +47,119 @@
 
 extern unsigned int nWalletDBUpdated;
 
+/****
+ * A class to handle the wallet DB environment
+ * 
+ * This can handle multiple files at the same time, and uses reference counting to
+ * keep track of which are currently in use.
+ */
 class CDBEnv
 {
 private:
-    bool fDbEnvInit;
-    bool fMockDb;
+    bool fDbEnvInit; // true if we have been initialized
+    bool fMockDb; // true if this should be a mock version
+
     // Don't change into boost::filesystem::path, as that can result in
     // shutdown problems/crashes caused by a static initialized internal pointer.
     std::string strPath;
 
+    /***
+     * @brief handles shutdown, used on calls to Close() or dtor
+     */
     void EnvShutdown();
 
 public:
     mutable CCriticalSection cs_db;
-    DbEnv *dbenv;
-    std::map<std::string, int> mapFileUseCount;
-    std::map<std::string, Db*> mapDb;
+    DbEnv *dbenv; // c++ wrapper around berkley db functions
+    std::map<std::string, int> mapFileUseCount; // current number of users that have a certain file "open"
+    std::map<std::string, Db*> mapDb; // map of files and their pointer
 
     CDBEnv();
     ~CDBEnv();
+
+    /**
+     * @brief reset the internal pointers
+     */
     void Reset();
 
+    /****
+     * @brief Makes a "mock" version of the database
+     */
     void MakeMock();
     bool IsMock() { return fMockDb; }
 
-    /**
-     * Verify that database file strFile is OK. If it is not,
-     * call the callback to try to recover.
-     * This must be called BEFORE strFile is opened.
-     * Returns true if strFile is OK.
-     */
     enum VerifyResult { VERIFY_OK,
                         RECOVER_OK,
                         RECOVER_FAIL };
-    VerifyResult Verify(const std::string& strFile, bool (*recoverFunc)(CDBEnv& dbenv, const std::string& strFile));
     /**
-     * Salvage data from a file that Verify says is bad.
-     * fAggressive sets the DB_AGGRESSIVE flag (see berkeley DB->verify() method documentation).
-     * Appends binary key/value pairs to vResult, returns true if successful.
-     * NOTE: reads the entire database into memory, so cannot be used
-     * for huge databases.
+     * @brief Verify that database file is OK. 
+     * @param strFile the file to check
+     * @param recoverFunc the callback function to use to attempt recovery
+     * @returns whether the file is okay, was recovered, or unrecoverable
      */
+    VerifyResult Verify(const std::string& strFile, 
+            bool (*recoverFunc)(CDBEnv& dbenv, const std::string& strFile));
+
     typedef std::pair<std::vector<unsigned char>, std::vector<unsigned char> > KeyValPair;
+
+    /**
+     * @brief Salvage data from a file that Verify says is bad.
+     * @note this reads the entire file into memory. This cannot be used for huge databases
+     * @param strFile the file to check
+     * @param fAggressive sets the DB_AGGRESSIVE flag (see berkeley DB->verify() method documentation).
+     * @param vResult the key/value pairs that were recovered
+     * @returns true if successful
+     */
     bool Salvage(const std::string& strFile, bool fAggressive, std::vector<KeyValPair>& vResult);
 
+    /****
+     * @param path the file to open
+     * @returns true on success
+     */
     bool Open(const boost::filesystem::path& path);
+
+    /*****
+     * @brief close all files
+     */
     void Close();
+
+    /*****
+     * @brief flush all writes
+     * @param fShutdown true if the reason is we are shutting down
+     */
     void Flush(bool fShutdown);
+
+    /****
+     * @brief Reset lsn
+     * @note this should be done before copying or moving the file
+     * @param strFile the file that should have its checkpoint reset
+     */
     void CheckpointLSN(const std::string& strFile);
 
+    /****
+     * @param strFile the file to close
+     */
     void CloseDb(const std::string& strFile);
+
+    /****
+     * @param strFile the file to remove
+     * @returns true on success
+     */
     bool RemoveDb(const std::string& strFile);
 
     DbTxn* TxnBegin(int flags = DB_TXN_WRITE_NOSYNC)
     {
-        DbTxn* ptxn = NULL;
+        DbTxn* ptxn = nullptr;
         int ret = dbenv->txn_begin(NULL, &ptxn, flags);
         if (!ptxn || ret != 0)
-            return NULL;
+            return nullptr;
         return ptxn;
     }
 };
 
+/****
+ * A global defined in db.cpp. This should probably not be a global
+ */
 extern CDBEnv bitdb;
 
 

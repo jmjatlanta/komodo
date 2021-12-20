@@ -230,7 +230,6 @@ bool CDBEnv::Salvage(const std::string& strFile, bool fAggressive, std::vector<C
     return (result == 0);
 }
 
-
 void CDBEnv::CheckpointLSN(const std::string& strFile)
 {
     dbenv->txn_checkpoint(0, 0, 0);
@@ -239,6 +238,28 @@ void CDBEnv::CheckpointLSN(const std::string& strFile)
     dbenv->lsn_reset(strFile.c_str(), 0);
 }
 
+void CDBEnv::CloseDb(const string& strFile)
+{
+    {
+        LOCK(cs_db);
+        if (mapDb[strFile] != nullptr) {
+            // Close the database handle
+            Db* pdb = mapDb[strFile];
+            pdb->close(0);
+            delete pdb;
+            mapDb[strFile] = nullptr;
+        }
+    }
+}
+
+bool CDBEnv::RemoveDb(const string& strFile)
+{
+    this->CloseDb(strFile);
+
+    LOCK(cs_db);
+    int rc = dbenv->dbremove(NULL, strFile.c_str(), NULL, DB_AUTO_COMMIT);
+    return (rc == 0);
+}
 
 CDB::CDB(const std::string& strFilename, const char* pszMode, bool fFlushOnCloseIn) : pdb(NULL), activeTxn(NULL)
 {
@@ -314,12 +335,14 @@ void CDB::Flush()
 
 void CDB::Close()
 {
-    if (!pdb)
+    if (pdb == nullptr)
         return;
+
     if (activeTxn)
         activeTxn->abort();
-    activeTxn = NULL;
-    pdb = NULL;
+
+    activeTxn = nullptr;
+    pdb = nullptr;
 
     if (fFlushOnClose)
         Flush();
@@ -328,29 +351,6 @@ void CDB::Close()
         LOCK(bitdb.cs_db);
         --bitdb.mapFileUseCount[strFile];
     }
-}
-
-void CDBEnv::CloseDb(const string& strFile)
-{
-    {
-        LOCK(cs_db);
-        if (mapDb[strFile] != NULL) {
-            // Close the database handle
-            Db* pdb = mapDb[strFile];
-            pdb->close(0);
-            delete pdb;
-            mapDb[strFile] = NULL;
-        }
-    }
-}
-
-bool CDBEnv::RemoveDb(const string& strFile)
-{
-    this->CloseDb(strFile);
-
-    LOCK(cs_db);
-    int rc = dbenv->dbremove(NULL, strFile.c_str(), NULL, DB_AUTO_COMMIT);
-    return (rc == 0);
 }
 
 bool CDB::Rewrite(const string& strFile, const char* pszSkip)
