@@ -140,10 +140,11 @@ public:
  */
 class CTxMemPool
 {
+protected:
+    CBlockPolicyEstimator* minerPolicyEstimator;
 private:
     uint32_t nCheckFrequency; //! Value n means that n times in 2^32 we check.
     unsigned int nTransactionsUpdated;
-    CBlockPolicyEstimator* minerPolicyEstimator;
 
     uint64_t totalTxSize = 0; //! sum of all mempool tx' byte sizes
     uint64_t cachedInnerUsage; //! sum of dynamic memory usage of all the map elements (NOT the maps themselves)
