@@ -20,6 +20,7 @@ public:
     ~TempFile() { unlink(filename.c_str()); }
     FILE* pointer() { return filePtr; }
     bool is_open() { return filePtr != nullptr; }
+    bool rewind(size_t offset) { if (!is_open()) return false; fseek(filePtr, offset, 0); return true; }
 private:
     const std::string filename;
     FILE* filePtr;
@@ -27,55 +28,101 @@ private:
 
 TEST(TestMempool, FeeEstimateReadWrite)
 {
+    /****
+     * CLIENT_VERSION went down instead of up, causing
+     * problems reading the mempool file
+     */
+    class OldTxMempool : public CTxMemPool
+    {
+        public:
+        OldTxMempool( const CFeeRate& in ) : CTxMemPool(in) {};
+        bool WriteFeeEstimates(CAutoFile& fileout) const 
+        {
+            try {
+                LOCK(cs);
+                fileout << 109900; // version required to read: 0.10.99 or later
+                fileout << 109900; // version that wrote the file
+                minerPolicyEstimator->Write(fileout);
+            }
+            catch (const std::exception&) {
+                LogPrintf("CTxMemPool::WriteFeeEstimates(): unable to write policy estimator data (non-fatal)\n");
+                return false;
+            }
+            return true;
+        }
+        bool ReadFeeEstimates(CAutoFile& filein) const
+        {
+            try {
+                int nVersionRequired, nVersionThatWrote;
+                filein >> nVersionRequired >> nVersionThatWrote;
+                if (nVersionRequired > 109900)
+                    return error("CTxMemPool::ReadFeeEstimates(): up-version (%d) fee estimate file", nVersionRequired);
+
+                LOCK(cs);
+                minerPolicyEstimator->Read(filein);
+            }
+            catch (const std::exception&) {
+                LogPrintf("CTxMemPool::ReadFeeEstimates(): unable to read policy estimator data (non-fatal)\n");
+                return false;
+            }
+            return true;
+        }
+    };
+    class NewTxMempool : public CTxMemPool
+    {
+        public:
+        NewTxMempool( const CFeeRate& in ) : CTxMemPool(in) {};
+        bool WriteFeeEstimates(CAutoFile& fileout) const 
+        {
+            try {
+                LOCK(cs);
+                fileout << 70100; // version required to read: 0.10.99 or later
+                fileout << 70100; // version that wrote the file
+                minerPolicyEstimator->Write(fileout);
+            }
+            catch (const std::exception&) {
+                LogPrintf("CTxMemPool::WriteFeeEstimates(): unable to write policy estimator data (non-fatal)\n");
+                return false;
+            }
+            return true;
+        }
+    };
+
     int type = 1;
     int version = 2;
-    // typical case
+    // the way it used to work
     {
-        CTxMemPool pool{CFeeRate(100)};
+        OldTxMempool pool{CFeeRate(100)};
         // create temp file
         TempFile tempFile("test.tmp");
         EXPECT_TRUE(tempFile.is_open());
         CAutoFile autoFile(tempFile.pointer(), type, version);
 
         EXPECT_TRUE(pool.WriteFeeEstimates(autoFile));
-        fseek(tempFile.pointer(), 0, 0);
+        tempFile.rewind(0);
         EXPECT_TRUE(pool.ReadFeeEstimates(autoFile));
     }
-    // read an "older" mempool file. Note that CLIENT_VERSION used to be numerically
-    // higher (109900) but is now 70100
+    // Now older files cannot be read due to "newer" CLIENT_VERSION (although a lower number)
     {
-        class OldTxMempool : public CTxMemPool
-        {
-            public:
-            OldTxMempool( const CFeeRate& in ) : CTxMemPool(in) {};
-            bool WriteFeeEstimates(CAutoFile& fileout) const 
-            {
-                try {
-                    LOCK(cs);
-                    fileout << 109900; // version required to read: 0.10.99 or later
-                    fileout << 109900; // version that wrote the file
-                    minerPolicyEstimator->Write(fileout);
-                }
-                catch (const std::exception&) {
-                    LogPrintf("CTxMemPool::WriteFeeEstimates(): unable to write policy estimator data (non-fatal)\n");
-                    return false;
-                }
-                return true;
-            }
-        };
         TempFile tempFile("test.tmp");
         CAutoFile autoFile(tempFile.pointer(), type, version);
         EXPECT_TRUE(tempFile.is_open());
         {
-            OldTxMempool oldPool{CFeeRate(100)};
-            EXPECT_TRUE(oldPool.WriteFeeEstimates(autoFile));
+            OldTxMempool pool{CFeeRate(100)};
+            EXPECT_TRUE(pool.WriteFeeEstimates(autoFile));
         }
-        // move file back to beginning
-        fseek(tempFile.pointer(), 0, 0);
-        CTxMemPool newPool{CFeeRate(100)};
-        EXPECT_TRUE(newPool.ReadFeeEstimates(autoFile));
+        tempFile.rewind(0);
+        {
+            NewTxMempool pool{CFeeRate(100)};
+            EXPECT_FALSE(pool.ReadFeeEstimates(autoFile));
+            // write with the new code
+            tempFile.rewind(0);
+            EXPECT_TRUE(pool.WriteFeeEstimates(autoFile));
+            // subsequent reads are okay
+            tempFile.rewind(0);
+            EXPECT_TRUE(pool.ReadFeeEstimates(autoFile));
+        }
     }
-
 }
 
 } // namespace TestMempool
