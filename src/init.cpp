@@ -36,6 +36,7 @@
 #include "key.h"
 #include "notarisationdb.h"
 #include "komodo_notary.h"
+#include "util/system.h"
 
 #ifdef ENABLE_MINING
 #include "key_io.h"
@@ -213,7 +214,7 @@ void Interrupt(boost::thread_group& threadGroup)
 void Shutdown()
 {
     LogPrintf("%s: In progress...\n", __func__);
-    static CCriticalSection cs_Shutdown;
+    static RecursiveMutex cs_Shutdown;
     TRY_LOCK(cs_Shutdown, lockShutdown);
     if (!lockShutdown)
         return;
@@ -352,7 +353,7 @@ bool static Bind(const CService &addr, unsigned int flags) {
 void OnRPCStopped()
 {
     cvBlockChange.notify_all();
-    LogPrint("rpc", "RPC stopped.\n");
+    LogPrint(BCLog::RPC, "RPC stopped.\n");
 }
 
 void OnRPCPreCommand(const CRPCCommand& cmd)
@@ -914,8 +915,7 @@ bool AppInitServers(boost::thread_group& threadGroup)
         return false;
     if (GetBoolArg("-rest", false) && !StartREST())
         return false;
-    if (!StartHTTPServer())
-        return false;
+    StartHTTPServer();
     return true;
 }
 

@@ -1,44 +1,25 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
-// Copyright (c) 2009-2014 The Bitcoin Core developers
+// Copyright (c) 2009-2019 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-/******************************************************************************
- * Copyright © 2014-2019 The SuperNET Developers.                             *
- *                                                                            *
- * See the AUTHORS, DEVELOPER-AGREEMENT and LICENSE files at                  *
- * the top-level directory of this distribution for the individual copyright  *
- * holder information and the developer policies on copyright and licensing.  *
- *                                                                            *
- * Unless otherwise agreed in a custom licensing agreement, no part of the    *
- * SuperNET software, including this file may be copied, modified, propagated *
- * or distributed except according to the terms contained in the LICENSE file *
- *                                                                            *
- * Removal or modification of this copyright notice is prohibited.            *
- *                                                                            *
- ******************************************************************************/
+#include <uint256.h>
 
-#include "uint256.h"
+#include <util/strencodings.h>
 
-#include "utilstrencodings.h"
-
-#include <stdio.h>
 #include <string.h>
 
 template <unsigned int BITS>
 base_blob<BITS>::base_blob(const std::vector<unsigned char>& vch)
 {
     assert(vch.size() == sizeof(data));
-    memcpy(data, &vch[0], sizeof(data));
+    memcpy(data, vch.data(), sizeof(data));
 }
 
 template <unsigned int BITS>
 std::string base_blob<BITS>::GetHex() const
 {
-    char psz[sizeof(data) * 2 + 1];
-    for (unsigned int i = 0; i < sizeof(data); i++)
-        sprintf(psz + i * 2, "%02x", data[sizeof(data) - i - 1]);
-    return std::string(psz, psz + sizeof(data) * 2);
+    return HexStr(std::reverse_iterator<const uint8_t*>(data + sizeof(data)), std::reverse_iterator<const uint8_t*>(data));
 }
 
 template <unsigned int BITS>
@@ -47,24 +28,23 @@ void base_blob<BITS>::SetHex(const char* psz)
     memset(data, 0, sizeof(data));
 
     // skip leading spaces
-    while (isspace(*psz))
+    while (IsSpace(*psz))
         psz++;
 
     // skip 0x
-    if (psz[0] == '0' && tolower(psz[1]) == 'x')
+    if (psz[0] == '0' && ToLower(psz[1]) == 'x')
         psz += 2;
 
     // hex string to uint
-    const char* pbegin = psz;
-    while (::HexDigit(*psz) != -1)
-        psz++;
-    psz--;
+    size_t digits = 0;
+    while (::HexDigit(psz[digits]) != -1)
+        digits++;
     unsigned char* p1 = (unsigned char*)data;
     unsigned char* pend = p1 + WIDTH;
-    while (psz >= pbegin && p1 < pend) {
-        *p1 = ::HexDigit(*psz--);
-        if (psz >= pbegin) {
-            *p1 |= ((unsigned char)::HexDigit(*psz--) << 4);
+    while (digits > 0 && p1 < pend) {
+        *p1 = ::HexDigit(psz[--digits]);
+        if (digits > 0) {
+            *p1 |= ((unsigned char)::HexDigit(psz[--digits]) << 4);
             p1++;
         }
     }
@@ -95,6 +75,11 @@ template std::string base_blob<256>::GetHex() const;
 template std::string base_blob<256>::ToString() const;
 template void base_blob<256>::SetHex(const char*);
 template void base_blob<256>::SetHex(const std::string&);
+
+uint256& UINT256_ONE() {
+    static uint256* one = new uint256(uint256S("0000000000000000000000000000000000000000000000000000000000000001"));
+    return *one;
+}
 
 static void inline HashMix(uint32_t& a, uint32_t& b, uint32_t& c)
 {

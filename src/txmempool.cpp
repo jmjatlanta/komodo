@@ -533,7 +533,7 @@ void CTxMemPool::removeExpired(unsigned int nBlockHeight)
     for (const CTransaction& tx : transactionsToRemove) {
         list<CTransaction> removed;
         remove(tx, removed, true);
-        LogPrint("mempool", "Removing expired txid: %s\n", tx.GetHash().ToString());
+        LogPrint(BCLog::MEMPOOL, "Removing expired txid: %s\n", tx.GetHash().ToString());
     }
 }
 
@@ -604,7 +604,7 @@ void CTxMemPool::check(const CCoinsViewCache *pcoins) const
     if (insecure_rand() >= nCheckFrequency)
         return;
 
-    LogPrint("mempool", "Checking mempool with %u transactions and %u inputs\n", (unsigned int)mapTx.size(), (unsigned int)mapNextTx.size());
+    LogPrint(BCLog::MEMPOOL, "Checking mempool with %u transactions and %u inputs\n", (unsigned int)mapTx.size(), (unsigned int)mapNextTx.size());
 
     uint64_t checkTotal = 0;
     uint64_t innerUsage = 0;

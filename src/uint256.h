@@ -1,29 +1,13 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
-// Copyright (c) 2009-2014 The Bitcoin Core developers
+// Copyright (c) 2009-2019 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
-
-/******************************************************************************
- * Copyright © 2014-2019 The SuperNET Developers.                             *
- *                                                                            *
- * See the AUTHORS, DEVELOPER-AGREEMENT and LICENSE files at                  *
- * the top-level directory of this distribution for the individual copyright  *
- * holder information and the developer policies on copyright and licensing.  *
- *                                                                            *
- * Unless otherwise agreed in a custom licensing agreement, no part of the    *
- * SuperNET software, including this file may be copied, modified, propagated *
- * or distributed except according to the terms contained in the LICENSE file *
- *                                                                            *
- * Removal or modification of this copyright notice is prohibited.            *
- *                                                                            *
- ******************************************************************************/
 
 #ifndef BITCOIN_UINT256_H
 #define BITCOIN_UINT256_H
 
 #include <assert.h>
 #include <cstring>
-#include <stdexcept>
 #include <stdint.h>
 #include <string>
 #include <vector>
@@ -33,8 +17,8 @@ template<unsigned int BITS>
 class base_blob
 {
 protected:
-    enum { WIDTH=BITS/8 };
-    alignas(uint32_t) uint8_t data[WIDTH];
+    static constexpr int WIDTH = BITS / 8;
+    uint8_t data[WIDTH];
 public:
     base_blob()
     {
@@ -56,9 +40,11 @@ public:
         memset(data, 0, sizeof(data));
     }
 
-    friend inline bool operator==(const base_blob& a, const base_blob& b) { return memcmp(a.data, b.data, sizeof(a.data)) == 0; }
-    friend inline bool operator!=(const base_blob& a, const base_blob& b) { return memcmp(a.data, b.data, sizeof(a.data)) != 0; }
-    friend inline bool operator<(const base_blob& a, const base_blob& b) { return memcmp(a.data, b.data, sizeof(a.data)) < 0; }
+    inline int Compare(const base_blob& other) const { return memcmp(data, other.data, sizeof(data)); }
+
+    friend inline bool operator==(const base_blob& a, const base_blob& b) { return a.Compare(b) == 0; }
+    friend inline bool operator!=(const base_blob& a, const base_blob& b) { return a.Compare(b) != 0; }
+    friend inline bool operator<(const base_blob& a, const base_blob& b) { return a.Compare(b) < 0; }
 
     std::string GetHex() const;
     void SetHex(const char* psz);
@@ -90,6 +76,19 @@ public:
         return sizeof(data);
     }
 
+    uint64_t GetUint64(int pos) const
+    {
+        const uint8_t* ptr = data + pos * 8;
+        return ((uint64_t)ptr[0]) | \
+               ((uint64_t)ptr[1]) << 8 | \
+               ((uint64_t)ptr[2]) << 16 | \
+               ((uint64_t)ptr[3]) << 24 | \
+               ((uint64_t)ptr[4]) << 32 | \
+               ((uint64_t)ptr[5]) << 40 | \
+               ((uint64_t)ptr[6]) << 48 | \
+               ((uint64_t)ptr[7]) << 56;
+    }
+
     template<typename Stream>
     void Serialize(Stream& s) const
     {
@@ -119,7 +118,6 @@ public:
 class uint160 : public base_blob<160> {
 public:
     uint160() {}
-    uint160(const base_blob<160>& b) : base_blob<160>(b) {}
     explicit uint160(const std::vector<unsigned char>& vch) : base_blob<160>(vch) {}
 };
 
@@ -173,5 +171,7 @@ inline uint256 uint256S(const std::string& str)
     rv.SetHex(str);
     return rv;
 }
+
+uint256& UINT256_ONE();
 
 #endif // BITCOIN_UINT256_H

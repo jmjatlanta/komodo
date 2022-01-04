@@ -516,6 +516,43 @@ public:
 template<typename I>
 CVarInt<I> WrapVarInt(I& n) { return CVarInt<I>(n); }
 
+/** Serialization wrapper class for big-endian integers.
+ *
+ * Use this wrapper around integer types that are stored in memory in native
+ * byte order, but serialized in big endian notation. This is only intended
+ * to implement serializers that are compatible with existing formats, and
+ * its use is not recommended for new data structures.
+ *
+ * Only 16-bit types are supported for now.
+ */
+template<typename I>
+class BigEndian
+{
+protected:
+    I& m_val;
+public:
+    explicit BigEndian(I& val) : m_val(val)
+    {
+        static_assert(std::is_unsigned<I>::value, "BigEndian type must be unsigned integer");
+        static_assert(sizeof(I) == 2 && std::numeric_limits<I>::min() == 0 && std::numeric_limits<I>::max() == std::numeric_limits<uint16_t>::max(), "Unsupported BigEndian size");
+    }
+
+    template<typename Stream>
+    void Serialize(Stream& s) const
+    {
+        ser_writedata16be(s, m_val);
+    }
+
+    template<typename Stream>
+    void Unserialize(Stream& s)
+    {
+        m_val = ser_readdata16be(s);
+    }
+};
+
+template<typename I>
+BigEndian<I> WrapBigEndian(I& n) { return BigEndian<I>(n); }
+
 /**
  * Forward declarations
  */

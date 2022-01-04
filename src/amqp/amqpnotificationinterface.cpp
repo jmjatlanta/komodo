@@ -78,15 +78,15 @@ AMQPNotificationInterface* AMQPNotificationInterface::CreateWithArguments(const 
 // Called at startup to conditionally set up
 bool AMQPNotificationInterface::Initialize()
 {
-    LogPrint("amqp", "amqp: Initialize notification interface\n");
+    LogPrint(BCLog::AMQP, "amqp: Initialize notification interface\n");
 
     std::list<AMQPAbstractNotifier*>::iterator i = notifiers.begin();
     for (; i != notifiers.end(); ++i) {
         AMQPAbstractNotifier *notifier = *i;
         if (notifier->Initialize()) {
-            LogPrint("amqp", "amqp: Notifier %s ready (address = %s)\n", notifier->GetType(), notifier->GetAddress());
+            LogPrint(BCLog::AMQP, "amqp: Notifier %s ready (address = %s)\n", notifier->GetType(), notifier->GetAddress());
         } else {
-            LogPrint("amqp", "amqp: Notifier %s failed (address = %s)\n", notifier->GetType(), notifier->GetAddress());
+            LogPrint(BCLog::AMQP, "amqp: Notifier %s failed (address = %s)\n", notifier->GetType(), notifier->GetAddress());
             break;
         }
     }
@@ -101,7 +101,7 @@ bool AMQPNotificationInterface::Initialize()
 // Called during shutdown sequence
 void AMQPNotificationInterface::Shutdown()
 {
-    LogPrint("amqp", "amqp: Shutdown notification interface\n");
+    LogPrint(BCLog::AMQP, "amqp: Shutdown notification interface\n");
 
     for (std::list<AMQPAbstractNotifier*>::iterator i = notifiers.begin(); i != notifiers.end(); ++i) {
         AMQPAbstractNotifier *notifier = *i;

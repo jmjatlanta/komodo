@@ -5,6 +5,7 @@
 #include "crosschain.h"
 #include "main.h"
 #include "notaries_staked.h"
+#include "util/system.h"
 
 #include <boost/foreach.hpp>
 

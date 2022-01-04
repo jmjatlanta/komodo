@@ -132,7 +132,7 @@ std::atomic<bool> fReopenDebugLog(false);
 CTranslationInterface translationInterface;
 
 /** Init OpenSSL library multithreading support */
-static CCriticalSection** ppmutexOpenSSL;
+static RecursiveMutex** ppmutexOpenSSL;
 void locking_callback(int mode, int i, const char* file, int line) NO_THREAD_SAFETY_ANALYSIS
 {
     if (mode & CRYPTO_LOCK) {
@@ -149,9 +149,9 @@ public:
     CInit()
     {
         // Init OpenSSL library multithreading support
-        ppmutexOpenSSL = (CCriticalSection**)OPENSSL_malloc(CRYPTO_num_locks() * sizeof(CCriticalSection*));
+        ppmutexOpenSSL = (RecursiveMutex**)OPENSSL_malloc(CRYPTO_num_locks() * sizeof(RecursiveMutex*));
         for (int i = 0; i < CRYPTO_num_locks(); i++)
-            ppmutexOpenSSL[i] = new CCriticalSection();
+            ppmutexOpenSSL[i] = new RecursiveMutex();
         CRYPTO_set_locking_callback(locking_callback);
 
         // OpenSSL can optionally load a config file which lists optional loadable modules and engines.
@@ -580,7 +580,7 @@ boost::filesystem::path GetDefaultDataDir()
 static boost::filesystem::path pathCached;
 static boost::filesystem::path pathCachedNetSpecific;
 static boost::filesystem::path zc_paramsPathCached;
-static CCriticalSection csPathCached;
+static RecursiveMutex csPathCached;
 
 static boost::filesystem::path ZC_GetBaseParamsDir()
 {
@@ -786,23 +786,6 @@ bool TryCreateDirectory(const boost::filesystem::path& p)
 
     // create_directory didn't create the directory, it had to have existed already
     return false;
-}
-
-void FileCommit(FILE *fileout)
-{
-    fflush(fileout); // harmless if redundantly called
-#ifdef _WIN32
-    HANDLE hFile = (HANDLE)_get_osfhandle(_fileno(fileout));
-    FlushFileBuffers(hFile);
-#else
-    #if defined(__linux__) || defined(__NetBSD__)
-    fdatasync(fileno(fileout));
-    #elif defined(__APPLE__) && defined(F_FULLFSYNC)
-    fcntl(fileno(fileout), F_FULLFSYNC, 0);
-    #else
-    fsync(fileno(fileout));
-    #endif
-#endif
 }
 
 bool TruncateFile(FILE *file, unsigned int length) {

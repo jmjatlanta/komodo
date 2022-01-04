@@ -95,7 +95,7 @@ AtomicCounter ehSolverRuns;
 AtomicCounter solutionTargetChecks;
 static AtomicCounter minedBlocks;
 AtomicTimer miningTimer;
-CCriticalSection cs_metrics;
+RecursiveMutex cs_metrics;
 
 double AtomicTimer::rate(const int64_t count)
 {

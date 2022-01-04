@@ -308,13 +308,6 @@ bool ImportGatewayValidate(struct CCcontract_info *cp,Eval *eval,const CTransact
         return eval->Invalid("no vouts");
     else
     {
-        //LogPrint("importgateway-1","check amounts\n");
-        // if ( ImportGatewayExactAmounts(cp,eval,tx,1,10000) == false )
-        // {
-        //      return eval->Invalid("invalid inputs vs. outputs!");   
-        // }
-        // else
-        // {  
             importgatewaypk = GetUnspendable(cp,0);      
             GetCCaddress(cp, importgatewayaddr, importgatewaypk);              
             if ( (funcid = DecodeImportGatewayOpRet(tx.vout[numvouts-1].scriptPubKey)) != 0)

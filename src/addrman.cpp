@@ -23,13 +23,15 @@
 #include "serialize.h"
 #include "streams.h"
 
+#include <cmath> // pow()
+
 int CAddrInfo::GetTriedBucket(const uint256& nKey, const std::vector<bool> &asmap) const
 {
     uint64_t hash1 = (CHashWriter(SER_GETHASH, 0) << nKey << GetKey()).GetHash().GetCheapHash();
     uint64_t hash2 = (CHashWriter(SER_GETHASH, 0) << nKey << GetGroup(asmap) << (hash1 % ADDRMAN_TRIED_BUCKETS_PER_GROUP)).GetHash().GetCheapHash();
     int tried_bucket = hash2 % ADDRMAN_TRIED_BUCKET_COUNT;
     uint32_t mapped_as = GetMappedAS(asmap);
-    LogPrint("net", "IP %s mapped to AS%i belongs to tried bucket %i\n", ToStringIP(), mapped_as, tried_bucket);
+    LogPrint(BCLog::NET, "IP %s mapped to AS%i belongs to tried bucket %i\n", ToStringIP(), mapped_as, tried_bucket);
     return tried_bucket;
 }
 
@@ -40,7 +42,7 @@ int CAddrInfo::GetNewBucket(const uint256& nKey, const CNetAddr& src, const std:
     uint64_t hash2 = (CHashWriter(SER_GETHASH, 0) << nKey << vchSourceGroupKey << (hash1 % ADDRMAN_NEW_BUCKETS_PER_SOURCE_GROUP)).GetHash().GetCheapHash();
     int new_bucket = hash2 % ADDRMAN_NEW_BUCKET_COUNT;
     uint32_t mapped_as = GetMappedAS(asmap);
-    LogPrint("net", "IP %s mapped to AS%i belongs to new bucket %i\n", ToStringIP(), mapped_as, new_bucket);
+    LogPrint(BCLog::NET, "IP %s mapped to AS%i belongs to new bucket %i\n", ToStringIP(), mapped_as, new_bucket);
     return new_bucket;
 }
 
@@ -257,7 +259,7 @@ void CAddrMan::Good_(const CService& addr, int64_t nTime)
     if (nUBucket == -1)
         return;
 
-    LogPrint("addrman", "Moving %s to tried\n", addr.ToString());
+    LogPrint(BCLog::ADDRMAN, "Moving %s to tried\n", addr.ToString());
 
     // move nId to the tried tables
     MakeTried(info, nId);
@@ -556,10 +558,6 @@ std::vector<bool> CAddrMan::DecodeAsmap(fs::path path)
         for (int bit = 0; bit < 8; ++bit) {
             bits.push_back((cur_byte >> bit) & 1);
         }
-    }
-    if (!SanityCheckASMap(bits)) {
-        LogPrintf("Sanity check of asmap file %s failed\n", path);
-        return {};
     }
     return bits;
 }

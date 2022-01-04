@@ -29,7 +29,7 @@ namespace libzcash {
 
 #include "zcash/circuit/gadget.tcc"
 
-static CCriticalSection cs_ParamsIO;
+static RecursiveMutex cs_ParamsIO;
 
 template<typename T>
 void saveToFile(const std::string path, T& obj) {

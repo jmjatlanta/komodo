@@ -20,6 +20,7 @@
 
 #include "alert.h"
 
+#include "util/system.h"
 #include "clientversion.h"
 #include "net.h"
 #include "pubkey.h"
@@ -39,7 +40,7 @@
 using namespace std;
 
 map<uint256, CAlert> mapAlerts;
-CCriticalSection cs_mapAlerts;
+RecursiveMutex cs_mapAlerts;
 
 void CUnsignedAlert::SetNull()
 {
@@ -222,13 +223,13 @@ bool CAlert::ProcessAlert(const std::vector<unsigned char>& alertKey, bool fThre
             const CAlert& alert = (*mi).second;
             if (Cancels(alert))
             {
-                LogPrint("alert", "cancelling alert %d\n", alert.nID);
+                LogPrint(BCLog::ALERT, "cancelling alert %d\n", alert.nID);
                 uiInterface.NotifyAlertChanged((*mi).first, CT_DELETED);
                 mapAlerts.erase(mi++);
             }
             else if (!alert.IsInEffect())
             {
-                LogPrint("alert", "expiring alert %d\n", alert.nID);
+                LogPrint(BCLog::ALERT, "expiring alert %d\n", alert.nID);
                 uiInterface.NotifyAlertChanged((*mi).first, CT_DELETED);
                 mapAlerts.erase(mi++);
             }
@@ -242,7 +243,7 @@ bool CAlert::ProcessAlert(const std::vector<unsigned char>& alertKey, bool fThre
             const CAlert& alert = item.second;
             if (alert.Cancels(*this))
             {
-                LogPrint("alert", "alert already cancelled by %d\n", alert.nID);
+                LogPrint(BCLog::ALERT, "alert already cancelled by %d\n", alert.nID);
                 return false;
             }
         }
@@ -257,7 +258,7 @@ bool CAlert::ProcessAlert(const std::vector<unsigned char>& alertKey, bool fThre
         }
     }
 
-    LogPrint("alert", "accepted alert %d, AppliesToMe()=%d\n", nID, AppliesToMe());
+    LogPrint(BCLog::ALERT, "accepted alert %d, AppliesToMe()=%d\n", nID, AppliesToMe());
     return true;
 }
 

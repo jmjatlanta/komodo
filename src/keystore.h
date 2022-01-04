@@ -38,8 +38,8 @@
 class CKeyStore
 {
 protected:
-    mutable CCriticalSection cs_KeyStore;
-    mutable CCriticalSection cs_SpendingKeyStore;
+    mutable RecursiveMutex cs_KeyStore;
+    mutable RecursiveMutex cs_SpendingKeyStore;
 
 public:
     virtual ~CKeyStore() {}

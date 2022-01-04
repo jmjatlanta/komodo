@@ -139,7 +139,7 @@ void UpdateTime(CBlockHeader* pblock, const Consensus::Params& consensusParams, 
 #include "komodo_defs.h"
 #include "cc/CCinclude.h"
 
-extern CCriticalSection cs_metrics;
+extern RecursiveMutex cs_metrics;
 void vcalc_sha256(char deprecated[(256 >> 3) * 2 + 1],uint8_t hash[256 >> 3],uint8_t *src,int32_t len);
 
 uint32_t Mining_start,Mining_height;
@@ -1719,7 +1719,7 @@ void static BitcoinMiner()
     else 
         solver = "default";
     assert(solver == "tromp" || solver == "default");
-    LogPrint("pow", "Using Equihash solver \"%s\" with n = %u, k = %u\n", solver, n, k);
+    LogPrint(BCLog::POW, "Using Equihash solver \"%s\" with n = %u, k = %u\n", solver, n, k);
     if ( ASSETCHAINS_SYMBOL[0] == 0 )
         fprintf(stderr,"notaryid.%d Mining.%s with %s\n",notaryid,ASSETCHAINS_SYMBOL,solver.c_str());
     std::mutex m_cs;
@@ -1927,7 +1927,7 @@ void static BitcoinMiner()
                 curr_state = state;
                 crypto_generichash_blake2b_update(&curr_state,pblock->nNonce.begin(),pblock->nNonce.size());
                 // (x_1, x_2, ...) = A(I, V, n, k)
-                LogPrint("pow", "Running Equihash solver \"%s\" with nNonce = %s\n",solver, pblock->nNonce.ToString());
+                LogPrint(BCLog::POW, "Running Equihash solver \"%s\" with nNonce = %s\n",solver, pblock->nNonce.ToString());
                 arith_uint256 hashTarget,hashTarget_POW = HASHTarget_POW;
                 if ( KOMODO_MININGTHREADS > 0 && ASSETCHAINS_STAKED > 0 && ASSETCHAINS_STAKED < 100 && Mining_height > 10 )
                     hashTarget = HASHTarget_POW;
@@ -1943,7 +1943,7 @@ void static BitcoinMiner()
                 (std::vector<unsigned char> soln) {
                     int32_t z; arith_uint256 h; CBlock B;
                     // Write the solution to the hash and compute the result.
-                    LogPrint("pow", "- Checking solution against target\n");
+                    LogPrint(BCLog::POW, "- Checking solution against target\n");
                     pblock->nSolution = soln;
                     solutionTargetChecks.increment();
                     B = *pblock;
@@ -2062,7 +2062,7 @@ void static BitcoinMiner()
 
                         // Convert solution indices to byte array (decompress) and pass it to validBlock method.
                         for (size_t s = 0; s < eq.nsols; s++) {
-                            LogPrint("pow", "Checking solution %d\n", s+1);
+                            LogPrint(BCLog::POW, "Checking solution %d\n", s+1);
                             std::vector<eh_index> index_vector(PROOFSIZE);
                             for (size_t i = 0; i < PROOFSIZE; i++) {
                                 index_vector[i] = eq.sols[s][i];
@@ -2090,7 +2090,7 @@ void static BitcoinMiner()
                                 break;
                             }
                         } catch (EhSolverCancelledException&) {
-                            LogPrint("pow", "Equihash solver cancelled\n");
+                            LogPrint(BCLog::POW, "Equihash solver cancelled\n");
                             std::lock_guard<std::mutex> lock{m_cs};
                             cancelSolver = false;
                         }

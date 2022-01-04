@@ -14,7 +14,7 @@
 class CTimeWarning
 {
 private:
-    CCriticalSection cs;
+    RecursiveMutex cs;
     std::set<CNetAddr> setKnown;
     size_t nPeersAhead;
     size_t nPeersBehind;

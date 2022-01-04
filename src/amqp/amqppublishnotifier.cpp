@@ -25,16 +25,16 @@ void AMQPAbstractPublishNotifier::SpawnProtonContainer()
         proton::default_container(*handler_).run();
     }
     catch (const proton::error_condition &e) {
-        LogPrint("amqp", "amqp: container error: %s\n", e.what());
+        LogPrint(BCLog::AMQP, "amqp: container error: %s\n", e.what());
     }
     catch (const std::runtime_error &e) {
-        LogPrint("amqp", "amqp: runtime error: %s\n", e.what());
+        LogPrint(BCLog::AMQP, "amqp: runtime error: %s\n", e.what());
     }
     catch (const std::exception &e) {
-        LogPrint("amqp", "amqp: exception: %s\n", e.what());
+        LogPrint(BCLog::AMQP, "amqp: exception: %s\n", e.what());
     }
     catch (...) {
-        LogPrint("amqp", "amqp: unknown error\n");
+        LogPrint(BCLog::AMQP, "amqp: unknown error\n");
     }
     handler_->terminate();
 }
@@ -49,7 +49,7 @@ bool AMQPAbstractPublishNotifier::Initialize()
             thread_ = std::make_shared<std::thread>(&AMQPAbstractPublishNotifier::SpawnProtonContainer, this);
         }
         catch (std::exception &e) {
-            LogPrint("amqp", "amqp: initialization error: %s\n", e.what());
+            LogPrint(BCLog::AMQP, "amqp: initialization error: %s\n", e.what());
             return false;
         }
         mapPublishNotifiers.insert(std::make_pair(address, this));
@@ -66,7 +66,7 @@ bool AMQPAbstractPublishNotifier::Initialize()
 
 void AMQPAbstractPublishNotifier::Shutdown()
 {
-    LogPrint("amqp", "amqp: Shutdown notifier %s at %s\n", GetType(), GetAddress());
+    LogPrint(BCLog::AMQP, "amqp: Shutdown notifier %s at %s\n", GetType(), GetAddress());
 
     int count = mapPublishNotifiers.count(address);
 
@@ -107,19 +107,19 @@ bool AMQPAbstractPublishNotifier::SendMessage(const char *command, const void* d
         handler_->publish(message);
 
     } catch (proton::error_condition &e) {
-        LogPrint("amqp", "amqp: error : %s\n", e.what());
+        LogPrint(BCLog::AMQP, "amqp: error : %s\n", e.what());
         return false;
     }
     catch (const std::runtime_error &e) {
-        LogPrint("amqp", "amqp: runtime error: %s\n", e.what());
+        LogPrint(BCLog::AMQP, "amqp: runtime error: %s\n", e.what());
         return false;
     }
     catch (const std::exception &e) {
-        LogPrint("amqp", "amqp: exception: %s\n", e.what());
+        LogPrint(BCLog::AMQP, "amqp: exception: %s\n", e.what());
         return false;
     }
     catch (...) {
-        LogPrint("amqp", "amqp: unknown error\n");
+        LogPrint(BCLog::AMQP, "amqp: unknown error\n");
         return false;
     }
 
@@ -131,7 +131,7 @@ bool AMQPAbstractPublishNotifier::SendMessage(const char *command, const void* d
 bool AMQPPublishHashBlockNotifier::NotifyBlock(const CBlockIndex *pindex)
 {
     uint256 hash = pindex->GetBlockHash();
-    LogPrint("amqp", "amqp: Publish hashblock %s\n", hash.GetHex());
+    LogPrint(BCLog::AMQP, "amqp: Publish hashblock %s\n", hash.GetHex());
     char data[32];
     for (unsigned int i = 0; i < 32; i++)
         data[31 - i] = hash.begin()[i];
@@ -141,7 +141,7 @@ bool AMQPPublishHashBlockNotifier::NotifyBlock(const CBlockIndex *pindex)
 bool AMQPPublishHashTransactionNotifier::NotifyTransaction(const CTransaction &transaction)
 {
     uint256 hash = transaction.GetHash();
-    LogPrint("amqp", "amqp: Publish hashtx %s\n", hash.GetHex());
+    LogPrint(BCLog::AMQP, "amqp: Publish hashtx %s\n", hash.GetHex());
     char data[32];
     for (unsigned int i = 0; i < 32; i++)
         data[31 - i] = hash.begin()[i];
@@ -150,14 +150,14 @@ bool AMQPPublishHashTransactionNotifier::NotifyTransaction(const CTransaction &t
 
 bool AMQPPublishRawBlockNotifier::NotifyBlock(const CBlockIndex *pindex)
 {
-    LogPrint("amqp", "amqp: Publish rawblock %s\n", pindex->GetBlockHash().GetHex());
+    LogPrint(BCLog::AMQP, "amqp: Publish rawblock %s\n", pindex->GetBlockHash().GetHex());
 
     CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
     {
         LOCK(cs_main);
         CBlock block;
         if(!ReadBlockFromDisk(block, pindex)) {
-            LogPrint("amqp", "amqp: Can't read block from disk");
+            LogPrint(BCLog::AMQP, "amqp: Can't read block from disk");
             return false;
         }
 
@@ -170,7 +170,7 @@ bool AMQPPublishRawBlockNotifier::NotifyBlock(const CBlockIndex *pindex)
 bool AMQPPublishRawTransactionNotifier::NotifyTransaction(const CTransaction &transaction)
 {
     uint256 hash = transaction.GetHash();
-    LogPrint("amqp", "amqp: Publish rawtx %s\n", hash.GetHex());
+    LogPrint(BCLog::AMQP, "amqp: Publish rawtx %s\n", hash.GetHex());
     CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
     ss << transaction;
     return SendMessage(MSG_RAWTX, &(*ss.begin()), ss.size());

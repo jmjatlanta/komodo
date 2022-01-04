@@ -5,6 +5,7 @@
 #include "paymentdisclosuredb.h"
 
 #include "util.h"
+#include "util/system.h"
 #include "dbwrapper.h"
 
 #include <boost/filesystem.hpp>

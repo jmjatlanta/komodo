@@ -79,7 +79,7 @@ int32_t komodo_isnotaryvout(char *coinaddr,uint32_t tiptime); // from ac_private
 CBlockIndex *komodo_getblockindex(uint256 hash);
 
 int64_t nWalletUnlockTime;
-static CCriticalSection cs_nWalletUnlockTime;
+static RecursiveMutex cs_nWalletUnlockTime;
 std::string CCerror;
 
 // Private method:

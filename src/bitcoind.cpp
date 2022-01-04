@@ -24,6 +24,7 @@
 #include "main.h"
 #include "noui.h"
 #include "scheduler.h"
+#include "util/system.h"
 #include "util.h"
 #include "httpserver.h"
 #include "httprpc.h"

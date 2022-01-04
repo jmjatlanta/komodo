@@ -194,7 +194,7 @@ class CAddrMan
 friend class CAddrManTest;
 private:
     //! critical section to protect the inner data structures
-    mutable CCriticalSection cs;
+    mutable RecursiveMutex cs;
 
     //! last used nId
     int nIdCount;
@@ -471,7 +471,7 @@ public:
             } else {
                 // In case the new table data cannot be used (nVersion unknown, bucket count wrong or new asmap),
                 // try to give them a reference based on their primary source address.
-                LogPrint("addrman", "Bucketing method was updated, re-bucketing addrman entries from disk\n");
+                LogPrint(BCLog::ADDRMAN, "Bucketing method was updated, re-bucketing addrman entries from disk\n");
                 bucket = info.GetNewBucket(nKey, m_asmap);
                 nUBucketPos = info.GetBucketPosition(nKey, true, bucket);
                 if (vvNew[bucket][nUBucketPos] == -1) {
@@ -493,7 +493,7 @@ public:
             }
         }
         if (nLost + nLostUnk > 0) {
-            LogPrint("addrman", "addrman lost %i new and %i tried addresses due to collisions\n", nLostUnk, nLost);
+            LogPrint(BCLog::ADDRMAN, "addrman lost %i new and %i tried addresses due to collisions\n", nLostUnk, nLost);
         }
 
         Check();
@@ -562,7 +562,7 @@ public:
             Check();
         }
         if (fRet)
-            LogPrint("addrman", "Added %s from %s: %i tried, %i new\n", addr.ToStringIPPort(), source.ToString(), nTried, nNew);
+            LogPrint(BCLog::ADDRMAN, "Added %s from %s: %i tried, %i new\n", addr.ToStringIPPort(), source.ToString(), nTried, nNew);
         return fRet;
     }
 
@@ -578,7 +578,7 @@ public:
             Check();
         }
         if (nAdd)
-            LogPrint("addrman", "Added %i addresses from %s: %i tried, %i new\n", nAdd, source.ToString(), nTried, nNew);
+            LogPrint(BCLog::ADDRMAN, "Added %i addresses from %s: %i tried, %i new\n", nAdd, source.ToString(), nTried, nNew);
         return nAdd > 0;
     }
 

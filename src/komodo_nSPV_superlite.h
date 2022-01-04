@@ -742,7 +742,7 @@ UniValue NSPV_mempooltxids(char *coinaddr,int32_t CCflag,uint8_t funcid,uint256 
     return(result);
 }
 
-int32_t NSPV_coinaddr_inmempool(char const *logcategory,char *coinaddr,uint8_t CCflag)
+int32_t NSPV_coinaddr_inmempool(BCLog::LogFlags logcategory,char *coinaddr,uint8_t CCflag)
 {
     NSPV_mempooltxids(coinaddr,CCflag,NSPV_MEMPOOL_ADDRESS,zeroid,-1);
     if ( NSPV_mempoolresult.txids != 0 && NSPV_mempoolresult.numtxids >= 1 && strcmp(NSPV_mempoolresult.coinaddr,coinaddr) == 0 && NSPV_mempoolresult.CCflag == CCflag )

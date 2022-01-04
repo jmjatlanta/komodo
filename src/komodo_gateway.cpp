@@ -12,6 +12,7 @@
  * Removal or modification of this copyright notice is prohibited.            *
  *                                                                            *
  ******************************************************************************/
+#include "util/system.h"
 #include "komodo.h"
 #include "komodo_extern_globals.h"
 #include "komodo_utils.h" // komodo_stateptrget

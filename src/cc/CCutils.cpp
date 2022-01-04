@@ -546,7 +546,7 @@ int64_t CCduration(int32_t &numblocks,uint256 txid)
     return(duration);
 }
 
-uint256 CCOraclesReverseScan(char const *logcategory,uint256 &txid,int32_t height,uint256 reforacletxid,uint256 batontxid)
+uint256 CCOraclesReverseScan(BCLog::LogFlags logcategory,uint256 &txid,int32_t height,uint256 reforacletxid,uint256 batontxid)
 {
     CTransaction tx; uint256 hash,mhash,bhash,hashBlock,oracletxid; int32_t len,len2,numvouts;
     int64_t val,merkleht; CPubKey pk; std::vector<uint8_t>data; char str[65],str2[65];
@@ -586,9 +586,9 @@ uint256 CCOraclesReverseScan(char const *logcategory,uint256 &txid,int32_t heigh
     return(zeroid);
 }
 
-int32_t NSPV_coinaddr_inmempool(char const *logcategory,char *coinaddr,uint8_t CCflag);
+int32_t NSPV_coinaddr_inmempool(BCLog::LogFlags logcategory,char *coinaddr,uint8_t CCflag);
 
-int32_t myIs_coinaddr_inmempoolvout(char const *logcategory,char *coinaddr)
+int32_t myIs_coinaddr_inmempoolvout(BCLog::LogFlags logcategory,char *coinaddr)
 {
     int32_t i,n; char destaddr[64];
     if ( KOMODO_NSPV_SUPERLITE )
@@ -639,7 +639,7 @@ int32_t myGet_mempool_txs(std::vector<CTransaction> &txs,uint8_t evalcode,uint8_
     return(i);
 }
 
-int32_t CCCointxidExists(char const *logcategory,uint256 cointxid)
+int32_t CCCointxidExists(BCLog::LogFlags logcategory,uint256 cointxid)
 {
     char txidaddr[64]; std::string coin; int32_t numvouts; uint256 hashBlock;
     std::vector<std::pair<CAddressIndexKey, CAmount> > addressIndex;

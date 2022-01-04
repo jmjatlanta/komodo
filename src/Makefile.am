@@ -32,7 +32,6 @@ BITCOIN_INCLUDES += -I$(srcdir)/snark/libsnark
 BITCOIN_INCLUDES += -I$(srcdir)/univalue/include
 
 LIBBITCOIN_SERVER=libbitcoin_server.a
-LIBBITCOIN_WALLET=libbitcoin_wallet.a
 LIBBITCOIN_COMMON=libbitcoin_common.a
 LIBBITCOIN_CLI=libbitcoin_cli.a
 LIBBITCOIN_UTIL=libbitcoin_util.a
@@ -90,7 +89,6 @@ $(LIBCRYPTOCONDITIONS): $(wildcard cryptoconditions/src/*) $(wildcard cryptocond
 #	$(AR) cr $(LIBCJSON) $^
 
 # libcjson build
-LIBCJSON=libcjson.a
 libcjson_a_SOURCES = cJSON.c \
   komodo_cJSON.c komodo_cutils.cpp
 libcjson_a_CPPFLAGS=-fPIC
@@ -435,8 +433,8 @@ crypto_libbitcoin_crypto_a_SOURCES = \
   crypto/verus_hash.h \
   crypto/verus_hash.cpp
 
-if EXPERIMENTAL_ASM
-  crypto_libbitcoin_crypto_a_SOURCES += crypto/sha256_sse4.cpp
+if USE_ASM
+crypto_libbitcoin_crypto_a_SOURCES += crypto/sha256_sse4.cpp
 endif
 
 if ENABLE_MINING
@@ -502,7 +500,8 @@ libbitcoin_common_a_SOURCES = \
   komodo_kv.cpp \
   komodo_notary.cpp \
   komodo_pax.cpp \
-  komodo_utils.cpp \  
+  komodo_utils.cpp \
+  netaddress.cpp \
   netbase.cpp \
   metrics.cpp \
   primitives/block.cpp \
@@ -539,6 +538,7 @@ libbitcoin_util_a_SOURCES = \
   random.cpp \
   rpc/protocol.cpp \
   support/cleanse.cpp \
+  logging.cpp \
   sync.cpp \
   uint256.cpp \
   util.cpp \
@@ -546,6 +546,12 @@ libbitcoin_util_a_SOURCES = \
   utilstrencodings.cpp \
   utiltime.cpp \
   util/asmap.cpp \
+  util/settings.cpp \
+  util/strencodings.cpp \
+  util/string.cpp \
+  util/system.cpp \
+  util/threadnames.cpp \
+  util/time.cpp \
   $(BITCOIN_CORE_H) \
   $(LIBZCASH_H)
 
@@ -713,35 +719,6 @@ komodo_tx_LDADD = \
   $(LIBCRYPTOCONDITIONS)
 
 komodo_tx_LDADD += $(BOOST_LIBS) $(CRYPTO_LIBS)
-#
-
-# zcash protocol primitives #
-libzcash_a_SOURCES = \
-	zcash/IncrementalMerkleTree.cpp \
-	zcash/NoteEncryption.cpp \
-	zcash/Address.cpp \
-	zcash/JoinSplit.cpp \
-	zcash/Proof.cpp \
-	zcash/Note.cpp \
-	zcash/prf.cpp \
-	zcash/util.cpp \
-  zcash/zip32.cpp \
-	zcash/circuit/commitment.tcc \
-	zcash/circuit/gadget.tcc \
-	zcash/circuit/merkle.tcc \
-	zcash/circuit/note.tcc \
-	zcash/circuit/prfs.tcc \
-	zcash/circuit/utils.tcc
-
-libzcash_a_CPPFLAGS = -DMULTICORE -fopenmp -fPIC -DBINARY_OUTPUT -DCURVE_ALT_BN128 -DBOOST_SPIRIT_THREADSAFE -DHAVE_BUILD_INFO -D__STDC_FORMAT_MACROS $(HARDENED_CPPFLAGS) $(HARDENED_CXXFLAGS) $(HARDENED_LDFLAGS) -pipe $(SAN_LDFLAGS) -O1 -g -Wstack-protector $(SAN_CXXFLAGS) -fstack-protector-all -fPIE -fvisibility=hidden -DSTATIC $(BITCOIN_INCLUDES)
-
-#libzcash_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
-#libzcash_a_LDFLAGS = $(RELDFLAGS) $(AM_LDFLAGS) $(LIBTOOL_APP_LDFLAGS)
-#libzcash_a_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES) -DMONTGOMERY_OUTPUT
-
-libzcash_a_CXXFLAGS = $(SAN_CXXFLAGS) $(HARDENED_CXXFLAGS) -fwrapv -fno-strict-aliasing
-libzcash_a_LDFLAGS = $(SAN_LDFLAGS) $(HARDENED_LDFLAGS)
-libzcash_a_CPPFLAGS += -DMONTGOMERY_OUTPUT
 
 # zcashconsensus library #
 if BUILD_BITCOIN_LIBS
