@@ -113,9 +113,12 @@ contrib/debian/substvars
 
 src/rpcmisc~.cpp
 src/komodo-cli
+src/tokel-cli
 src/komodod
+src/tokeld
 src/komodo-tx
 src/komodo-test
+src/komodo-test-cc
 src/wallet-utility
 src/komodo-cli.exe
 src/komodod.exe

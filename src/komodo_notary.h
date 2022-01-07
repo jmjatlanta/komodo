@@ -196,9 +196,19 @@ int32_t komodo_ratify_threshold(int32_t height,uint64_t signedmask)
     else return(0);
 }
 
+static int32_t hwmheight;
+
+/***
+ * @note only use for uint tests
+ * @param in the new hwmheight
+ */
+void adjust_hwmheight(int32_t in)
+{
+    hwmheight = in;
+}
+
 void komodo_notarysinit(int32_t origheight,uint8_t pubkeys[64][33],int32_t num)
 {
-    static int32_t hwmheight;
     int32_t k,i,htind,height; struct knotary_entry *kp; struct knotaries_entry N;
     if ( Pubkeys == 0 )
         Pubkeys = (struct knotaries_entry *)calloc(1 + (KOMODO_MAXBLOCKS / KOMODO_ELECTION_GAP),sizeof(*Pubkeys));
