@@ -7,7 +7,9 @@
 #include <gtest/gtest.h>
 
 
-TEST(block_tests, header_size_is_expected) {
+TEST(block_tests, header_size_is_expected) 
+{
+    ASSETCHAINS_ADAPTIVEPOW = 2;
     // Header with an empty Equihash solution.
     CBlockHeader header;
     CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
@@ -20,7 +22,8 @@ TEST(block_tests, header_size_is_expected) {
 
 TEST(block_tests, TestStopAt)
 {
-    TestChain chain;
+    ASSETCHAINS_ADAPTIVEPOW = 2;
+    TestChain chain(CBaseChainParams::TESTNET);
     auto notary = chain.AddWallet(chain.getNotaryKey());
     CBlock lastBlock = chain.generateBlock(); // genesis block
     ASSERT_GT( chain.GetIndex()->GetHeight(), 0 );
@@ -35,6 +38,7 @@ TEST(block_tests, TestStopAt)
 
 TEST(block_tests, TestConnectWithoutChecks)
 {
+    ASSETCHAINS_ADAPTIVEPOW = 2;
     TestChain chain;
     auto notary = chain.AddWallet(chain.getNotaryKey());
     auto alice = chain.AddWallet();
@@ -70,6 +74,7 @@ TEST(block_tests, TestConnectWithoutChecks)
 
 TEST(block_tests, TestSpendInSameBlock)
 {
+    ASSETCHAINS_ADAPTIVEPOW = 2;
     TestChain chain;
     auto notary = chain.AddWallet(chain.getNotaryKey());
     auto alice = chain.AddWallet();
@@ -123,6 +128,7 @@ TEST(block_tests, TestSpendInSameBlock)
 
 TEST(block_tests, TestDoubleSpendInSameBlock)
 {
+    ASSETCHAINS_ADAPTIVEPOW = 2;
     TestChain chain;
     auto notary = chain.AddWallet(chain.getNotaryKey());
     auto alice = chain.AddWallet();
@@ -196,6 +202,7 @@ bool CalcPoW(CBlock *pblock);
 
 TEST(block_tests, TestProcessBlock)
 {
+    ASSETCHAINS_ADAPTIVEPOW = 2;
     TestChain chain;
     EXPECT_EQ(chain.GetIndex()->GetHeight(), 0);
     auto notary = chain.AddWallet(chain.getNotaryKey());
@@ -249,6 +256,7 @@ TEST(block_tests, TestProcessBlock)
 
 TEST(block_tests, TestProcessBadBlock)
 {
+    ASSETCHAINS_ADAPTIVEPOW = 2;
     TestChain chain;
     auto notary = chain.AddWallet(chain.getNotaryKey());
     auto alice = chain.AddWallet();
@@ -282,3 +290,79 @@ TEST(block_tests, TestProcessBadBlock)
     // Verify transaction is still in mempool
     EXPECT_EQ(mempool.size(), 1);
 }
+
+// Successfully mine a block that fails to meet the PoW minimum
+TEST(block_tests, TestProcessWeakBlock)
+{
+    ASSETCHAINS_ADAPTIVEPOW = 2;
+    TestChain chain;
+    EXPECT_EQ(chain.GetIndex()->GetHeight(), 0);
+    auto notary = chain.AddWallet(chain.getNotaryKey());
+    auto alice = chain.AddWallet();
+    auto bob = chain.AddWallet();
+    auto charlie = chain.AddWallet();
+    CBlock lastBlock = chain.generateBlock(); // gives notary everything
+    EXPECT_EQ(chain.GetIndex()->GetHeight(), 1);
+    chain.IncrementChainTime();
+    auto notaryPrevOut = notary->GetAvailable(100000);
+    // add a transaction to the mempool
+    CTransaction fundAlice = notary->CreateSpendTransaction(alice, 100000);
+    EXPECT_TRUE( chain.acceptTx(fundAlice).IsValid() );
+    // construct the block
+    CBlock block;
+    int32_t newHeight = chain.GetIndex()->GetHeight() + 1;
+    CValidationState state;
+    // no transactions
+    EXPECT_FALSE( ProcessNewBlock(false, newHeight, state, nullptr, &block, false, nullptr) );
+    EXPECT_EQ(state.GetRejectReason(), "bad-blk-length");
+    EXPECT_EQ(chain.GetIndex()->GetHeight(), 1);
+
+    // add first a coinbase tx
+    auto consensusParams = Params().GetConsensus();
+    CMutableTransaction txNew = CreateNewContextualCMutableTransaction(consensusParams, newHeight);
+    txNew.vin.resize(1);
+    txNew.vin[0].prevout.SetNull();
+    txNew.vin[0].scriptSig = (CScript() << newHeight << CScriptNum(1)) + COINBASE_FLAGS;
+    txNew.vout.resize(1);
+    txNew.vout[0].nValue = GetBlockSubsidy(newHeight,consensusParams);
+    txNew.nExpiryHeight = 0;
+    block.vtx.push_back(CTransaction(txNew));
+    // no PoW, no merkle root should fail on merkle error
+    EXPECT_FALSE( ProcessNewBlock(false, newHeight, state, nullptr, &block, false, nullptr) );
+    EXPECT_EQ(state.GetRejectReason(), "bad-txnmrklroot");
+    // Verify transaction is still in mempool
+    EXPECT_EQ(mempool.size(), 1);
+
+    // finish constructing the block
+    block.nBits = GetNextWorkRequired( chain.GetIndex(), &block, Params().GetConsensus());
+    block.nTime = GetTime();
+    block.hashPrevBlock = lastBlock.GetHash();
+    block.hashMerkleRoot = block.BuildMerkleTree();
+
+    // Add the PoW
+    EXPECT_TRUE(CalcPoW(&block));
+    state = CValidationState();
+    EXPECT_TRUE( ProcessNewBlock(false, newHeight, state, nullptr, &block, false, nullptr) );
+    if (!state.IsValid())
+        FAIL() << state.GetRejectReason();
+    // Verify transaction is still in mempool
+    EXPECT_EQ(mempool.size(), 1);
+}
+
+/*
+TEST(block_test, u256test)
+{
+    auto val1 = uint256S("0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f"); 
+    // Regtest: 0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f
+    // Regtest: 6811299366900952671974763824040465167839410862684739061144563765171360567055
+    // testnet: 07ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
+    // testnet: 3618502788666131106986593281521497120414687020801267626233049500247285301247
+    // mainnet same as testnet
+    // Results: Regtest powLimit is a higher number, and less work (by about half)
+    std::cout << "GetHex: " << val1.GetHex() << std::endl;
+    auto arith = UintToArith256(val1);
+    arith += 1;
+    // 6811299366900952671974763824040465167839410862684739061144563765171360567056
+    std::cout << "Plus 1: " << ArithToUint256(arith).GetHex() << std::endl;
+} 
+*/

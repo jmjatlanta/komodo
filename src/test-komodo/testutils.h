@@ -42,7 +42,7 @@ public:
     /***
      * ctor to create a chain
      */
-    TestChain();
+    TestChain(CBaseChainParams::Network network = CBaseChainParams::REGTEST);
     /***
      * dtor to release resources
      */

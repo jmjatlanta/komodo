@@ -38,9 +38,9 @@ extern std::string NOTARY_PUBKEY;
 
 void adjust_hwmheight(int32_t in); // in komodo.cpp
 
-void setupChain()
+void setupChain(CBaseChainParams::Network networkParams)
 {
-    SelectParams(CBaseChainParams::REGTEST);
+    SelectParams(networkParams);
 
     // Settings to get block reward
     NOTARY_PUBKEY = notaryPubkey;
@@ -60,6 +60,11 @@ void setupChain()
     pcoinsTip = new CCoinsViewCache(pcoinsdbview);
     pnotarisations = new NotarisationDB(1 << 20, true);
     InitBlockIndex();
+}
+
+void setupChain()
+{
+    setupChain(CBaseChainParams::REGTEST);
 }
 
 /***
@@ -162,7 +167,7 @@ CTransaction getInputTx(CScript scriptPubKey)
  * A class to provide a simple chain for tests
  */
 
-TestChain::TestChain()
+TestChain::TestChain(CBaseChainParams::Network network)
 {
     previousNetwork = Params().NetworkIDString();
     dataDir = GetTempPath() / strprintf("test_komodo_%li_%i", GetTime(), GetRand(100000));
@@ -171,7 +176,7 @@ TestChain::TestChain()
     boost::filesystem::create_directories(dataDir);
     mapArgs["-datadir"] = dataDir.string();
 
-    setupChain();
+    setupChain(network);
     CBitcoinSecret vchSecret;
     vchSecret.SetString(notarySecret); // this returns false due to network prefix mismatch but works anyway
     notaryKey = vchSecret.GetKey();
