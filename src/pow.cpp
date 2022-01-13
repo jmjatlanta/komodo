@@ -276,24 +276,27 @@ arith_uint256 zawy_ctB(arith_uint256 bnTarget,uint32_t solvetime)
     return(bnTarget);
 }
 
-arith_uint256 zawy_TSA_EMA(int32_t height,int32_t tipdiff,arith_uint256 prevTarget,int32_t solvetime)
+/****
+ * @brief Adaptive PoW algo TSA
+ * @param height block height
+ * @param tipdiff the time span from tip in seconds
+ * @param prevTarget the previous target
+ * @param solvetime not used
+ * @returns the new target
+ */
+arith_uint256 zawy_TSA_EMA(int32_t height,int32_t tipdiff,arith_uint256 prevTarget)
 {
-    arith_uint256 A,B,C,bnTarget;
     if ( tipdiff < 4 )
         tipdiff = 4;
     tipdiff &= ~1;
-    bnTarget = prevTarget / arith_uint256(K*T);
-    A = bnTarget * arith_uint256(T);
-    B = (bnTarget / arith_uint256(360000)) * arith_uint256(tipdiff * zawy_exponential_val360000(tipdiff/2));
-    C = (bnTarget / arith_uint256(360000)) * arith_uint256(T * zawy_exponential_val360000(tipdiff/2));
+
+    arith_uint256 bnTarget = prevTarget / arith_uint256(K*T);
+    arith_uint256 A = bnTarget * arith_uint256(T);
+    arith_uint256 B = (bnTarget / arith_uint256(360000)) * arith_uint256(tipdiff * zawy_exponential_val360000(tipdiff/2));
+    arith_uint256 C = (bnTarget / arith_uint256(360000)) * arith_uint256(T * zawy_exponential_val360000(tipdiff/2));
     bnTarget = ((A + B - C) / arith_uint256(tipdiff)) * arith_uint256(K*T);
-    {
-        int32_t z;
-        for (z=31; z>=0; z--)
-            fprintf(stderr,"%02x",((uint8_t *)&bnTarget)[z]);
-    }
-    fprintf(stderr," ht.%d TSA bnTarget tipdiff.%d\n",height,tipdiff);
-    return(bnTarget);
+
+    return bnTarget;
 }
 
 unsigned int GetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHeader *pblock, const Consensus::Params& params)
@@ -354,7 +357,7 @@ unsigned int GetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHead
         }
         if ( ASSETCHAINS_ADAPTIVEPOW == 2 ) // TSA
         {
-            bnTarget = zawy_TSA_EMA(height,tipdiff,ct[0],ts[0] - ts[1]);
+            bnTarget = zawy_TSA_EMA(height,tipdiff,ct[0]);
             nbits = bnTarget.GetCompact();
             nbits = (nbits & 0xfffffffc) | 0;
             return(nbits);
@@ -494,7 +497,7 @@ unsigned int GetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHead
             }
             if ( 0 && zflags[0] == 0 && zawyflag == 0 && mult <= 1 )
             {
-                bnTarget = zawy_TSA_EMA(height,tipdiff,(bnTarget+ct[0]+ct[1])/arith_uint256(3),ts[0] - ts[1]);
+                bnTarget = zawy_TSA_EMA(height,tipdiff,(bnTarget+ct[0]+ct[1])/arith_uint256(3));
                 if ( bnTarget < origtarget )
                     zawyflag = 3;
             }
@@ -886,8 +889,6 @@ bool CheckProofOfWork(const CBlockHeader &blkHeader, uint8_t *pubkey33, int32_t 
         arith_uint256 bnMaxPoSdiff;
         bnTarget.SetCompact(KOMODO_MINDIFF_NBITS,&fNegative,&fOverflow);
     }
-    //else if ( ASSETCHAINS_ADAPTIVEPOW > 0 && ASSETCHAINS_STAKED == 0 )
-    //    bnTarget = komodo_adaptivepow_target(height,bnTarget,blkHeader.nTime);
     // Check proof of work matches claimed amount
     if ( UintToArith256(hash = blkHeader.GetHash()) > bnTarget && !blkHeader.IsVerusPOSBlock() )
     {

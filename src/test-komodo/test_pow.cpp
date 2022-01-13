@@ -146,3 +146,39 @@ TEST(PoW, MinDifficultyRules) {
             bnRes.GetCompact());
 
 }
+
+arith_uint256 zawy_TSA_EMA(int32_t height,int32_t tipdiff,arith_uint256 prevTarget);
+
+TEST(PoW, AdaptivePoW2)
+{
+    // tested with K==1000000 and T = ASSETCHAINS_BLOCKTIME (which was 60)
+    int32_t height = 1;
+    int32_t tipdiff = 1;
+    arith_uint256 prevTarget;
+    arith_uint256 expectedTarget;
+
+    // heights with low targets do not matter
+    arith_uint256 newTarget = zawy_TSA_EMA(height, tipdiff, prevTarget);
+    EXPECT_EQ(prevTarget, newTarget);
+    EXPECT_EQ(newTarget, expectedTarget);
+    height++;
+    for(; height < 2500; ++height)
+    {
+        newTarget = zawy_TSA_EMA(height, tipdiff, prevTarget);
+        EXPECT_EQ(prevTarget, newTarget);
+        EXPECT_EQ(expectedTarget, newTarget);
+        prevTarget = newTarget;
+    }
+
+    // higher span to tip adjusts target lower
+    prevTarget = 600000000;
+    // Anything less than 4 is adjusted to 4
+    arith_uint256 newTarget4 = zawy_TSA_EMA(height, 4, prevTarget);
+    EXPECT_NE(newTarget4, arith_uint256());
+    arith_uint256 newTarget100 = zawy_TSA_EMA(height, 100, prevTarget);
+    EXPECT_LT(newTarget100, newTarget4);
+    arith_uint256 newTarget1000 = zawy_TSA_EMA(height, 1000, prevTarget);
+    EXPECT_NE(newTarget100, newTarget1000);
+    EXPECT_LT(newTarget1000, newTarget100);
+    EXPECT_EQ(newTarget1000, arith_uint256());
+}
