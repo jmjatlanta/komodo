@@ -245,9 +245,6 @@ struct pax_transaction
     char symbol[KOMODO_ASSETCHAIN_MAXLEN],source[KOMODO_ASSETCHAIN_MAXLEN],coinaddr[64]; uint8_t rmd160[20],type,buf[35];
 };
 
-struct knotary_entry { UT_hash_handle hh; uint8_t pubkey[33],notaryid; };
-struct knotaries_entry { int32_t height,numnotaries; struct knotary_entry *Notaries; };
-
 struct notarized_checkpoint
 {
     uint256 notarized_hash;
