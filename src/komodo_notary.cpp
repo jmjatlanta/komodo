@@ -279,13 +279,18 @@ void komodo_notarysinit(int32_t origheight,uint8_t pubkeys[64][33],int32_t num)
 int32_t komodo_chosennotary(int32_t *notaryidp,int32_t height,uint8_t *pubkey33,uint32_t timestamp)
 {
     // -1 if not notary, 0 if notary, 1 if special notary
-    int32_t numnotaries=0,htind,modval = -1;
+    int32_t numnotaries=0;
+    int32_t htind;
+    int32_t modval = -1;
+
     *notaryidp = -1;
-    if ( height < 0 )//|| height >= KOMODO_MAXBLOCKS )
+
+    if ( height < 0 )
     {
         printf("komodo_chosennotary ht.%d illegal\n",height);
-        return(-1);
+        return -1;
     }
+
     if ( height >= KOMODO_NOTARIES_HARDCODED || ASSETCHAINS_SYMBOL[0] != 0 )
     {
         if ( (*notaryidp= komodo_electednotary(&numnotaries,pubkey33,height,timestamp)) >= 0 && numnotaries != 0 )
@@ -294,10 +299,13 @@ int32_t komodo_chosennotary(int32_t *notaryidp,int32_t height,uint8_t *pubkey33,
             return(modval);
         }
     }
+
     if ( height >= 250000 )
-        return(-1);
+        return -1;
+
     if ( Pubkeys[0].IsInitialized() == 0 )
         komodo_init(0);
+        
     htind = height / KOMODO_ELECTION_GAP;
     if ( htind >= KOMODO_MAXBLOCKS / KOMODO_ELECTION_GAP )
         htind = (KOMODO_MAXBLOCKS / KOMODO_ELECTION_GAP) - 1;
