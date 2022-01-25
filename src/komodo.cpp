@@ -183,8 +183,34 @@ int32_t komodo_parsestatefiledata(struct komodo_state *sp,uint8_t *filedata,long
  */
 size_t write_event(std::shared_ptr<komodo::event> evt, FILE *fp)
 {
+    if (evt == nullptr)
+        return 0;
+
     std::stringstream ss;
-    ss << evt;
+    switch (evt->type)
+    {
+        case (komodo::komodo_event_type::EVENT_PUBKEYS):
+            ss << *(dynamic_cast<komodo::event_pubkeys*>( evt.get() ));
+            break;
+        case (komodo::komodo_event_type::EVENT_NOTARIZED):
+            ss << *(dynamic_cast<komodo::event_notarized*>( evt.get() ));
+            break;
+        case (komodo::komodo_event_type::EVENT_U):
+            ss << *(dynamic_cast<komodo::event_u*>( evt.get() ));
+            break;
+        case (komodo::komodo_event_type::EVENT_KMDHEIGHT):
+            ss << *(dynamic_cast<komodo::event_kmdheight*>( evt.get() ));
+            break;
+        case (komodo::komodo_event_type::EVENT_OPRETURN):
+            ss << *(dynamic_cast<komodo::event_opreturn*>( evt.get() ));
+            break;
+        case (komodo::komodo_event_type::EVENT_PRICEFEED):
+            ss << *(dynamic_cast<komodo::event_pricefeed*>( evt.get() ));
+            break;
+        case (komodo::komodo_event_type::EVENT_REWIND):
+            ss << *(dynamic_cast<komodo::event_rewind*>( evt.get() ));
+            break;
+    }
     std::string buf = ss.str();
     return fwrite(buf.c_str(), buf.size(), 1, fp);
 }

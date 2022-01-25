@@ -155,8 +155,11 @@ std::ostream& operator<<(std::ostream& os, const event_pubkeys& in)
     const event& e = dynamic_cast<const event&>(in);
     os << e;
     os << in.num;
-    for(uint8_t i = 0; i < in.num-1; ++i)
-        os << in.pubkeys[i];
+    for(uint8_t i = 0; i < in.num; ++i)
+    {
+        for(size_t x = 0; x < 33; ++x)
+            os << in.pubkeys[i][x];
+    }
     return os;
 }
 
