@@ -274,14 +274,30 @@ struct komodo_ccdata
 
 struct komodo_state
 {
-    uint256 NOTARIZED_HASH,NOTARIZED_DESTTXID,MoM;
-    int32_t SAVEDHEIGHT,CURRENT_HEIGHT,NOTARIZED_HEIGHT,MoMdepth;
-    uint32_t SAVEDTIMESTAMP;
-    uint64_t deposited,issued,withdrawn,approved,redeemed,shorted;
-    struct notarized_checkpoint *NPOINTS; 
-    int32_t NUM_NPOINTS,last_NPOINTSi;
+    komodo_state()
+    {
+        memset(RTbufs, 0, sizeof(uint32_t) * 64 * 3 );
+    }
+    uint256 NOTARIZED_HASH;
+    uint256 NOTARIZED_DESTTXID;
+    uint256 MoM;
+    int32_t SAVEDHEIGHT = 0;
+    int32_t CURRENT_HEIGHT = 0;
+    int32_t NOTARIZED_HEIGHT = 0;
+    int32_t MoMdepth = 0;
+    uint32_t SAVEDTIMESTAMP = 0;
+    uint64_t deposited = 0;
+    uint64_t issued = 0;
+    uint64_t withdrawn = 0;
+    uint64_t approved = 0;
+    uint64_t redeemed = 0;
+    uint64_t shorted = 0;
+    notarized_checkpoint *NPOINTS = nullptr; 
+    int32_t NUM_NPOINTS = 0;
+    int32_t last_NPOINTSi = 0;
     std::list<std::shared_ptr<komodo::event>> events;
-    uint32_t RTbufs[64][3]; uint64_t RTmask;
+    uint32_t RTbufs[64][3]; 
+    uint64_t RTmask = 0;
     bool add_event(const std::string& symbol, const uint32_t height, std::shared_ptr<komodo::event> in);
 };
 

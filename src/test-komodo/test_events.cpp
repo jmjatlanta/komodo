@@ -6,8 +6,13 @@
 #include <komodo_structs.h>
 
 int32_t komodo_faststateinit(struct komodo_state *sp,const char *fname,char *symbol,char *dest);
+int32_t komodo_parsestatefile(struct komodo_state *sp,FILE *fp,char *symbol,char *dest);
 struct komodo_state *komodo_stateptrget(char *base);
 extern int32_t KOMODO_EXTERNAL_NOTARIES;
+void komodo_stateupdate(int32_t height,uint8_t notarypubs[][33],uint8_t numnotaries,
+        uint8_t notaryid,uint256 txhash,uint64_t voutmask,uint8_t numvouts,uint32_t *pvals,
+        uint8_t numpvals,int32_t KMDheight,uint32_t KMDtimestamp,uint64_t opretvalue,
+        uint8_t *opretbuf,uint16_t opretlen,uint16_t vout,uint256 MoM,int32_t MoMdepth);
 
 namespace TestEvents {
 
@@ -759,6 +764,144 @@ TEST(TestEvents, komodo_faststateinit_test_kmd)
         FAIL() << "Exception thrown";
     }
     boost::filesystem::remove_all(temp);
+}
+
+TEST(TestEvents, FastStateInitActualFile)
+{
+    komodo_state state;
+    std::string filename = "komodostatesnapshot";
+    char symbol[4] = "KMD";
+    char dest[4] = "BTC";
+    int32_t result = komodo_faststateinit( &state, filename.c_str(), symbol, dest);
+}
+
+TEST(TestEvents, StateUpdate)
+{
+    strcpy(ASSETCHAINS_SYMBOL, "JMJ");
+    unlink("komodostate");
+    std::string old_data_dir = mapArgs["-datadir"];
+    mapArgs["-datadir"] = ".";
+    int32_t height = 1;
+    uint8_t notarypubsarray[3][33];
+    memset(notarypubsarray[0], 1, 33);
+    memset(notarypubsarray[1], 2, 33);
+    memset(notarypubsarray[2], 3, 33);
+    uint8_t numnotaries = 3;
+    uint8_t notaryid = 2;
+    uint256 txhash;
+    txhash.SetHex("0101010101010101010101010101010101010101010101010101010101010101");
+    uint64_t voutmask = 1;
+    uint8_t numvouts = 1;
+    uint32_t pvals[32] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 
+            19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32};
+    uint8_t numpvals = 32;
+    int32_t kmd_height = 2;
+    uint32_t kmd_timestamp = 3;
+    uint64_t opretvalue = 4;
+    uint8_t opretbuf = 5;
+    uint16_t opretlen = 1;
+    uint16_t vout = 0;
+    uint256 mom;
+    int32_t momdepth = 0;
+    // write kmdheight record... Must have kmd_height, kmd_timestamp
+    komodo_stateupdate(height, notarypubsarray, numnotaries, 
+            notaryid, txhash, voutmask, numvouts, pvals, numpvals, kmd_height, 
+            kmd_timestamp, opretvalue, &opretbuf, opretlen, vout, mom, momdepth);
+    // write opreturn record
+    kmd_height = 0;
+    komodo_stateupdate(height, notarypubsarray, numnotaries, 
+            notaryid, txhash, voutmask, numvouts, pvals, numpvals, kmd_height, 
+            kmd_timestamp, opretvalue, &opretbuf, opretlen, vout, mom, momdepth);
+    // write pubkeys record
+    opretlen = 0;
+    komodo_stateupdate(height, notarypubsarray, numnotaries, 
+            notaryid, txhash, voutmask, numvouts, pvals, numpvals, kmd_height, 
+            kmd_timestamp, opretvalue, &opretbuf, opretlen, vout, mom, momdepth);
+    // write U record
+    numnotaries = 0;
+    komodo_stateupdate(height, notarypubsarray, numnotaries, 
+            notaryid, txhash, voutmask, numvouts, pvals, numpvals, kmd_height, 
+            kmd_timestamp, opretvalue, &opretbuf, opretlen, vout, mom, momdepth);
+    // write pricefeed record
+    numvouts = 0;
+    komodo_stateupdate(height, notarypubsarray, numnotaries, 
+            notaryid, txhash, voutmask, numvouts, pvals, numpvals, kmd_height, 
+            kmd_timestamp, opretvalue, &opretbuf, opretlen, vout, mom, momdepth);
+
+    // now read back records
+    std::string filename = "komodostate";
+    FILE* fp = fopen(filename.c_str(), "rb");
+    komodo_state state;
+    char symbol[4] = "KMD";
+    char dest[4] = "BTC";
+    // read the kmdheight record
+    int32_t retval = komodo_parsestatefile(&state, fp, symbol, dest);
+    EXPECT_EQ(retval, 'T');
+    EXPECT_EQ(state.events.size(), 1);
+    komodo::event_kmdheight* height_obj = dynamic_cast<komodo::event_kmdheight*>( state.events.back().get() );
+    EXPECT_EQ(height_obj->height, 1);
+    EXPECT_EQ(height_obj->kheight, 2);
+    EXPECT_EQ(height_obj->timestamp, 3);
+    // read the opreturn record
+    retval = komodo_parsestatefile(&state, fp, symbol, dest);
+    EXPECT_EQ(retval, 'R');
+    EXPECT_EQ(state.events.size(), 2);
+    komodo::event_opreturn* opreturn_obj = dynamic_cast<komodo::event_opreturn*>( state.events.back().get() );
+    EXPECT_EQ(opreturn_obj->height, 1);
+    EXPECT_EQ(opreturn_obj->value, 4);
+    EXPECT_EQ(opreturn_obj->opret.size(), 1);
+    EXPECT_EQ(opreturn_obj->opret[0], 5);
+    // read the pubkeys record
+    retval = komodo_parsestatefile(&state, fp, symbol, dest);
+    EXPECT_EQ(retval, 'P');
+    EXPECT_EQ(state.events.size(), 3);
+    komodo::event_pubkeys* pubkeys_obj = dynamic_cast<komodo::event_pubkeys*>( state.events.back().get() );
+    EXPECT_EQ(pubkeys_obj->height, 1);
+    EXPECT_EQ(pubkeys_obj->num, 3);
+    EXPECT_EQ(pubkeys_obj->pubkeys[0][0], 1);
+    EXPECT_EQ(pubkeys_obj->pubkeys[0][32], 1);
+    EXPECT_EQ(pubkeys_obj->pubkeys[1][0], 2);
+    EXPECT_EQ(pubkeys_obj->pubkeys[1][32], 2);
+    EXPECT_EQ(pubkeys_obj->pubkeys[2][0], 3);
+    EXPECT_EQ(pubkeys_obj->pubkeys[2][32], 3);
+    // read the U record (deprecated, so should not do much
+    retval = komodo_parsestatefile(&state, fp, symbol, dest);
+    EXPECT_EQ(retval, 'U');
+    EXPECT_EQ(state.events.size(), 3); // nothing changed
+    // read the Pricefeed record
+    retval = komodo_parsestatefile(&state, fp, symbol, dest);
+    EXPECT_EQ(retval, 'V');
+    EXPECT_EQ(state.events.size(), 4);
+    komodo::event_pricefeed* price_obj = dynamic_cast<komodo::event_pricefeed*>( state.events.back().get() );
+    EXPECT_EQ(price_obj->height, 1);
+    EXPECT_EQ(price_obj->num, 32);
+    EXPECT_EQ(price_obj->prices[0], 1);
+    EXPECT_EQ(price_obj->prices[31], 32);
+
+    // cleanup    
+    mapArgs["-datadir"] = old_data_dir;
+    unlink("komodostate");
+    ASSETCHAINS_SYMBOL[0] = 0;
+}
+
+TEST(TestEvents, ParseStateFile)
+{
+    std::string filename = "komodostatesnapshot";
+    FILE* fp = fopen(filename.c_str(), "rb");
+    komodo_state state;
+    char symbol[4] = "KMD";
+    char dest[4] = "BTC";
+    size_t pos = 0;
+    int32_t retval = 0;
+    while(retval != EOF)
+    {
+        // read the first record, which is just a 0
+        retval = komodo_parsestatefile(&state, fp, symbol, dest);
+        if (state.events.size() > 0)
+            std::cout << "Successful read at position " << std::to_string(pos) << std::endl;
+        ++pos;
+    }
+    std::cout << "Ended at position " << std::to_string(pos) << std::endl;
 }
 
 } // namespace TestEvents
