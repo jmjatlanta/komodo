@@ -766,15 +766,6 @@ TEST(TestEvents, komodo_faststateinit_test_kmd)
     boost::filesystem::remove_all(temp);
 }
 
-TEST(TestEvents, FastStateInitActualFile)
-{
-    komodo_state state;
-    std::string filename = "komodostatesnapshot";
-    char symbol[4] = "KMD";
-    char dest[4] = "BTC";
-    int32_t result = komodo_faststateinit( &state, filename.c_str(), symbol, dest);
-}
-
 TEST(TestEvents, StateUpdate)
 {
     strcpy(ASSETCHAINS_SYMBOL, "JMJ");
@@ -884,6 +875,19 @@ TEST(TestEvents, StateUpdate)
     ASSETCHAINS_SYMBOL[0] = 0;
 }
 
+/***
+ * These require a copy of the komodostate file in the directory where
+ * this test is run from.
+ 
+TEST(TestEvents, FastStateInitActualFile)
+{
+    komodo_state state;
+    std::string filename = "komodostatesnapshot";
+    char symbol[4] = "KMD";
+    char dest[4] = "BTC";
+    int32_t result = komodo_faststateinit( &state, filename.c_str(), symbol, dest);
+}
+
 TEST(TestEvents, ParseStateFile)
 {
     std::string filename = "komodostatesnapshot";
@@ -903,5 +907,6 @@ TEST(TestEvents, ParseStateFile)
     }
     std::cout << "Ended at position " << std::to_string(pos) << std::endl;
 }
+*/
 
 } // namespace TestEvents
