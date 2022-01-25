@@ -184,7 +184,7 @@ int32_t komodo_parsestatefiledata(struct komodo_state *sp,uint8_t *filedata,long
 size_t write_event(std::shared_ptr<komodo::event> evt, FILE *fp)
 {
     std::stringstream ss;
-    ss << evt;
+    ss << *(evt);
     std::string buf = ss.str();
     return fwrite(buf.c_str(), buf.size(), 1, fp);
 }
