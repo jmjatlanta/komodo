@@ -878,34 +878,44 @@ TEST(TestEvents, StateUpdate)
 /***
  * These require a copy of the komodostate file in the directory where
  * this test is run from.
- 
+ *
 TEST(TestEvents, FastStateInitActualFile)
 {
     komodo_state state;
-    std::string filename = "komodostatesnapshot";
-    char symbol[4] = "KMD";
+    std::string filename = "komodostatesnapshot.594982";
+    char symbol[4] = "JMJ";
     char dest[4] = "BTC";
     int32_t result = komodo_faststateinit( &state, filename.c_str(), symbol, dest);
 }
 
 TEST(TestEvents, ParseStateFile)
 {
-    std::string filename = "komodostatesnapshot";
+    std::string filename = "komodostatesnapshot.594982";
     FILE* fp = fopen(filename.c_str(), "rb");
     komodo_state state;
-    char symbol[4] = "KMD";
+    char symbol[4] = "JMJ";
     char dest[4] = "BTC";
-    size_t pos = 0;
+    uint32_t good_record = 0;
+    uint32_t bad_record = 0;
     int32_t retval = 0;
+    size_t last_size = 0;
     while(retval != EOF)
     {
         // read the first record, which is just a 0
         retval = komodo_parsestatefile(&state, fp, symbol, dest);
-        if (state.events.size() > 0)
-            std::cout << "Successful read at position " << std::to_string(pos) << std::endl;
-        ++pos;
+        if (state.events.size() == last_size + 1)
+        {
+            ++good_record;
+        }
+        else
+        {
+            std::cout << "Bad read. Return value was " << std::to_string(retval) << std::endl;
+            ++bad_record;
+        }
+        last_size = state.events.size();
     }
-    std::cout << "Ended at position " << std::to_string(pos) << std::endl;
+    std::cout << "Ended with " << std::to_string(good_record) << " good records and " 
+            << std::to_string(bad_record) << " bad records." << std::endl;
 }
 */
 
