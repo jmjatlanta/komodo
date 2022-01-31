@@ -8,12 +8,24 @@
 
 extern pthread_mutex_t staked_mutex;
 
+static bool staked_doneinit = false;
+
+/****
+ * Undo a static set by is_STAKED
+ * This should only be called by unit tests
+ */
+void undo_init_STAKED()
+{
+    staked_doneinit = false;
+}
+
 int8_t is_STAKED(const char *chain_name) 
 {
-    static int8_t STAKED,doneinit;
+    static int32_t STAKED;
+
     if ( chain_name[0] == 0 )
         return(0);
-    if (doneinit == 1 && ASSETCHAINS_SYMBOL[0] != 0)
+    if (staked_doneinit && ASSETCHAINS_SYMBOL[0] != 0)
         return(STAKED);
     else STAKED = 0;
     if ( (strcmp(chain_name, "LABS") == 0) ) 
@@ -26,7 +38,7 @@ int8_t is_STAKED(const char *chain_name)
         STAKED = 4; // These chains are for testing consensus to create a chain etc. Not meant to be actually used for anything important.
     else if ( (strcmp(chain_name, "THIS_CHAIN_IS_BANNED") == 0) )
         STAKED = 255; // Any chain added to this group is banned, no notarisations are valid, as a consensus rule. Can be used to remove a chain from cluster if needed.
-    doneinit = 1;
+    staked_doneinit = true;
     return(STAKED);
 };
 

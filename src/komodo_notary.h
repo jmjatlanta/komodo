@@ -19,9 +19,12 @@
 
 #include "notaries_staked.h"
 
+// after this height, the elected notaries are used instead of the genesis notaries
 #define KOMODO_MAINNET_START 178999
+// after this height, watch for fee stealing
 #define KOMODO_NOTARIES_HEIGHT1 814000
-#define KOMODO_NOTARIES_HEIGHT2 2588672
+ // after this height, the block reward is reduced by the fees within the block
+ #define KOMODO_NOTARIES_HEIGHT2 2588672
 
 #define CRYPTO777_PUBSECPSTR "020e46e79a2a8d12b9b5d12c7a91adb4e454edfae43c0a0cb805427d2ac7613fd9"
 
