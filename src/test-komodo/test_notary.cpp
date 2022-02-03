@@ -4,8 +4,6 @@
 
 #include <gtest/gtest.h>
 
-void undo_init_notaries(); // test helper
-
 namespace TestNotary
 {
 
@@ -47,7 +45,7 @@ TEST(TestNotary, KomodoNotaries)
 {
     // Test komodo_notaries(), getkmdseason()
     ASSETCHAINS_SYMBOL[0] = 0;
-    undo_init_notaries();
+    teardownChain();
     uint8_t pubkeys[64][33];
     int32_t height = 0;
     uint32_t timestamp = 0;
@@ -86,7 +84,7 @@ TEST(TestNotary, KomodoNotaries)
     // also tests STAKED_era()
     height = 0;
     timestamp = 1;
-    undo_init_notaries();
+    teardownChain();
     strcpy(ASSETCHAINS_SYMBOL, "LABS");
     // we should be in era 1 now
     result = komodo_notaries(pubkeys, height, timestamp);
@@ -121,7 +119,7 @@ TEST(TestNotary, KomodoNotaries)
     EXPECT_EQ( getacseason(1751328001), 0);
 
     // cleanup
-    undo_init_notaries();
+    teardownChain();
 }
 
 TEST(TestNotary, ElectedNotary)
@@ -129,7 +127,7 @@ TEST(TestNotary, ElectedNotary)
     // exercise the routine that checks to see if a particular public key is a notary at the current height
 
     // setup
-    undo_init_notaries();
+    teardownChain();
     my_key first_era("02ebfc784a4ba768aad88d44d1045d240d47b26e248cafaf1c5169a42d7a61d344");
     my_key second_era("030f34af4b908fb8eb2099accb56b8d157d49f6cfb691baa80fdd34f385efed961");
 

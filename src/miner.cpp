@@ -192,9 +192,10 @@ int32_t komodo_waituntilelegible(uint32_t blocktime, int32_t stakeHeight, uint32
  * @param _scriptPubKeyIn the script for the public key
  * @param gpucount assists in calculating the block's nTime
  * @param isStake
+ * @param includeMempool true to include mempool transactions
  * @returns the block template
  */
-CBlockTemplate* CreateNewBlock(const CPubKey _pk, const CScript& _scriptPubKeyIn, int32_t gpucount, bool isStake)
+CBlockTemplate* CreateNewBlock(const CPubKey _pk, const CScript& _scriptPubKeyIn, int32_t gpucount, bool isStake, bool includeMempool)
 {
     CScript scriptPubKeyIn(_scriptPubKeyIn);
 
@@ -312,175 +313,178 @@ CBlockTemplate* CreateNewBlock(const CPubKey _pk, const CScript& _scriptPubKeyIn
         vecPriority.reserve(mempool.mapTx.size() + 1);
 
         // now add transactions from the mem pool
-        int32_t Notarisations = 0; uint64_t txvalue;
-        for (CTxMemPool::indexed_transaction_set::iterator mi = mempool.mapTx.begin();
-             mi != mempool.mapTx.end(); ++mi)
+        if (includeMempool)
         {
-            //break; // dont add any tx to block.. debug for KMD fix. Disabled. 
-            const CTransaction& tx = mi->GetTx();
-
-            int64_t nLockTimeCutoff = (STANDARD_LOCKTIME_VERIFY_FLAGS & LOCKTIME_MEDIAN_TIME_PAST)
-            ? nMedianTimePast
-            : pblock->GetBlockTime();
-
-            if (tx.IsCoinBase() || !IsFinalTx(tx, nHeight, nLockTimeCutoff) || IsExpiredTx(tx, nHeight))
+            int32_t Notarisations = 0; 
+            for (CTxMemPool::indexed_transaction_set::iterator mi = mempool.mapTx.begin();
+                mi != mempool.mapTx.end(); ++mi)
             {
-                //fprintf(stderr,"coinbase.%d finaltx.%d expired.%d\n",tx.IsCoinBase(),IsFinalTx(tx, nHeight, nLockTimeCutoff),IsExpiredTx(tx, nHeight));
-                continue;
-            }
-            txvalue = tx.GetValueOut();
-            if ( KOMODO_VALUETOOBIG(txvalue) != 0 )
-                continue;
-            if ( ASSETCHAINS_SYMBOL[0] == 0 && komodo_validate_interest(tx,nHeight,(uint32_t)pblock->nTime,0) < 0 )
-            {
-                fprintf(stderr,"CreateNewBlock: komodo_validate_interest failure txid.%s nHeight.%d nTime.%u vs locktime.%u\n",tx.GetHash().ToString().c_str(),nHeight,(uint32_t)pblock->nTime,(uint32_t)tx.nLockTime);
-                continue;
-            }
+                //break; // dont add any tx to block.. debug for KMD fix. Disabled. 
+                const CTransaction& tx = mi->GetTx();
 
-            COrphan* porphan = NULL;
-            double dPriority = 0;
-            CAmount nTotalIn = 0;
-            bool fMissingInputs = false;
-            bool fNotarisation = false;
-            std::vector<int8_t> TMP_NotarisationNotaries;
-            if (tx.IsCoinImport())
-            {
-                CAmount nValueIn = GetCoinImportValue(tx); // burn amount
-                nTotalIn += nValueIn;
-                dPriority += (double)nValueIn * 1000;  // flat multiplier... max = 1e16.
-            } else {
-                TMP_NotarisationNotaries.clear();
-                bool fToCryptoAddress = false;
-                if ( numSN != 0 && notarypubkeys[0][0] != 0 && komodo_is_notarytx(tx) == 1 )
-                    fToCryptoAddress = true;
+                int64_t nLockTimeCutoff = (STANDARD_LOCKTIME_VERIFY_FLAGS & LOCKTIME_MEDIAN_TIME_PAST)
+                ? nMedianTimePast
+                : pblock->GetBlockTime();
 
-                BOOST_FOREACH(const CTxIn& txin, tx.vin)
+                if (tx.IsCoinBase() || !IsFinalTx(tx, nHeight, nLockTimeCutoff) || IsExpiredTx(tx, nHeight))
                 {
-                    if (tx.IsPegsImport() && txin.prevout.n==10e8)
-                    {
-                        CAmount nValueIn = GetCoinImportValue(tx); // burn amount
-                        nTotalIn += nValueIn;
-                        dPriority += (double)nValueIn * 1000;  // flat multiplier... max = 1e16.
-                        continue;
-                    }
-                    // Read prev transaction
-                    if (!view.HaveCoins(txin.prevout.hash))
-                    {
-                        // This should never happen; all transactions in the memory
-                        // pool should connect to either transactions in the chain
-                        // or other transactions in the memory pool.
-                        if (!mempool.mapTx.count(txin.prevout.hash))
-                        {
-                            LogPrintf("ERROR: mempool transaction missing input\n");
-                            // if (fDebug) assert("mempool transaction missing input" == 0);
-                            fMissingInputs = true;
-                            if (porphan)
-                                vOrphan.pop_back();
-                            break;
-                        }
+                    //fprintf(stderr,"coinbase.%d finaltx.%d expired.%d\n",tx.IsCoinBase(),IsFinalTx(tx, nHeight, nLockTimeCutoff),IsExpiredTx(tx, nHeight));
+                    continue;
+                }
+                uint64_t txvalue = tx.GetValueOut();
+                if ( KOMODO_VALUETOOBIG(txvalue) != 0 )
+                    continue;
+                if ( ASSETCHAINS_SYMBOL[0] == 0 && komodo_validate_interest(tx,nHeight,(uint32_t)pblock->nTime,0) < 0 )
+                {
+                    fprintf(stderr,"CreateNewBlock: komodo_validate_interest failure txid.%s nHeight.%d nTime.%u vs locktime.%u\n",tx.GetHash().ToString().c_str(),nHeight,(uint32_t)pblock->nTime,(uint32_t)tx.nLockTime);
+                    continue;
+                }
 
-                        // Has to wait for dependencies
-                        if (!porphan)
-                        {
-                            // Use list for automatic deletion
-                            vOrphan.push_back(COrphan(&tx));
-                            porphan = &vOrphan.back();
-                        }
-                        mapDependers[txin.prevout.hash].push_back(porphan);
-                        porphan->setDependsOn.insert(txin.prevout.hash);
-                        nTotalIn += mempool.mapTx.find(txin.prevout.hash)->GetTx().vout[txin.prevout.n].nValue;
-                        continue;
-                    }
-                    const CCoins* coins = view.AccessCoins(txin.prevout.hash);
-                    assert(coins);
-
-                    CAmount nValueIn = coins->vout[txin.prevout.n].nValue;
+                COrphan* porphan = NULL;
+                double dPriority = 0;
+                CAmount nTotalIn = 0;
+                bool fMissingInputs = false;
+                bool fNotarisation = false;
+                std::vector<int8_t> TMP_NotarisationNotaries;
+                if (tx.IsCoinImport())
+                {
+                    CAmount nValueIn = GetCoinImportValue(tx); // burn amount
                     nTotalIn += nValueIn;
+                    dPriority += (double)nValueIn * 1000;  // flat multiplier... max = 1e16.
+                } else {
+                    TMP_NotarisationNotaries.clear();
+                    bool fToCryptoAddress = false;
+                    if ( numSN != 0 && notarypubkeys[0][0] != 0 && komodo_is_notarytx(tx) == 1 )
+                        fToCryptoAddress = true;
 
-                    int nConf = nHeight - coins->nHeight;
-                    
-                    uint8_t *script; int32_t scriptlen; uint256 hash; CTransaction tx1;
-                    // loop over notaries array and extract index of signers.
-                    if ( fToCryptoAddress && myGetTransaction(txin.prevout.hash,tx1,hash) )
+                    BOOST_FOREACH(const CTxIn& txin, tx.vin)
                     {
-                        for (int8_t i = 0; i < numSN; i++) 
+                        if (tx.IsPegsImport() && txin.prevout.n==10e8)
                         {
-                            script = (uint8_t *)&tx1.vout[txin.prevout.n].scriptPubKey[0];
-                            scriptlen = (int32_t)tx1.vout[txin.prevout.n].scriptPubKey.size();
-                            if ( scriptlen == 35 && script[0] == 33 && script[34] == OP_CHECKSIG && memcmp(script+1,notarypubkeys[i],33) == 0 )
+                            CAmount nValueIn = GetCoinImportValue(tx); // burn amount
+                            nTotalIn += nValueIn;
+                            dPriority += (double)nValueIn * 1000;  // flat multiplier... max = 1e16.
+                            continue;
+                        }
+                        // Read prev transaction
+                        if (!view.HaveCoins(txin.prevout.hash))
+                        {
+                            // This should never happen; all transactions in the memory
+                            // pool should connect to either transactions in the chain
+                            // or other transactions in the memory pool.
+                            if (!mempool.mapTx.count(txin.prevout.hash))
                             {
-                                // We can add the index of each notary to vector, and clear it if this notarisation is not valid later on.
-                                TMP_NotarisationNotaries.push_back(i);                          
+                                LogPrintf("ERROR: mempool transaction missing input\n");
+                                // if (fDebug) assert("mempool transaction missing input" == 0);
+                                fMissingInputs = true;
+                                if (porphan)
+                                    vOrphan.pop_back();
+                                break;
+                            }
+
+                            // Has to wait for dependencies
+                            if (!porphan)
+                            {
+                                // Use list for automatic deletion
+                                vOrphan.push_back(COrphan(&tx));
+                                porphan = &vOrphan.back();
+                            }
+                            mapDependers[txin.prevout.hash].push_back(porphan);
+                            porphan->setDependsOn.insert(txin.prevout.hash);
+                            nTotalIn += mempool.mapTx.find(txin.prevout.hash)->GetTx().vout[txin.prevout.n].nValue;
+                            continue;
+                        }
+                        const CCoins* coins = view.AccessCoins(txin.prevout.hash);
+                        assert(coins);
+
+                        CAmount nValueIn = coins->vout[txin.prevout.n].nValue;
+                        nTotalIn += nValueIn;
+
+                        int nConf = nHeight - coins->nHeight;
+                        
+                        uint8_t *script; int32_t scriptlen; uint256 hash; CTransaction tx1;
+                        // loop over notaries array and extract index of signers.
+                        if ( fToCryptoAddress && myGetTransaction(txin.prevout.hash,tx1,hash) )
+                        {
+                            for (int8_t i = 0; i < numSN; i++) 
+                            {
+                                script = (uint8_t *)&tx1.vout[txin.prevout.n].scriptPubKey[0];
+                                scriptlen = (int32_t)tx1.vout[txin.prevout.n].scriptPubKey.size();
+                                if ( scriptlen == 35 && script[0] == 33 && script[34] == OP_CHECKSIG && memcmp(script+1,notarypubkeys[i],33) == 0 )
+                                {
+                                    // We can add the index of each notary to vector, and clear it if this notarisation is not valid later on.
+                                    TMP_NotarisationNotaries.push_back(i);                          
+                                }
+                            }
+                        }
+                        dPriority += (double)nValueIn * nConf;
+                    }
+                    if ( numSN != 0 && notarypubkeys[0][0] != 0 && TMP_NotarisationNotaries.size() >= numSN / 5 )
+                    {
+                        // check a notary didnt sign twice (this would be an invalid notarisation later on and cause problems)
+                        std::set<int> checkdupes( TMP_NotarisationNotaries.begin(), TMP_NotarisationNotaries.end() );
+                        if ( checkdupes.size() != TMP_NotarisationNotaries.size() ) 
+                        {
+                            fprintf(stderr, "possible notarisation is signed multiple times by same notary, passed as normal transaction.\n");
+                        } else fNotarisation = true;
+                    }
+                    nTotalIn += tx.GetShieldedValueIn();
+                }
+
+                if (fMissingInputs) continue;
+
+                // Priority is sum(valuein * age) / modified_txsize
+                unsigned int nTxSize = ::GetSerializeSize(tx, SER_NETWORK, PROTOCOL_VERSION);
+                dPriority = tx.ComputePriority(dPriority, nTxSize);
+
+                uint256 hash = tx.GetHash();
+                mempool.ApplyDeltas(hash, dPriority, nTotalIn);
+
+                CFeeRate feeRate(nTotalIn-tx.GetValueOut(), nTxSize);
+
+                if ( fNotarisation ) 
+                {
+                    // Special miner for notary pay chains. Can only enter this if numSN/notarypubkeys is set higher up.
+                    if ( tx.vout.size() == 2 && tx.vout[1].nValue == 0 )
+                    {
+                        // Get the OP_RETURN for the notarisation
+                        uint8_t *script = (uint8_t *)&tx.vout[1].scriptPubKey[0];
+                        int32_t scriptlen = (int32_t)tx.vout[1].scriptPubKey.size();
+                        if ( script[0] == OP_RETURN )
+                        {
+                            Notarisations++;
+                            if ( Notarisations > 1 ) 
+                            {
+                                fprintf(stderr, "skipping notarization.%d\n",Notarisations);
+                                // Any attempted notarization needs to be in its own block!
+                                continue;
+                            }
+                            int32_t notarizedheight = komodo_getnotarizedheight(pblock->nTime, nHeight, script, scriptlen);
+                            if ( notarizedheight != 0 )
+                            {
+                                // this is the first one we see, add it to the block as TX1 
+                                NotarisationNotaries = TMP_NotarisationNotaries;
+                                dPriority = 1e16;
+                                fNotarisationBlock = true;
+                                //fprintf(stderr, "Notarisation %s set to maximum priority\n",hash.ToString().c_str());
                             }
                         }
                     }
-                    dPriority += (double)nValueIn * nConf;
                 }
-                if ( numSN != 0 && notarypubkeys[0][0] != 0 && TMP_NotarisationNotaries.size() >= numSN / 5 )
+                else if ( dPriority == 1e16 )
                 {
-                    // check a notary didnt sign twice (this would be an invalid notarisation later on and cause problems)
-                    std::set<int> checkdupes( TMP_NotarisationNotaries.begin(), TMP_NotarisationNotaries.end() );
-                    if ( checkdupes.size() != TMP_NotarisationNotaries.size() ) 
-                    {
-                        fprintf(stderr, "possible notarisation is signed multiple times by same notary, passed as normal transaction.\n");
-                    } else fNotarisation = true;
+                    dPriority -= 10;
+                    // make sure notarisation is tx[1] in block. 
                 }
-                nTotalIn += tx.GetShieldedValueIn();
-            }
-
-            if (fMissingInputs) continue;
-
-            // Priority is sum(valuein * age) / modified_txsize
-            unsigned int nTxSize = ::GetSerializeSize(tx, SER_NETWORK, PROTOCOL_VERSION);
-            dPriority = tx.ComputePriority(dPriority, nTxSize);
-
-            uint256 hash = tx.GetHash();
-            mempool.ApplyDeltas(hash, dPriority, nTotalIn);
-
-            CFeeRate feeRate(nTotalIn-tx.GetValueOut(), nTxSize);
-
-            if ( fNotarisation ) 
-            {
-                // Special miner for notary pay chains. Can only enter this if numSN/notarypubkeys is set higher up.
-                if ( tx.vout.size() == 2 && tx.vout[1].nValue == 0 )
+                if (porphan)
                 {
-                    // Get the OP_RETURN for the notarisation
-                    uint8_t *script = (uint8_t *)&tx.vout[1].scriptPubKey[0];
-                    int32_t scriptlen = (int32_t)tx.vout[1].scriptPubKey.size();
-                    if ( script[0] == OP_RETURN )
-                    {
-                        Notarisations++;
-                        if ( Notarisations > 1 ) 
-                        {
-                            fprintf(stderr, "skipping notarization.%d\n",Notarisations);
-                            // Any attempted notarization needs to be in its own block!
-                            continue;
-                        }
-                        int32_t notarizedheight = komodo_getnotarizedheight(pblock->nTime, nHeight, script, scriptlen);
-                        if ( notarizedheight != 0 )
-                        {
-                            // this is the first one we see, add it to the block as TX1 
-                            NotarisationNotaries = TMP_NotarisationNotaries;
-                            dPriority = 1e16;
-                            fNotarisationBlock = true;
-                            //fprintf(stderr, "Notarisation %s set to maximum priority\n",hash.ToString().c_str());
-                        }
-                    }
+                    porphan->dPriority = dPriority;
+                    porphan->feeRate = feeRate;
                 }
+                else
+                    vecPriority.push_back(TxPriority(dPriority, feeRate, &(mi->GetTx())));
             }
-            else if ( dPriority == 1e16 )
-            {
-                dPriority -= 10;
-                // make sure notarisation is tx[1] in block. 
-            }
-            if (porphan)
-            {
-                porphan->dPriority = dPriority;
-                porphan->feeRate = feeRate;
-            }
-            else
-                vecPriority.push_back(TxPriority(dPriority, feeRate, &(mi->GetTx())));
-        }
+        } // includeMempool
 
         // Collect transactions into block
         uint64_t nBlockSize = 1000;
@@ -964,7 +968,7 @@ void IncrementExtraNonce(CBlock* pblock, CBlockIndex* pindexPrev, unsigned int& 
  * @param isStake
  * @returns the block template
  */
-CBlockTemplate* CreateNewBlockWithKey(CReserveKey& reservekey, int32_t nHeight, int32_t gpucount, bool isStake)
+CBlockTemplate* CreateNewBlockWithKey(CReserveKey& reservekey, int32_t nHeight, int32_t gpucount, bool isStake, bool includeMempool)
 {
     CPubKey pubkey; CScript scriptPubKey; uint8_t *script,*ptr; int32_t i,len;
     if ( nHeight == 1 && ASSETCHAINS_COMMISSION != 0 && ASSETCHAINS_SCRIPTPUB[ASSETCHAINS_SCRIPTPUB.back()] != 49 && ASSETCHAINS_SCRIPTPUB[ASSETCHAINS_SCRIPTPUB.back()-1] != 51 )
@@ -1007,7 +1011,7 @@ CBlockTemplate* CreateNewBlockWithKey(CReserveKey& reservekey, int32_t nHeight, 
                 return NULL;
         }
     }
-    return CreateNewBlock(pubkey, scriptPubKey, gpucount, isStake);
+    return CreateNewBlock(pubkey, scriptPubKey, gpucount, isStake, includeMempool);
 }
 
 void komodo_sendmessage(int32_t minpeers,int32_t maxpeers,const char *message,std::vector<uint8_t> payload)

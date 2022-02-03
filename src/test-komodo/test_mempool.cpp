@@ -9,6 +9,10 @@
 #include "txmempool.h"
 #include "policy/fees.h"
 #include "util.h"
+#include "testutils.h"
+#include "komodo_notary.h"
+
+extern int32_t USE_EXTERNAL_PUBKEY;
 
 void CreateJoinSplitSignature(CMutableTransaction& mtx, uint32_t consensusBranchId) {
     // Generate an ephemeral keypair.
@@ -148,6 +152,8 @@ TEST(Mempool, PriorityStatsDoNotCrash) {
 }
 
 TEST(Mempool, TxInputLimit) {
+    teardownChain();
+    setupChain();
     SelectParams(CBaseChainParams::REGTEST);
 
     CTxMemPool pool(::minRelayTxFee);
@@ -329,4 +335,57 @@ TEST(Mempool, SproutNegativeVersionTxWhenOverwinterActive) {
 
     // Revert to default
     UpdateNetworkUpgradeParameters(Consensus::UPGRADE_OVERWINTER, Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT);
+}
+
+TEST(Mempool, TransactionsRemain)
+{
+    /****
+     * Transactions that are not part of a block should remain in the pool
+     * even if a fork used them
+     */
+    TestChain testChain;
+    Params().SetRegTestSimulateNotarizations(false); // don't fake notarizations
+    COINBASE_MATURITY = 100;
+    USE_EXTERNAL_PUBKEY = 0; // we need custom keys for this
+    std::shared_ptr<TestWallet> notaryWallet = testChain.AddWallet(testChain.getNotaryKey());
+    std::shared_ptr<TestWallet> aliceWallet = testChain.AddWallet();
+    std::shared_ptr<TestWallet> charlieWallet = testChain.AddWallet();
+    CBlock blockA0 = testChain.generateBlock(uint256(), true, notaryWallet);
+    // mature the coinbase
+    for(uint8_t i = chainActive.Height() + 1 ; i < 110; ++i)
+    {
+        blockA0 = testChain.generateBlock(blockA0.GetHash(), true, notaryWallet);
+    }
+    // put a transaction in the mempool
+    uint32_t lastMempoolSize = testChain.MempoolSize();
+    CTransaction testTx = notaryWallet->CreateSpendTransaction(aliceWallet, 100000, 1000);
+    EXPECT_TRUE( testChain.acceptTx(testTx).IsValid() );
+    EXPECT_EQ( testChain.MempoolSize(), lastMempoolSize+1);
+    lastMempoolSize = testChain.MempoolSize();
+    // Chain A is longest
+    CBlock blockA1 = testChain.generateBlock(blockA0.GetHash(), false, charlieWallet);
+    EXPECT_EQ( testChain.BlockHash(), blockA1.GetHash() );
+    // Tx still in mempool?
+    EXPECT_EQ( testChain.MempoolSize(), lastMempoolSize);
+    // Add another block to the A chain
+    CBlock blockA2 = testChain.generateBlock(blockA1.GetHash(), false, charlieWallet);
+    EXPECT_EQ( testChain.MempoolSize(), lastMempoolSize);
+    EXPECT_EQ( testChain.BlockHash(), blockA2.GetHash() );
+    // Chain B forks from block A1, and block contains mempool tx. But chain A is still longest
+    CBlock blockB2 = testChain.generateBlock(blockA1.GetHash(), true, aliceWallet);
+    // Tx still in mempool? Yes, as B is not longest chain
+    EXPECT_EQ( testChain.MempoolSize(), lastMempoolSize);
+    // Is Chain A is still longest
+    EXPECT_EQ( testChain.BlockHash(), blockA2.GetHash() );
+    // Chain B should become longest
+    CBlock blockB3 = testChain.generateBlock(blockB2.GetHash(), false, aliceWallet); 
+    EXPECT_EQ( testChain.BlockHash(), blockB3.GetHash() );
+    // Tx still in mempool? No, as B ate it
+    EXPECT_EQ( testChain.MempoolSize(), lastMempoolSize-1);
+    // Chain A returns to being the longest chain
+    CBlock blockA3 = testChain.generateBlock(blockA2.GetHash(), false, charlieWallet);
+    CBlock blockA4 = testChain.generateBlock(blockA3.GetHash(), false, charlieWallet);
+    EXPECT_EQ( testChain.BlockHash(), blockA4.GetHash());
+    // Tx still in mempool? Yes. The reorg put it back.
+    EXPECT_EQ( testChain.MempoolSize(), lastMempoolSize);
 }

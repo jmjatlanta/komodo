@@ -1,6 +1,7 @@
 #pragma once
 
 #include "main.h"
+#include "wallet/wallet.h"
 
 #define VCH(a,b) std::vector<unsigned char>(a, a + b)
 
@@ -14,13 +15,19 @@ extern std::string notaryPubkey;
 extern std::string notarySecret;
 extern CKey notaryKey;
 
+class TestWallet;
+
+/***
+ * Clear any leftovers from tests
+ */
+void teardownChain();
 
 void setupChain();
 /***
  * Generate a block
  * @param block a place to store the block (read from disk)
  */
-void generateBlock(CBlock *block=NULL);
+void generateBlock(CBlock *block=nullptr, bool includeMempool = true, std::shared_ptr<TestWallet> wallet = nullptr);
 bool acceptTx(const CTransaction tx, CValidationState &state);
 void acceptTxFail(const CTransaction tx);
 /****
@@ -32,9 +39,6 @@ void acceptTxFail(const CTransaction tx);
 CTransaction getInputTx(CScript scriptPubKey);
 CMutableTransaction spendTx(const CTransaction &txIn, int nOut=0);
 std::vector<uint8_t> getSig(const CMutableTransaction mtx, CScript inputPubKey, int nIn=0);
-
-
-class TestWallet;
 
 class TestChain
 {
@@ -60,9 +64,18 @@ public:
     CCoinsViewCache *GetCoinsViewCache();
     /**
      * Generate a block
+     * @param prevHash the hash of the previous block (blank attaches to longest chain)
+     * @param includeMempool true to include mempool transactions in block
+     * @param miner who gets the credit
      * @returns the block generated
      */
-    CBlock generateBlock();
+    CBlock generateBlock(uint256 prevHash, bool includeMempool = true, std::shared_ptr<TestWallet> miner = nullptr);
+    /****
+     * @brief add a block to the longest chain
+     * @param includeMempool true to include mempool transactions in block
+     * @returns the block added
+     */
+    CBlock generateBlock(bool includeMempool = true);
     /****
      * @brief set the chain time to something reasonable
      * @note must be called after generateBlock if you
@@ -90,10 +103,20 @@ public:
      * @returns the wallet
      */
     std::shared_ptr<TestWallet> AddWallet();
+    /***
+     * @return the number of transactions in the mempool
+     */
+    uint32_t MempoolSize();
+    /***
+     * @param height the height to look for
+     * @returns the block hash that is at the height of the longest chain
+     */
+    uint256 BlockHash(uint32_t height = 0);
 private:
     std::vector<std::shared_ptr<TestWallet>> toBeNotified;
     boost::filesystem::path dataDir;
     std::string previousNetwork;
+    bool generateBlockAndNotify(CBlock& in, bool includeMempool, std::shared_ptr<TestWallet> miner = nullptr);
 };
 
 /***
@@ -101,7 +124,7 @@ private:
  * - It does not keep track of spent transactions
  * - Blocks containing vOuts that apply are added to the front of a vector
  */
-class TestWallet
+class TestWallet : public CWallet
 {
 public:
     TestWallet(TestChain* chain);
@@ -138,7 +161,8 @@ public:
      * @param needed how much is needed
      * @returns a pair of CTransaction and the n value of the vout
      */
-    std::pair<CTransaction, uint32_t> GetAvailable(CAmount needed);
+    std::pair<CTransaction, uint32_t> GetAvailable(CAmount needed, bool remove = true);
+
     /***
      * Add a transaction to the list of available vouts
      * @param tx the transaction
@@ -150,9 +174,10 @@ public:
      * @param to who to send funds to
      * @param amount
      * @param fee
+     * @param remove to remove from spendable collection
      * @returns the transaction
      */
-    CTransaction CreateSpendTransaction(std::shared_ptr<TestWallet> to, CAmount amount, CAmount fee = 0);
+    CTransaction CreateSpendTransaction(std::shared_ptr<TestWallet> to, CAmount amount, CAmount fee = 0, bool remove = true);
     /***
      * Transfer to another user (sends to mempool)
      * @param to who to transfer to

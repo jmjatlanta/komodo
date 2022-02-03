@@ -116,6 +116,13 @@ public:
     std::string GetFoundersRewardAddressAtIndex(int i) const;
     /** Enforce coinbase consensus rule in regtest mode */
     void SetRegTestCoinbaseMustBeProtected() { consensus.fCoinbaseMustBeProtected = true; }
+    /****
+     * @brief simulate notarizations every 7 blocks
+     * @note regtest only
+     * @param val true to simulate notarizations
+     */
+    void SetRegTestSimulateNotarizations(bool val) const { assert(strNetworkID == "regtest"); simulateNotarizations = val; }
+    bool GetRegTestSimulateNotarizations() const { return simulateNotarizations; }
 
     void SetDefaultPort(uint16_t port) { nDefaultPort = port; }
     void SetCheckpointData(CCheckpointData checkpointData);
@@ -154,6 +161,7 @@ protected:
     bool fRequireStandard = false;
     bool fMineBlocksOnDemand = false;
     bool fTestnetToBeDeprecatedFieldRPC = false;
+    mutable bool simulateNotarizations = false; // regtest only
     CCheckpointData checkpointData;
     std::vector<std::string> vFoundersRewardAddress;
 };

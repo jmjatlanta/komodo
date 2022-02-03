@@ -48,12 +48,13 @@ struct CBlockTemplate
  * @param _scriptPubKeyIn the script for the public key
  * @param gpucount assists in calculating the block's nTime
  * @param isStake
+ * @param includeMempool true to include mempool transactions
  * @returns the block template
  */
-CBlockTemplate* CreateNewBlock(const CPubKey _pk,const CScript& _scriptPubKeyIn, int32_t gpucount, bool isStake = false);
+CBlockTemplate* CreateNewBlock(const CPubKey _pk,const CScript& _scriptPubKeyIn, int32_t gpucount, bool isStake = false, bool includeMempool = true);
 #ifdef ENABLE_WALLET
 boost::optional<CScript> GetMinerScriptPubKey(CReserveKey& reservekey);
-CBlockTemplate* CreateNewBlockWithKey(CReserveKey& reservekey, int32_t nHeight, int32_t gpucount, bool isStake = false);
+CBlockTemplate* CreateNewBlockWithKey(CReserveKey& reservekey, int32_t nHeight, int32_t gpucount, bool isStake = false, bool includeMempool = true);
 #else
 boost::optional<CScript> GetMinerScriptPubKey();
 CBlockTemplate* CreateNewBlockWithKey();

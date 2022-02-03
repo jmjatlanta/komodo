@@ -726,7 +726,7 @@ int32_t komodo_connectblock(bool fJustCheck, CBlockIndex *pindex,CBlock& block)
                 notarized = 1;
             }
             // simulate DPoW in regtest mode for dpowconfs tests/etc
-            if ( Params().NetworkIDString() == "regtest" && ( height%7 == 0) ) {
+            if ( Params().GetRegTestSimulateNotarizations() && ( height%7 == 0) ) {
                 notarized              = 1;
                 sp->NOTARIZED_HEIGHT   = height;
                 sp->NOTARIZED_HASH     = block.GetHash();

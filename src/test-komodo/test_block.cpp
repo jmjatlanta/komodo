@@ -203,7 +203,10 @@ TEST(block_tests, TestProcessBlock)
     auto bob = chain.AddWallet();
     auto charlie = chain.AddWallet();
     CBlock lastBlock = chain.generateBlock(); // gives notary everything
-    EXPECT_EQ(chain.GetIndex()->GetHeight(), 1);
+    // mature the coinbase
+    for(int i = 1; i < 102; ++i)
+        lastBlock = chain.generateBlock();
+    EXPECT_EQ(chain.GetIndex()->GetHeight(), 102);
     chain.IncrementChainTime();
     auto notaryPrevOut = notary->GetAvailable(100000);
     // add a transaction to the mempool
@@ -216,7 +219,7 @@ TEST(block_tests, TestProcessBlock)
     // no transactions
     EXPECT_FALSE( ProcessNewBlock(false, newHeight, state, nullptr, &block, false, nullptr) );
     EXPECT_EQ(state.GetRejectReason(), "bad-blk-length");
-    EXPECT_EQ(chain.GetIndex()->GetHeight(), 1);
+    EXPECT_EQ(chain.GetIndex()->GetHeight(), 102);
     // add first a coinbase tx
     auto consensusParams = Params().GetConsensus();
     CMutableTransaction txNew = CreateNewContextualCMutableTransaction(consensusParams, newHeight);
@@ -255,6 +258,9 @@ TEST(block_tests, TestProcessBadBlock)
     auto bob = chain.AddWallet();
     auto charlie = chain.AddWallet();
     CBlock lastBlock = chain.generateBlock(); // genesis block
+    // mature coinbase
+    for(int i = 1; i < 102; ++i)
+        lastBlock = chain.generateBlock();
     auto notaryPrevOut = notary->GetAvailable(100000);
     // add a transaction to the mempool
     CTransaction fundAlice = notary->CreateSpendTransaction(alice, 100000);

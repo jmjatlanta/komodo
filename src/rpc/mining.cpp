@@ -248,7 +248,65 @@ bool CalcPoW(CBlock *pblock)
     return false;
 }
 
-//Value generate(const Array& params, bool fHelp)
+/****
+ * @brief mine a block
+ * @note Used for unit testing. Typical use should instead use the generate(UniValue...) below
+ * @param prevHash the hash of the previous block
+ * @param includeMempool true to include mempool transactions
+ * @param reserveKey the key to use
+ * @returns a UniValue array of block hashes
+ */
+UniValue generate(uint256 prevHash, bool includeMempool, CReserveKey &reserveKey)
+{
+    if (GetArg("-mineraddress", "").empty()) {
+        if (!pwalletMain) {
+            throw JSONRPCError(RPC_METHOD_NOT_FOUND, "Wallet disabled and -mineraddress not set");
+        }
+    }
+
+    int nHeight = 0;
+    CBlockIndex *prevIndex = nullptr;
+    if (prevHash != uint256() )
+    {
+        // if we are not connecting to tip, we need to calculate the height
+        prevIndex = mapBlockIndex.at(prevHash);
+        if (prevIndex != nullptr)
+            nHeight = prevIndex->GetHeight();
+    }
+    else
+    {
+        nHeight = chainActive.Height();
+        prevIndex = chainActive.Tip();
+    }
+
+    unsigned int nExtraNonce = 0;
+    UniValue blockHashes(UniValue::VARR);
+    uint64_t lastTime = 0;
+    // Validation may fail if block generation is too fast
+    if (GetTime() == lastTime) MilliSleep(1001);
+    lastTime = GetTime();
+
+    std::unique_ptr<CBlockTemplate> pblocktemplate(CreateNewBlockWithKey(reserveKey,nHeight,KOMODO_MAXGPUCOUNT, false, includeMempool));
+
+    if (!pblocktemplate.get())
+        throw JSONRPCError(RPC_INTERNAL_ERROR, "Wallet keypool empty");
+    CBlock *pblock = &pblocktemplate->block;
+    if (prevHash != uint256{})
+        pblock->hashPrevBlock = prevHash;
+    {
+        LOCK(cs_main);
+        IncrementExtraNonce(pblock, prevIndex, nExtraNonce);
+    }
+
+    CalcPoW(pblock); // add PoW
+    CValidationState state;
+    if (!ProcessNewBlock(1,nHeight+1,state, NULL, pblock, true, NULL))
+        throw JSONRPCError(RPC_INTERNAL_ERROR, "ProcessNewBlock, block not accepted");
+    ++nHeight;
+    blockHashes.push_back(pblock->GetHash().GetHex());
+    return blockHashes;
+}
+
 UniValue generate(const UniValue& params, bool fHelp, const CPubKey& mypk)
 {
     if (fHelp || params.size() < 1 || params.size() > 1)
