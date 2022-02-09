@@ -389,3 +389,61 @@ TEST(Mempool, TransactionsRemain)
     // Tx still in mempool? Yes. The reorg put it back.
     EXPECT_EQ( testChain.MempoolSize(), lastMempoolSize);
 }
+
+extern uint32_t VALIDATE_INTEREST_HARDFORK_HEIGHT;
+extern uint32_t VALIDATE_INTEREST_HARDFORK_TIMEADJUST_HEIGHT;
+
+TEST(Mempool, OldTransactions)
+{
+    // get past the hardfork
+    VALIDATE_INTEREST_HARDFORK_HEIGHT = 0;
+    VALIDATE_INTEREST_HARDFORK_TIMEADJUST_HEIGHT = 0;
+
+    TestChain testChain;
+    auto notaryWallet = testChain.AddWallet(testChain.getNotaryKey());
+    auto aliceWallet = testChain.AddWallet();
+    testChain.generateBlock();
+
+    // a transaction that is too old (nLockTime is old) should not be admitted to the pool
+    {
+        auto txToSpend = notaryWallet->GetAvailable(100000 + 1000);
+        CMutableTransaction oldTransaction = 
+                notaryWallet->CreateUnsignedSpendTransaction(aliceWallet, txToSpend, 100000, 1000);
+        oldTransaction.nLockTime = chainActive.Tip()->GetMedianTimePast() - 86400; // median block time - 1 day
+        EXPECT_FALSE( testChain.acceptTx( notaryWallet->SignTransaction(oldTransaction, txToSpend)).IsValid() );
+    }
+
+    // a transaction that is admitted to the pool and then grows old should be expelled from the pool
+    {
+        auto txToSpend = notaryWallet->GetAvailable(100000 + 1000);
+        CMutableTransaction oldTransaction = 
+                notaryWallet->CreateUnsignedSpendTransaction(aliceWallet, txToSpend, 100000, 1000);
+        oldTransaction.nLockTime = chainActive.Tip()->GetMedianTimePast() - 1800; // median block time - 1/2 hour
+        EXPECT_TRUE( testChain.acceptTx( notaryWallet->SignTransaction(oldTransaction, txToSpend)).IsValid() );
+        // now mine blocks to push GetMedianTimePast() to the point the tx is removed from the mempool
+        uint32_t numBlocksMined = 0;
+        while( testChain.MempoolSize() == 1 && numBlocksMined < 30)
+        {
+            SetMockTime( chainActive.Tip()->GetMedianTimePast() + 300); // add 5 minutes
+            testChain.generateBlock(false);
+            numBlocksMined++;
+        }
+        EXPECT_LT(numBlocksMined, 20);
+    }
+
+    // a transaction that is too old (block height is old) should not be admitted to the pool
+    {
+        // fast-forward several blocks
+        for(auto i = 0; i < 100; ++i)
+            testChain.generateBlock();
+        auto txToSpend = notaryWallet->GetAvailable(100000 + 1000);
+        CMutableTransaction oldTransaction = 
+                notaryWallet->CreateUnsignedSpendTransaction(aliceWallet, txToSpend, 100000, 1000);
+        oldTransaction.nLockTime = 1;
+        // the following test is TRUE, as komodo_validate_interest only looks at time values, not block height.
+        // the transaction is accepted although old.
+        EXPECT_TRUE( testChain.acceptTx( notaryWallet->SignTransaction(oldTransaction, txToSpend)).IsValid() );
+    }
+
+
+}

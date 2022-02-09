@@ -1113,28 +1113,39 @@ int32_t komodo_isrealtime(int32_t *kmdheightp)
     else return(0);
 }
 
-int32_t komodo_validate_interest(const CTransaction &tx,int32_t txheight,uint32_t cmptime,int32_t dispflag)
+// not macros to make testing easier
+uint32_t VALIDATE_INTEREST_HARDFORK_HEIGHT = 246748;
+uint32_t VALIDATE_INTEREST_HARDFORK_TIMEADJUST_HEIGHT = 247205;
+
+/****
+ * @brief determine if a transaction is valid given the time.
+ * @param tx the transaction to examine
+ * @param txheight the height (for consensus rule checking)
+ * @param cmptime the block time (or something close) to determine if tx is too old
+ * @returns -1 on error, 0 on success
+ */
+int32_t komodo_validate_interest(const CTransaction &tx, int32_t txheight, uint32_t cmptime)
 {
-    dispflag = 1;
-    if ( KOMODO_REWIND == 0 && ASSETCHAINS_SYMBOL[0] == 0 && (int64_t)tx.nLockTime >= LOCKTIME_THRESHOLD ) //1473793441 )
+    // if we should calculate time (not block height)...
+    if ( KOMODO_REWIND == 0 && ASSETCHAINS_SYMBOL[0] == 0 
+            && (int64_t)tx.nLockTime >= LOCKTIME_THRESHOLD
+            && txheight > VALIDATE_INTEREST_HARDFORK_HEIGHT )
     {
-        if ( txheight > 246748 )
+        if ( txheight < VALIDATE_INTEREST_HARDFORK_TIMEADJUST_HEIGHT )
+            cmptime -= 16000;
+
+        if ( (int64_t)tx.nLockTime < cmptime - KOMODO_MAXMEMPOOLTIME )
         {
-            if ( txheight < 247205 )
-                cmptime -= 16000;
-            if ( (int64_t)tx.nLockTime < cmptime-KOMODO_MAXMEMPOOLTIME )
+            if ( tx.nLockTime != 1477258935 )
             {
-                if ( tx.nLockTime != 1477258935 && dispflag != 0 )
-                {
-                    fprintf(stderr,"komodo_validate_interest.%d reject.%d [%d] locktime %u cmp2.%u\n",dispflag,txheight,(int32_t)(tx.nLockTime - (cmptime-KOMODO_MAXMEMPOOLTIME)),(uint32_t)tx.nLockTime,cmptime);
-                }
-                return(-1);
+                fprintf(stderr,"komodo_validate_interest. reject.%d [%d] locktime %u cmp2.%u\n",
+                        txheight,(int32_t)(tx.nLockTime - (cmptime-KOMODO_MAXMEMPOOLTIME)),
+                        (uint32_t)tx.nLockTime,cmptime);
             }
-            if ( 0 && dispflag != 0 )
-                fprintf(stderr,"validateinterest.%d accept.%d [%d] locktime %u cmp2.%u\n",dispflag,(int32_t)txheight,(int32_t)(tx.nLockTime - (cmptime-KOMODO_MAXMEMPOOLTIME)),(int32_t)tx.nLockTime,cmptime);
+            return -1;
         }
     }
-    return(0);
+    return 0;
 }
 
 /*

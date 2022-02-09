@@ -508,7 +508,7 @@ void CTxMemPool::removeConflicts(const CTransaction &tx, std::list<CTransaction>
     }
 }
 
-int32_t komodo_validate_interest(const CTransaction &tx,int32_t txheight,uint32_t nTime,int32_t dispflag);
+int32_t komodo_validate_interest(const CTransaction &tx,int32_t txheight,uint32_t nTime);
 extern char ASSETCHAINS_SYMBOL[];
 
 void CTxMemPool::removeExpired(unsigned int nBlockHeight)
@@ -522,7 +522,9 @@ void CTxMemPool::removeExpired(unsigned int nBlockHeight)
         const CTransaction& tx = it->GetTx();
         tipindex = chainActive.LastTip();
 
-        bool fInterestNotValidated = ASSETCHAINS_SYMBOL[0] == 0 && tipindex != 0 && komodo_validate_interest(tx,tipindex->GetHeight()+1,tipindex->GetMedianTimePast() + 777,0) < 0;
+        bool fInterestNotValidated = ASSETCHAINS_SYMBOL[0] == 0 && tipindex != 0 
+                && komodo_validate_interest(tx,tipindex->GetHeight()+1,
+                tipindex->GetMedianTimePast() + 777) < 0;
         if (IsExpiredTx(tx, nBlockHeight) || fInterestNotValidated)
         {
             if (fInterestNotValidated && tipindex != 0)

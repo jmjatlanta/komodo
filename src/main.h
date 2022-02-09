@@ -770,11 +770,12 @@ bool IsFinalTx(const CTransaction &tx, int nBlockHeight, int64_t nBlockTime);
 bool IsExpiredTx(const CTransaction &tx, int nBlockHeight);
 
 /**
- * Check if transaction will be final in the next block to be created.
- *
- * Calls IsFinalTx() with current block height and appropriate block time.
- *
- * See consensus/consensus.h for flag definitions.
+ * @brief Check if transaction will be final in the next block to be created.
+ * @note Calls IsFinalTx() with current block height and appropriate block time.
+ * 
+ * @param tx the transaction to examine
+ * @param flags see consensus/consensus.h for flag definitions
+ * @returns true if the transaction is final
  */
 bool CheckFinalTx(const CTransaction &tx, int flags = -1);
 

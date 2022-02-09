@@ -161,7 +161,7 @@ public:
      * @param needed how much is needed
      * @returns a pair of CTransaction and the n value of the vout
      */
-    std::pair<CTransaction, uint32_t> GetAvailable(CAmount needed, bool remove = true);
+    std::pair<CTransaction, uint32_t> GetAvailable(CAmount needed);
 
     /***
      * Add a transaction to the list of available vouts
@@ -170,14 +170,23 @@ public:
      */
     void AddOut(CTransaction tx, uint32_t n);
     /*****
+     * @brief create a transaction with 1 recipient (unsigned)
+     * @param to who to send funds to
+     * @param amount
+     * @param fee
+     * @returns the transaction
+     */
+    CMutableTransaction CreateUnsignedSpendTransaction(std::shared_ptr<TestWallet> to, 
+            std::pair<CTransaction, uint32_t> txToSpend, CAmount amount, CAmount fee);
+    /*****
      * @brief create a transaction with 1 recipient (signed)
      * @param to who to send funds to
      * @param amount
      * @param fee
-     * @param remove to remove from spendable collection
      * @returns the transaction
      */
-    CTransaction CreateSpendTransaction(std::shared_ptr<TestWallet> to, CAmount amount, CAmount fee = 0, bool remove = true);
+    CTransaction CreateSpendTransaction(std::shared_ptr<TestWallet> to, CAmount amount, CAmount fee = 0);
+    CTransaction SignTransaction(CMutableTransaction in, std::pair<CTransaction, uint32_t> txToSpend);
     /***
      * Transfer to another user (sends to mempool)
      * @param to who to transfer to

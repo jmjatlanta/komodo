@@ -938,36 +938,49 @@ bool IsStandardTx(const CTransaction& tx, string& reason, const int nHeight)
     return true;
 }
 
+/***
+ * @brief determine if a transaction would be final
+ * @param tx the transaction to examine
+ * @param nBlockHeight the block height
+ * @param nBlockTime the block time
+ * @return true if the transaction would be final
+ */
 bool IsFinalTx(const CTransaction &tx, int nBlockHeight, int64_t nBlockTime)
 {
      if (tx.nLockTime == 0)
         return true;
-    if ((int64_t)tx.nLockTime < ((int64_t)tx.nLockTime < LOCKTIME_THRESHOLD ? (int64_t)nBlockHeight : nBlockTime))
+    if ((int64_t)tx.nLockTime < ((int64_t)tx.nLockTime < LOCKTIME_THRESHOLD 
+            ? (int64_t)nBlockHeight 
+            : nBlockTime))
         return true;
-    BOOST_FOREACH(const CTxIn& txin, tx.vin)
+    for(const CTxIn& txin : tx.vin)
     {
+        // if nSequence is 1 less than max(), nLockTime should be evaluated to
+        // determine finality
         if ( !komodo_hardfork_active(nBlockTime) && txin.nSequence == 0xfffffffe &&
-        //if ( (nBlockTime <= ASSETCHAINS_STAKED_HF_TIMESTAMP ) && txin.nSequence == 0xfffffffe &&
             (
-                ((int64_t)tx.nLockTime >= LOCKTIME_THRESHOLD && (int64_t)tx.nLockTime > nBlockTime) ||
-                ((int64_t)tx.nLockTime <  LOCKTIME_THRESHOLD && (int64_t)tx.nLockTime > nBlockHeight)
-            )
-        )
+                ((int64_t)tx.nLockTime >= LOCKTIME_THRESHOLD 
+                        && (int64_t)tx.nLockTime > nBlockTime) 
+                || ((int64_t)tx.nLockTime <  LOCKTIME_THRESHOLD 
+                        && (int64_t)tx.nLockTime > nBlockHeight)
+            ))
         {
-
+            continue;
         }
-        //else if ( nBlockTime > ASSETCHAINS_STAKED_HF_TIMESTAMP && txin.nSequence == 0xfffffffe &&
         else if ( komodo_hardfork_active(nBlockTime) && txin.nSequence == 0xfffffffe &&
             (
-                ((int64_t)tx.nLockTime >= LOCKTIME_THRESHOLD && (int64_t)tx.nLockTime <= nBlockTime) ||
-                ((int64_t)tx.nLockTime <  LOCKTIME_THRESHOLD && (int64_t)tx.nLockTime <= nBlockHeight))
+                ((int64_t)tx.nLockTime >= LOCKTIME_THRESHOLD 
+                        && (int64_t)tx.nLockTime <= nBlockTime) 
+                || ((int64_t)tx.nLockTime <  LOCKTIME_THRESHOLD 
+                        && (int64_t)tx.nLockTime <= nBlockHeight))
             )
         {
-
+            continue;
         }
         else if (!txin.IsFinal())
         {
-            LogPrintf("non-final txin seq.%x locktime.%u vs nTime.%u\n",txin.nSequence,(uint32_t)tx.nLockTime,(uint32_t)nBlockTime);
+            LogPrintf("non-final txin seq.%x locktime.%u vs nTime.%u\n",
+                    txin.nSequence,(uint32_t)tx.nLockTime,(uint32_t)nBlockTime);
             return false;
         }
     }
@@ -982,6 +995,14 @@ bool IsExpiredTx(const CTransaction &tx, int nBlockHeight)
     return static_cast<uint32_t>(nBlockHeight) > tx.nExpiryHeight;
 }
 
+/**
+ * @brief Check if transaction will be final in the next block to be created.
+ * @note Calls IsFinalTx() with current block height and appropriate block time.
+ * 
+ * @param tx the transaction to examine
+ * @param flags see consensus/consensus.h for flag definitions
+ * @returns true if the transaction is final
+ */
 bool CheckFinalTx(const CTransaction &tx, int flags)
 {
     AssertLockHeld(cs_main);
@@ -1007,8 +1028,8 @@ bool CheckFinalTx(const CTransaction &tx, int flags)
     // and there aren't timestamp applications where it matters.
     // However this changes once median past time-locks are enforced:
     const int64_t nBlockTime = (flags & LOCKTIME_MEDIAN_TIME_PAST)
-    ? chainActive.Tip()->GetMedianTimePast()
-    : GetTime();
+            ? chainActive.Tip()->GetMedianTimePast()
+            : GetTime();
 
     return IsFinalTx(tx, nBlockHeight, nBlockTime);
 }
@@ -1838,7 +1859,7 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
     auto verifier = libzcash::ProofVerifier::Strict();
     if ( ASSETCHAINS_SYMBOL[0] == 0 && chainActive.LastTip() != nullptr
             && komodo_validate_interest(tx,chainActive.LastTip()->GetHeight()+1,
-            chainActive.LastTip()->GetMedianTimePast() + 777,0) < 0 )
+            chainActive.LastTip()->GetMedianTimePast() + 777) < 0 )
     {
         fprintf(stderr,"AcceptToMemoryPool komodo_validate_interest failure\n");
         return error("AcceptToMemoryPool: komodo_validate_interest failed");
@@ -5283,7 +5304,9 @@ bool CheckBlock(int32_t *futureblockp, int32_t height, CBlockIndex *pindex, cons
     for (uint32_t i = 0; i < block.vtx.size(); i++)
     {
         const CTransaction& tx = block.vtx[i];
-        if ( komodo_validate_interest(tx,height == 0 ? komodo_block2height((CBlock *)&block) : height,block.nTime,0) < 0 )
+        if ( komodo_validate_interest(tx,
+                height == 0 ? komodo_block2height((CBlock *)&block) : height,
+                block.nTime) < 0 )
         {
             fprintf(stderr, "validate intrest failed for txnum.%i tx.%s\n", i, tx.ToString().c_str());
             return error("CheckBlock: komodo_validate_interest failed");

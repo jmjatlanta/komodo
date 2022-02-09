@@ -416,6 +416,10 @@ public:
 
     enum { nMedianTimeSpan=11 };
 
+    /***
+     * @brief get the median block time (uses a lookback window of blocks)
+     * @returns the block time of the median block
+     */
     int64_t GetMedianTimePast() const
     {
         int64_t pmedian[nMedianTimeSpan];

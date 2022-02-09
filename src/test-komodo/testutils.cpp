@@ -391,7 +391,7 @@ void TestWallet::BlockNotification(const CBlock& block)
  * @param needed how much is needed
  * @returns a pair of CTransaction and the n value of the vout
  */
-std::pair<CTransaction, uint32_t> TestWallet::GetAvailable(CAmount needed, bool remove)
+std::pair<CTransaction, uint32_t> TestWallet::GetAvailable(CAmount needed)
 {
     std::pair<CTransaction, uint32_t> retval;
 
@@ -402,8 +402,6 @@ std::pair<CTransaction, uint32_t> TestWallet::GetAvailable(CAmount needed, bool 
         uint32_t n = retval.second;
         if (tx.vout[n].nValue >= needed)
         {
-            if (remove)
-                availableTransactions.erase(itr);
             return retval;
         }
     }
@@ -432,22 +430,34 @@ CValidationState TestWallet::Transfer(std::shared_ptr<TestWallet> to, CAmount am
     return chain->acceptTx(fundTo);
 }
 
-CTransaction TestWallet::CreateSpendTransaction(std::shared_ptr<TestWallet> to, CAmount amount, CAmount fee, bool remove)
+CMutableTransaction TestWallet::CreateUnsignedSpendTransaction(std::shared_ptr<TestWallet> to,
+        std::pair<CTransaction, uint32_t> txToSpend, CAmount amount, CAmount fee)
 {
-    std::pair<CTransaction, uint32_t> available = GetAvailable(amount + fee, remove);
     CMutableTransaction tx = CreateNewContextualCMutableTransaction(Params().GetConsensus(), chainActive.Height()+1);
-    tx.vin.push_back(CTxIn(available.first.GetHash(), available.second));
+    tx.vin.push_back(CTxIn(txToSpend.first.GetHash(), txToSpend.second));
     tx.vout.push_back( CTxOut(amount, GetScriptForDestination(to->GetPubKey())));
     // give the rest back to wallet owner
     CTxOut out2(
-                available.first.vout[available.second].nValue - amount - fee,
+                txToSpend.first.vout[txToSpend.second].nValue - amount - fee,
                 GetScriptForDestination(key.GetPubKey()));
     tx.vout.push_back(out2);
 
-    auto consensusBranchId = CurrentEpochBranchId(chainActive.Height() + 1, Params().GetConsensus());
-    uint256 hash = SignatureHash(available.first.vout[available.second].scriptPubKey, 
-            tx, 0, SIGHASH_ALL, available.first.vout[available.second].nValue, consensusBranchId);
-    tx.vin[0].scriptSig << Sign(hash, SIGHASH_ALL);
+    return tx;
+}
 
-    return CTransaction(tx);
+CTransaction TestWallet::CreateSpendTransaction(std::shared_ptr<TestWallet> to, CAmount amount, CAmount fee)
+{
+    auto txToSpend = GetAvailable(amount + fee);
+    CMutableTransaction tx = CreateUnsignedSpendTransaction(to, txToSpend, amount, fee);
+    return SignTransaction(tx, txToSpend);
+}
+
+CTransaction TestWallet::SignTransaction(CMutableTransaction in, std::pair<CTransaction, uint32_t> txToSpend)
+{
+    auto consensusBranchId = CurrentEpochBranchId(chainActive.Height() + 1, Params().GetConsensus());
+    uint256 hash = SignatureHash(txToSpend.first.vout[txToSpend.second].scriptPubKey, 
+            in, 0, SIGHASH_ALL, txToSpend.first.vout[txToSpend.second].nValue, consensusBranchId);
+    in.vin[0].scriptSig << Sign(hash, SIGHASH_ALL);
+
+    return CTransaction(in);
 }
