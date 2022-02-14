@@ -57,6 +57,11 @@ const char *Notaries_genesis[][2] =
     { "titomane_SH", "035f49d7a308dd9a209e894321f010d21b7793461b0c89d6d9231a3fe5f68d9960" },
 };
 
+const char *Notaries_genesis_testnet[][2] =
+{
+    { "jmj_testA",   "037c032430fd231b5797cb4a637dae3eadf87b10274fd84be31670bd2a02c4fbc5" }
+};
+
 int32_t getkmdseason(int32_t height)
 {
     if ( height <= KMD_SEASON_HEIGHTS[0] )
@@ -481,21 +486,41 @@ void komodo_notarized_update(struct komodo_state *sp,int32_t nHeight,int32_t not
 void komodo_init(int32_t height)
 {
     static int didinit; 
-    uint256 zero; 
-    int32_t k,n; 
-    uint8_t pubkeys[64][33];
-    memset(&zero,0,sizeof(zero));
+
     if ( didinit == 0 )
     {
+        uint256 zero; 
+        memset(&zero,0,sizeof(zero));
         decode_hex(NOTARY_PUBKEY33,33,NOTARY_PUBKEY.c_str());
         if ( height >= 0 )
         {
-            n = (int32_t)(sizeof(Notaries_genesis)/sizeof(*Notaries_genesis));
-            for (k=0; k<n; k++)
+            uint8_t pubkeys[64][33];
+            int32_t k;
+            if (Params().NetworkIDString() == "testnet")
             {
-                if ( Notaries_genesis[k][0] == 0 || Notaries_genesis[k][1] == 0 || Notaries_genesis[k][0][0] == 0 || Notaries_genesis[k][1][0] == 0 )
-                    break;
-                decode_hex(pubkeys[k],33,(char *)Notaries_genesis[k][1]);
+                int32_t n = (int32_t)(sizeof(Notaries_genesis_testnet)/sizeof(*Notaries_genesis_testnet));
+                for ( k=0; k<n; k++)
+                {
+                    if ( Notaries_genesis_testnet[k][0] == 0 
+                            || Notaries_genesis_testnet[k][1] == 0 
+                            || Notaries_genesis_testnet[k][0][0] == 0 
+                            || Notaries_genesis_testnet[k][1][0] == 0 )
+                        break;
+                    decode_hex(pubkeys[k],33,(char *)Notaries_genesis_testnet[k][1]);
+                }
+            }
+            else
+            {
+                int32_t n = (int32_t)(sizeof(Notaries_genesis)/sizeof(*Notaries_genesis));
+                for ( k=0; k<n; k++)
+                {
+                    if ( Notaries_genesis[k][0] == 0 
+                            || Notaries_genesis[k][1] == 0 
+                            || Notaries_genesis[k][0][0] == 0 
+                            || Notaries_genesis[k][1][0] == 0 )
+                        break;
+                    decode_hex(pubkeys[k],33,(char *)Notaries_genesis[k][1]);
+                }
             }
             komodo_notarysinit(0,pubkeys,k);
         }
