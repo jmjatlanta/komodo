@@ -496,7 +496,7 @@ void komodo_init(int32_t height)
         {
             uint8_t pubkeys[64][33];
             int32_t k;
-            if (Params().NetworkIDString() == "testnet")
+            if (Params().NetworkIDString() == "test")
             {
                 int32_t n = (int32_t)(sizeof(Notaries_genesis_testnet)/sizeof(*Notaries_genesis_testnet));
                 for ( k=0; k<n; k++)
