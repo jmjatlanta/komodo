@@ -162,4 +162,93 @@ TEST(TestNotary, ElectedNotary)
     EXPECT_EQ(numnotaries, 64);
 }
 
+TEST(TestNotary, HardforkActive2019)
+{
+    /*
+    {
+        // ATM, we cannot change the consts that this method uses, hence this test takes a 
+        // very long time. In the future, it is hoped we can be a bit more flexible with this
+        ASSETCHAINS_SYMBOL[0] = 0;
+        undo_init_notaries();
+        
+        TestChain testChain;
+        auto height = testChain.GetIndex()->GetHeight();
+        while (height < nDecemberHardforkHeight)
+        {
+            testChain.generateBlock();
+            height = testChain.GetIndex()->GetHeight();
+            EXPECT_FALSE( komodo_hardfork_active(0) );
+        }
+        while (height < nDecemberHardforkHeight + 10)
+        {
+            testChain.generateBlock();
+            EXPECT_TRUE( komodo_hardfork_active(0) );
+            height = testChain.GetIndex()->GetHeight();
+        }
+    }
+    */
+    {
+        // with asset chains, time is used instead of block height
+        strcpy(ASSETCHAINS_SYMBOL, "JMJ");
+        undo_init_notaries();
+        
+        TestChain testChain;
+        EXPECT_FALSE( komodo_hardfork_active(0) );
+        EXPECT_FALSE( komodo_hardfork_active(nStakedDecemberHardforkTimestamp) );
+        EXPECT_TRUE(  komodo_hardfork_active(nStakedDecemberHardforkTimestamp + 1) );
+        EXPECT_TRUE(  komodo_hardfork_active(nStakedDecemberHardforkTimestamp + 10) );
+        ASSETCHAINS_SYMBOL[0] = 0;
+        undo_init_notaries();
+    }
+    // test komodo_newStakerActive based on timestamp
+    {
+        TestChain testChain;
+        auto height = testChain.GetIndex()->GetHeight();
+        uint32_t timestamp = 0;
+        // both are too low
+        EXPECT_FALSE( komodo_newStakerActive(height, timestamp) );
+        // timestamp is the same as activation timestamp
+        timestamp = nStakedDecemberHardforkTimestamp;
+        EXPECT_FALSE( komodo_newStakerActive(height, timestamp) );
+        // timestamp is 1 more than activation timestamp
+        ++timestamp;
+        EXPECT_TRUE( komodo_newStakerActive(height, timestamp) );
+        // now base on heights
+        timestamp = 0;
+        EXPECT_FALSE( komodo_newStakerActive(height, timestamp) );
+        // because we are well beyond the hardfork time, making just 
+        // 1 block should cause the hardfork
+        testChain.generateBlock();
+        height = testChain.GetIndex()->GetHeight();
+        EXPECT_TRUE( komodo_newStakerActive(height, timestamp) );
+    }
+    {
+        // the CDiskBlockIndex adds segid to serialization if
+        // the chain is staked and the hardfork has happened
+        // for non-staked chains, CDiskBlockIndex does not change
+        ASSETCHAINS_STAKED = 0;
+        CDiskBlockIndex idx;
+        idx.nTime = 0;
+        CDataStream s1(SER_DISK, CLIENT_VERSION);
+        idx.Serialize(s1);
+        idx.nTime = nStakedDecemberHardforkTimestamp + 10;
+        CDataStream s2(SER_DISK, CLIENT_VERSION);
+        idx.Serialize(s2);
+        EXPECT_EQ( s2.size(), s1.size() );
+        // for staked chains, the serialized CDiskBlockIndex includes segid
+        ASSETCHAINS_STAKED = 1;
+        CDiskBlockIndex idx2;
+        idx2.nTime = nStakedDecemberHardforkTimestamp; // still no hardfork until next second
+        CDataStream s3(SER_DISK, CLIENT_VERSION);
+        idx2.Serialize(s3);
+        idx2.nTime = nStakedDecemberHardforkTimestamp + 10;
+        CDataStream s4(SER_DISK, CLIENT_VERSION);
+        idx2.Serialize(s4);
+        EXPECT_EQ( s2.size(), s3.size() );
+        // hardfork happened, s4 should be 1 byte bigger
+        EXPECT_EQ( s4.size(), s3.size() + 1 );
+    }
+
+}
+
 } // namespace TestNotary

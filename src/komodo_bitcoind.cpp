@@ -623,9 +623,17 @@ uint8_t DecodeStakingOpRet(CScript scriptPubKey, uint256 &merkleroot)
     return(0);
 }
 
+/****
+ * @brief determine if the staker hardfork has happened
+ * @note either of the inputs must be higher than the hardfork timestamp. Both are not required.
+ * @param height the current chain height
+ * @param timestamp the current chain time
+ * @returns 1 if the hardfork has happened, 0 if not
+ */
 int32_t komodo_newStakerActive(int32_t height, uint32_t timestamp)
 {
-    if ( timestamp > nStakedDecemberHardforkTimestamp || komodo_heightstamp(height) > nStakedDecemberHardforkTimestamp ) //December 2019 hardfork
+    if ( timestamp > nStakedDecemberHardforkTimestamp 
+            || komodo_heightstamp(height) > nStakedDecemberHardforkTimestamp ) //December 2019 hardfork
         return(1);
     else return(0);
 }

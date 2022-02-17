@@ -32,6 +32,14 @@ int32_t getacseason(uint32_t timestamp);
 
 int32_t komodo_notaries(uint8_t pubkeys[64][33],int32_t height,uint32_t timestamp);
 
+/****
+ * @brief retrieve information about a notary
+ * @param[out] numnotariesp number of notaries in the era
+ * @param[in] pubkey33 the public key of the notary to examine
+ * @param[in] height the chain height to examine
+ * @param[in] timestamp the chain timestamp to examine (some chains use time instead of height)
+ * @return -1 on error, otherwise the index of the found notary
+ */
 int32_t komodo_electednotary(int32_t *numnotariesp,uint8_t *pubkey33,int32_t height,uint32_t timestamp);
 
 int32_t komodo_ratify_threshold(int32_t height,uint64_t signedmask);
