@@ -18,9 +18,11 @@
 #include "primitives/transaction.h"
 #include "script/cc.h"
 #include "script/interpreter.h"
+#include "wallet/wallet.h"
 
 #include "testutils.h"
 
+void undo_init_notaries(); // test helper
 
 std::string notaryPubkey = "0205a8ad0c1dbc515f149af377981aab58b836af008d4d7ab21bd76faf80550b47";
 std::string notarySecret = "UxFWWxsf1d7w7K5TvAWSkeX4H95XQKwdwGv49DXwWUTzPTTjHBbU";
@@ -38,9 +40,9 @@ extern std::string NOTARY_PUBKEY;
 
 void adjust_hwmheight(int32_t in); // in komodo.cpp
 
-void setupChain()
+void setupChain(CBaseChainParams::Network network)
 {
-    SelectParams(CBaseChainParams::REGTEST);
+    SelectParams(network);
 
     // Settings to get block reward
     NOTARY_PUBKEY = notaryPubkey;
@@ -60,6 +62,11 @@ void setupChain()
     pcoinsTip = new CCoinsViewCache(pcoinsdbview);
     pnotarisations = new NotarisationDB(1 << 20, true);
     InitBlockIndex();
+}
+
+void setupChain()
+{
+    setupChain(CBaseChainParams::REGTEST);
 }
 
 /***
@@ -161,9 +168,9 @@ CTransaction getInputTx(CScript scriptPubKey)
 /****
  * A class to provide a simple chain for tests
  */
-
-TestChain::TestChain()
+TestChain::TestChain(CBaseChainParams::Network desiredNetwork)
 {
+    undo_init_notaries();
     previousNetwork = Params().NetworkIDString();
     dataDir = GetTempPath() / strprintf("test_komodo_%li_%i", GetTime(), GetRand(100000));
     if (ASSETCHAINS_SYMBOL[0])
@@ -171,7 +178,7 @@ TestChain::TestChain()
     boost::filesystem::create_directories(dataDir);
     mapArgs["-datadir"] = dataDir.string();
 
-    setupChain();
+    setupChain(desiredNetwork);
     CBitcoinSecret vchSecret;
     vchSecret.SetString(notarySecret); // this returns false due to network prefix mismatch but works anyway
     notaryKey = vchSecret.GetKey();
@@ -179,7 +186,7 @@ TestChain::TestChain()
 
 TestChain::~TestChain()
 {
-    adjust_hwmheight(0); // hwmheight can get skewed if komodo_connectblock not called (which some tests do)
+    undo_init_notaries();
     boost::filesystem::remove_all(dataDir);
     if (previousNetwork == "main")
         SelectParams(CBaseChainParams::MAIN);
@@ -222,6 +229,51 @@ CBlock TestChain::generateBlock()
         wallet->BlockNotification(block);
     }
     return block;
+}
+
+class MockReserveKey : public CReserveKey
+{
+public:
+    MockReserveKey(std::shared_ptr<TestWallet> wallet) : CReserveKey(nullptr)
+    {
+        pubKey = wallet->GetPubKey();
+    }
+    ~MockReserveKey() {}
+    virtual bool GetReservedKey(CPubKey& pubKey)
+    {
+        pubKey = this->pubKey;
+        return true;
+    }
+protected:
+    CPubKey pubKey;
+};
+
+/****
+ * @brief get a block that is ready to be mined
+ * @note The guts of this was taken from mining.cpp's generate() method
+ * @returns a block with no PoW
+ */
+std::unique_ptr<CBlockTemplate> TestChain::BuildBlock(std::shared_ptr<TestWallet> who)
+{
+    MockReserveKey reserveKey(who);
+    int nHeight = chainActive.Height();
+    unsigned int nExtraNonce = 0;
+    UniValue blockHashes(UniValue::VARR);
+    uint64_t lastTime = 0;
+    // Validation may fail if block generation is too fast
+    if (GetTime() == lastTime) MilliSleep(1001);
+    lastTime = GetTime();
+
+    std::unique_ptr<CBlockTemplate> pblocktemplate(
+            CreateNewBlockWithKey(reserveKey,nHeight,KOMODO_MAXGPUCOUNT));
+
+    if (!pblocktemplate.get())
+        throw JSONRPCError(RPC_INTERNAL_ERROR, "Wallet keypool empty");
+
+    CBlock *pblock = &pblocktemplate->block;
+    IncrementExtraNonce(pblock, chainActive.LastTip(), nExtraNonce);
+
+    return pblocktemplate;
 }
 
 CKey TestChain::getNotaryKey() { return notaryKey; }

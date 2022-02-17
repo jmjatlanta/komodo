@@ -15,7 +15,7 @@ extern std::string notarySecret;
 extern CKey notaryKey;
 
 
-void setupChain();
+void setupChain(CBaseChainParams::Network network = CBaseChainParams::REGTEST);
 /***
  * Generate a block
  * @param block a place to store the block (read from disk)
@@ -35,6 +35,7 @@ std::vector<uint8_t> getSig(const CMutableTransaction mtx, CScript inputPubKey, 
 
 
 class TestWallet;
+struct CBlockTemplate;
 
 class TestChain
 {
@@ -42,7 +43,7 @@ public:
     /***
      * ctor to create a chain
      */
-    TestChain();
+    TestChain(CBaseChainParams::Network desiredNetwork = CBaseChainParams::REGTEST);
     /***
      * dtor to release resources
      */
@@ -63,6 +64,8 @@ public:
      * @returns the block generated
      */
     CBlock generateBlock();
+
+    std::unique_ptr<CBlockTemplate> BuildBlock( std::shared_ptr<TestWallet> who );
     /****
      * @brief set the chain time to something reasonable
      * @note must be called after generateBlock if you

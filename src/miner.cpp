@@ -931,17 +931,28 @@ CBlockTemplate* CreateNewBlock(const CPubKey _pk, const CScript& _scriptPubKeyIn
 
 #ifdef ENABLE_MINING
 
+/***
+ * @brief increment the nonce in the coinbase scriptSig and set hashMerkleRoot
+ * @param[in] pblock the block whos coinbase is to be adjusted
+ * @param[in] pindexPrev to calculate height
+ * @param[out] nExtraNonce the new value
+ */
 void IncrementExtraNonce(CBlock* pblock, CBlockIndex* pindexPrev, unsigned int& nExtraNonce)
 {
+    static uint256 hashPrevBlock; // the last block that we looked at
+
     // Update nExtraNonce
-    static uint256 hashPrevBlock;
     if (hashPrevBlock != pblock->hashPrevBlock)
     {
+        // we are looking at a different block. Reset the
         nExtraNonce = 0;
         hashPrevBlock = pblock->hashPrevBlock;
     }
     ++nExtraNonce;
+    
+    // Height first in coinbase required for block.version=2
     unsigned int nHeight = pindexPrev->GetHeight()+1; // Height first in coinbase required for block.version=2
+    
     CMutableTransaction txCoinbase(pblock->vtx[0]);
     txCoinbase.vin[0].scriptSig = (CScript() << nHeight << CScriptNum(nExtraNonce)) + COINBASE_FLAGS;
     assert(txCoinbase.vin[0].scriptSig.size() <= 100);
