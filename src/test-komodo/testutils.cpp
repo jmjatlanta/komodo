@@ -19,6 +19,7 @@
 #include "script/cc.h"
 #include "script/interpreter.h"
 #include "wallet/wallet.h"
+#include "komodo_extern_globals.h"
 
 #include "testutils.h"
 
@@ -35,17 +36,13 @@ CKey notaryKey;
  */
 int64_t nMockTime;
 
-extern uint32_t USE_EXTERNAL_PUBKEY;
-extern std::string NOTARY_PUBKEY;
-
-void adjust_hwmheight(int32_t in); // in komodo.cpp
-
 void setupChain(CBaseChainParams::Network network)
 {
     SelectParams(network);
 
     // Settings to get block reward
     NOTARY_PUBKEY = notaryPubkey;
+    STAKED_NOTARY_ID = -1;
     USE_EXTERNAL_PUBKEY = 1;
     mapArgs["-mineraddress"] = "bogus";
     COINBASE_MATURITY = 1;

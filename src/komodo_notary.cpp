@@ -89,10 +89,11 @@ static int32_t hwmheight = 0; // komodo_notariesinit()
 static bool didinit = false; // komodo_init()
 
 /*****
- * 2 Helpers for unit tests that reset statics (among other things)
+ * 3 Helpers for unit tests that reset statics (among other things)
  * DO NOT USE for anything other than unit tests
  */
 void undo_init_STAKED(); // see notaries_staked.cpp
+void adjust_hwmheight(int32_t newHeight); // see komodo.cpp
 void undo_init_notaries()
 {
     undo_init_STAKED();
@@ -103,6 +104,7 @@ void undo_init_notaries()
         Pubkeys = nullptr;
     }
     hwmheight = 0;
+    adjust_hwmheight(0); // in komodo.cpp
     didinit = false;
 }
 
