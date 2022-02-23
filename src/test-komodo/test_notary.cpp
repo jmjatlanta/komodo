@@ -161,23 +161,19 @@ TEST(TestNotary, ElectedNotary)
     EXPECT_EQ(numnotaries, 64);
 }
 
-uint8_t GetCoinbaseNonce(const CBlock& in)
+uint32_t GetCoinbaseNonce(const CBlock& in)
 {
-
+    uint32_t retVal = 0;
     std::vector<std::vector<unsigned char> > results;
     CScript scr = in.vtx[0].vin[0].scriptSig;
     scr.GetPushedData(scr.begin(), results);
-    /*
-    // this is just for debugging
-    uint32_t idx = 0;
-    for( auto vec : results)
+    if (results.size() >= 2)
     {
-        std::cout << "Index: " << std::to_string(idx++) 
-                << " Size: " << vec.size() 
-                <<  " Value: " << std::to_string( (int)vec[0]) << "\n";
+        CScriptNum scr(results[1], false);
+        retVal = scr.getint();
     }
-    */
-    return results[1][0]; // the first field is the height, 2nd is the nExtraNonce
+    
+    return retVal;
 }
 
 TEST(TestNotary, HardforkActiveDecember2019)
@@ -205,14 +201,37 @@ TEST(TestNotary, HardforkActiveDecember2019)
     }
     {
         // a notary miner should set ExtraNonce to 1 after hardfork
-        TestChain testChain(CBaseChainParams::REGTEST);
+        // This is hard to test as it is in miner.cpp::BitcoinMiner()
+        // TODO: Break that method apart. Note that some of that code
+        // looks to be a duplicate of rpc/mining.cpp::generate()
+        TestChain testChain;
+        // at first, anything within nExtraNonce is valid
         std::shared_ptr<TestWallet> notaryWallet = testChain.AddWallet( testChain.getNotaryKey() );
-        for( int i = 0; i < 20; ++i)
+        for( int i = 0; i < nDecemberHardforkHeight; ++i)
         {
-            auto block = testChain.generateBlock();
-            std::cout << "Value of extra nonce at height " << std::to_string(testChain.GetIndex()->GetHeight())
-                    << " is " << std::to_string( (int)GetCoinbaseNonce( block ) ) << "\n";
+            auto block = testChain.BuildBlock(notaryWallet);
+            unsigned int nExtraNonce = GetCoinbaseNonce(block);
+            for (int x = 0; x < i % 5; ++x)
+            {
+                IncrementExtraNonce(&block, testChain.GetIndex(), nExtraNonce);
+            }
+            block = testChain.generateBlock(block);
+            EXPECT_EQ( GetCoinbaseNonce(block), nExtraNonce);
         }
+        // progress past hardfork
+        for( int i = chainActive.Height(); i < nDecemberHardforkHeight+10; ++i)
+        {
+            auto block = testChain.BuildBlock(notaryWallet);
+            unsigned int nExtraNonce = GetCoinbaseNonce(block);
+            for (int x = 0; x < i % 5; ++x)
+            {
+                IncrementExtraNonce(&block, testChain.GetIndex(), nExtraNonce);
+            }
+            block = testChain.generateBlock(block);
+            EXPECT_EQ( GetCoinbaseNonce(block), nExtraNonce);
+        }
+        // TODO: after another hardfork, even non-notaries should not have the nonce
+        // set to anything but 1.
     }
     */
     {

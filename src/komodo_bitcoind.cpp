@@ -533,6 +533,12 @@ int32_t komodo_verifynotarization(char *symbol,char *dest,int32_t height,int32_t
     return(retval);
 }
 
+/***
+ * @brief build an OP_RETURN script
+ * @param pblock the block that has the transaction hashes
+ * @param fNew true if this is a new block
+ * @returns the OP_RETURN CScript that contains the Merkle Root of the txs
+ */
 CScript komodo_makeopret(CBlock *pblock, bool fNew)
 {
     std::vector<uint256> vLeaves;
@@ -643,6 +649,12 @@ int32_t komodo_hasOpRet(int32_t height, uint32_t timestamp)
     return komodo_newStakerActive(height, timestamp) == 1;
 }
 
+/****
+ * @brief see if the Merkle Root in the OP_RETURN is correct for the block
+ * @param pblock the block to check
+ * @param[out] merkleroot the OP_RETURN found
+ * @returns true if OP_RETURN is found and is correct
+ */
 bool komodo_checkopret(CBlock *pblock, CScript &merkleroot)
 {
     merkleroot = pblock->vtx.back().vout.back().scriptPubKey;

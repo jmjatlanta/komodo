@@ -121,6 +121,12 @@ int32_t komodo_newStakerActive(int32_t height, uint32_t timestamp);
 
 int32_t komodo_hasOpRet(int32_t height, uint32_t timestamp);
 
+/****
+ * @brief see if the Merkle Root in the OP_RETURN is correct for the block
+ * @param pblock the block to check
+ * @param[out] merkleroot the OP_RETURN found
+ * @returns true if OP_RETURN is found and is correct
+ */
 bool komodo_checkopret(CBlock *pblock, CScript &merkleroot);
 
 bool komodo_hardfork_active(uint32_t time);

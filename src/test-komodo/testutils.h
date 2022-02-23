@@ -35,7 +35,6 @@ std::vector<uint8_t> getSig(const CMutableTransaction mtx, CScript inputPubKey, 
 
 
 class TestWallet;
-struct CBlockTemplate;
 
 class TestChain
 {
@@ -59,13 +58,26 @@ public:
      * @returns the view
      */
     CCoinsViewCache *GetCoinsViewCache();
+
     /**
      * Generate a block
      * @returns the block generated
      */
     CBlock generateBlock();
 
-    std::unique_ptr<CBlockTemplate> BuildBlock( std::shared_ptr<TestWallet> who );
+    /****
+     * @brief generate PoW on block and submit to chain
+     * @param in the block to push
+     * @return the block
+     */
+    CBlock generateBlock(const CBlock& in);
+
+    /***
+     * @brief Build a block, but do not add PoW or submit to chain
+     * @param who the miner
+     */
+    CBlock BuildBlock( std::shared_ptr<TestWallet> who );
+    
     /****
      * @brief set the chain time to something reasonable
      * @note must be called after generateBlock if you

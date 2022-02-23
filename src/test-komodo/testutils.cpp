@@ -24,6 +24,7 @@
 #include "testutils.h"
 
 void undo_init_notaries(); // test helper
+bool CalcPoW(CBlock *pblock); // generate PoW on a block
 
 std::string notaryPubkey = "0205a8ad0c1dbc515f149af377981aab58b836af008d4d7ab21bd76faf80550b47";
 std::string notarySecret = "UxFWWxsf1d7w7K5TvAWSkeX4H95XQKwdwGv49DXwWUTzPTTjHBbU";
@@ -245,12 +246,22 @@ protected:
     CPubKey pubKey;
 };
 
+CBlock TestChain::generateBlock(const CBlock& in)
+{
+    CBlock retVal = in;
+    CalcPoW(&retVal);
+    CValidationState state;
+    if (!ProcessNewBlock(1,chainActive.LastTip()->GetHeight()+1,state, NULL, &retVal, true, NULL))
+        throw JSONRPCError(RPC_INTERNAL_ERROR, "ProcessNewBlock, block not accepted");
+    return retVal;
+}
+
 /****
  * @brief get a block that is ready to be mined
  * @note The guts of this was taken from mining.cpp's generate() method
  * @returns a block with no PoW
  */
-std::unique_ptr<CBlockTemplate> TestChain::BuildBlock(std::shared_ptr<TestWallet> who)
+CBlock TestChain::BuildBlock(std::shared_ptr<TestWallet> who)
 {
     MockReserveKey reserveKey(who);
     int nHeight = chainActive.Height();
@@ -270,7 +281,8 @@ std::unique_ptr<CBlockTemplate> TestChain::BuildBlock(std::shared_ptr<TestWallet
     CBlock *pblock = &pblocktemplate->block;
     IncrementExtraNonce(pblock, chainActive.LastTip(), nExtraNonce);
 
-    return pblocktemplate;
+    CBlock retVal = *pblock;
+    return retVal;
 }
 
 CKey TestChain::getNotaryKey() { return notaryKey; }
