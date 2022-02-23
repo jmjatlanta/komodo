@@ -5492,9 +5492,20 @@ UniValue z_listoperationids(const UniValue& params, bool fHelp, const CPubKey& m
 #include "script/sign.h"
 extern std::string NOTARY_PUBKEY;
 
-int32_t komodo_notaryvin(CMutableTransaction &txNew,uint8_t *notarypub33, void *pTr)
+/****
+ * @brief create notary vin
+ * @param txNew the transaction to modify
+ * @param notarypub33 the notary public key
+ * @param notaryScript the script (if includes notarizations)
+ * @param notaryLocktime the locktime (only used if notarizations included)
+ * @returns length of the signature (0 on error)
+ */
+int32_t komodo_notaryvin(CMutableTransaction &txNew,uint8_t *notarypub33, 
+        const CScript& notaryScript, uint32_t notaryLocktime)
 {
-    set<CBitcoinAddress> setAddress; uint8_t *script,utxosig[128]; uint256 utxotxid; uint64_t utxovalue; int32_t i,siglen=0,nMinDepth = 0,nMaxDepth = 9999999; vector<COutput> vecOutputs; uint32_t utxovout,eligible,earliest = 0; CScript best_scriptPubKey; bool fNegative,fOverflow;
+    set<CBitcoinAddress> setAddress; uint8_t *script,utxosig[128]; uint256 utxotxid; 
+    uint64_t utxovalue; int32_t i,siglen=0,nMinDepth = 0,nMaxDepth = 9999999; 
+    vector<COutput> vecOutputs; uint32_t utxovout,eligible,earliest = 0; CScript best_scriptPubKey; bool fNegative,fOverflow;
     bool signSuccess; SignatureData sigdata; uint64_t txfee; uint8_t *ptr;
     auto consensusBranchId = CurrentEpochBranchId(chainActive.Height() + 1, Params().GetConsensus());
     if (!EnsureWalletIsAvailable(0))
@@ -5525,39 +5536,32 @@ int32_t komodo_notaryvin(CMutableTransaction &txNew,uint8_t *notarypub33, void *
             continue;
         const CScript& pk = out.tx->vout[out.i].scriptPubKey;
         CTxDestination address;
-        if (ExtractDestination(out.tx->vout[out.i].scriptPubKey, address))
-        {
-            //entry.push_back(Pair("address", CBitcoinAddress(address).ToString()));
-            //if (pwalletMain->mapAddressBook.count(address))
-            //    entry.push_back(Pair("account", pwalletMain->mapAddressBook[address].name));
-        }
+        ExtractDestination(out.tx->vout[out.i].scriptPubKey, address);
         script = (uint8_t *)&out.tx->vout[out.i].scriptPubKey[0];
-        if ( out.tx->vout[out.i].scriptPubKey.size() != 35 || script[0] != 33 || script[34] != OP_CHECKSIG || memcmp(notarypub33,script+1,33) != 0 )
+        if ( out.tx->vout[out.i].scriptPubKey.size() != 35 || script[0] != 33 
+                || script[34] != OP_CHECKSIG || memcmp(notarypub33,script+1,33) != 0 )
         {
-            //fprintf(stderr,"scriptsize.%d [0] %02x\n",(int32_t)out.tx->vout[out.i].scriptPubKey.size(),script[0]);
             continue;
         }
         utxovalue = (uint64_t)nValue;
         utxotxid = out.tx->GetHash();
         utxovout = out.i;
         best_scriptPubKey = out.tx->vout[out.i].scriptPubKey;
-        //fprintf(stderr,"check %s/v%d %llu\n",(char *)utxotxid.GetHex().c_str(),utxovout,(long long)utxovalue);
 
         txNew.vin.resize(1);
-        txNew.vout.resize((pTr!=0)+1);
+        // 1 or 2 depending on if notary script has something in it
+        txNew.vout.resize((notaryScript.size() != 0)+1); 
         txfee = utxovalue / 2;
-        //for (i=0; i<32; i++)
-        //    ((uint8_t *)&revtxid)[i] = ((uint8_t *)&utxotxid)[31 - i];
         txNew.vin[0].prevout.hash = utxotxid; //revtxid;
         txNew.vin[0].prevout.n = utxovout;
         txNew.vout[0].nValue = utxovalue - txfee;
         txNew.vout[0].scriptPubKey = CScript() << ParseHex(CRYPTO777_PUBSECPSTR) << OP_CHECKSIG;
-        if ( pTr != 0 )
+        if ( notaryScript.size() != 0 )
         {
-            void **p = (void**)pTr;
+            // include the passed-in notary script
             txNew.vout[1].nValue = 0;
-            txNew.vout[1].scriptPubKey = *(CScript*)p[0];
-            txNew.nLockTime = (uint32_t)(unsigned long long)p[1];
+            txNew.vout[1].scriptPubKey = notaryScript;
+            txNew.nLockTime = notaryLocktime;
         }
         CTransaction txNewConst(txNew);
         signSuccess = ProduceSignature(TransactionSignatureCreator(&keystore, &txNewConst, 0, utxovalue, SIGHASH_ALL), best_scriptPubKey, sigdata, consensusBranchId);
@@ -5569,8 +5573,7 @@ int32_t komodo_notaryvin(CMutableTransaction &txNew,uint8_t *notarypub33, void *
             ptr = (uint8_t *)&sigdata.scriptSig[0];
             siglen = sigdata.scriptSig.size();
             for (i=0; i<siglen; i++)
-                utxosig[i] = ptr[i];//, fprintf(stderr,"%02x",ptr[i]);
-            //fprintf(stderr," siglen.%d notaryvin %s/v%d\n",siglen,utxotxid.GetHex().c_str(),utxovout);
+                utxosig[i] = ptr[i];
             break;
         }
     }
