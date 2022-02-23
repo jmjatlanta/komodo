@@ -109,6 +109,7 @@ private:
     std::vector<std::shared_ptr<TestWallet>> toBeNotified;
     boost::filesystem::path dataDir;
     std::string previousNetwork;
+    void CleanGlobals();
 };
 
 /***

@@ -168,7 +168,7 @@ CTransaction getInputTx(CScript scriptPubKey)
  */
 TestChain::TestChain(CBaseChainParams::Network desiredNetwork)
 {
-    undo_init_notaries();
+    CleanGlobals();
     previousNetwork = Params().NetworkIDString();
     dataDir = GetTempPath() / strprintf("test_komodo_%li_%i", GetTime(), GetRand(100000));
     if (ASSETCHAINS_SYMBOL[0])
@@ -184,7 +184,7 @@ TestChain::TestChain(CBaseChainParams::Network desiredNetwork)
 
 TestChain::~TestChain()
 {
-    undo_init_notaries();
+    CleanGlobals();
     boost::filesystem::remove_all(dataDir);
     if (previousNetwork == "main")
         SelectParams(CBaseChainParams::MAIN);
@@ -193,6 +193,18 @@ TestChain::~TestChain()
     if (previousNetwork == "test")
         SelectParams(CBaseChainParams::TESTNET);
 
+}
+
+void TestChain::CleanGlobals()
+{
+    // hwmheight can get skewed if komodo_connectblock not called (which some tests do)
+    undo_init_notaries();
+    for(int i = 0; i < 33; ++i)
+    {
+        komodo_state s = KOMODO_STATES[i];
+        s.events.clear();
+        // TODO: clean notarization points
+    }
 }
 
 /***
