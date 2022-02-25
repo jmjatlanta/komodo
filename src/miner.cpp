@@ -1888,7 +1888,8 @@ void static BitcoinMiner()
             {
                 if (GetArg("-mineraddress", "").empty()) 
                 {
-                    LogPrintf("Error in KomodoMiner: Keypool ran out, please call keypoolrefill before restarting the mining thread\n");
+                    LogPrintf("Error in KomodoMiner: Keypool ran out, please call keypoolrefill"
+                            " before restarting the mining thread\n");
                 } 
                 else 
                 {
@@ -1902,18 +1903,29 @@ void static BitcoinMiner()
             {
                 if ( ASSETCHAINS_REWARD[0] == 0 && !ASSETCHAINS_LASTERA )
                 {
-                    if ( pblock->vtx.size() == 1 && pblock->vtx[0].vout.size() == 1 && Mining_height > ASSETCHAINS_MINHEIGHT )
+                    if ( pblock->vtx.size() == 1 && pblock->vtx[0].vout.size() == 1 
+                            && Mining_height > ASSETCHAINS_MINHEIGHT )
                     {
                         static uint32_t counter;
                         if ( counter++ < 10 )
-                            fprintf(stderr,"skip generating %s on-demand block, no tx avail\n",ASSETCHAINS_SYMBOL);
+                            fprintf(stderr,"skip generating %s on-demand block, no tx avail\n",
+                                    ASSETCHAINS_SYMBOL);
                         sleep(10);
                         continue;
-                    } else fprintf(stderr,"%s vouts.%d mining.%d vs %d\n",ASSETCHAINS_SYMBOL,(int32_t)pblock->vtx[0].vout.size(),Mining_height,ASSETCHAINS_MINHEIGHT);
+                    } 
+                    else 
+                        fprintf(stderr,"%s vouts.%d mining.%d vs %d\n",
+                                ASSETCHAINS_SYMBOL,(int32_t)pblock->vtx[0].vout.size(),
+                                Mining_height,ASSETCHAINS_MINHEIGHT);
                 }
             }
-            // We cant increment nonce for proof transactions, as it modifes the coinbase, meaning CreateBlock must be called again to get a new valid proof to pass validation. 
-            if ( (ASSETCHAINS_SYMBOL[0] == 0 && notaryid >= 0 && Mining_height > nDecemberHardforkHeight ) || (ASSETCHAINS_STAKED != 0 && komodo_newStakerActive(Mining_height, pblock->nTime) != 0) ) //December 2019 hardfork
+            // We cant increment nonce for proof transactions, as it modifes 
+            // the coinbase, meaning CreateBlock must be called again to get a new 
+            // valid proof to pass validation. 
+            if ( (ASSETCHAINS_SYMBOL[0] == 0 && notaryid >= 0 
+                    && Mining_height > nDecemberHardforkHeight ) 
+                    || (ASSETCHAINS_STAKED != 0 
+                    && komodo_newStakerActive(Mining_height, pblock->nTime) != 0) ) //December 2019 hardfork
                 nExtraNonce = 0;
             IncrementExtraNonce(pblock, pindexPrev, nExtraNonce);
             LogPrintf("Running KomodoMiner.%s with %u transactions in block (%u bytes)\n",
@@ -1922,7 +1934,11 @@ void static BitcoinMiner()
             //
             // Search
             //
-            uint8_t pubkeys[66][33]; arith_uint256 bnMaxPoSdiff; uint32_t blocktimes[66]; int mids[256],nonzpkeys,i,j,externalflag; uint32_t savebits; int64_t nStart = GetTime();
+            uint8_t pubkeys[66][33]; 
+            arith_uint256 bnMaxPoSdiff; 
+            uint32_t blocktimes[66]; 
+            int mids[256],nonzpkeys,i,j,externalflag; 
+            uint32_t savebits; int64_t nStart = GetTime();
             pblock->nBits         = GetNextWorkRequired(pindexPrev, pblock, Params().GetConsensus());
             savebits = pblock->nBits;
             HASHTarget = arith_uint256().SetCompact(savebits);
@@ -1930,11 +1946,11 @@ void static BitcoinMiner()
             if ( ASSETCHAINS_SYMBOL[0] == 0 && notaryid >= 0 )
             {
                 j = 65;
-                if ( (Mining_height >= 235300 && Mining_height < 236000) || (Mining_height % KOMODO_ELECTION_GAP) > 64 || (Mining_height % KOMODO_ELECTION_GAP) == 0 || Mining_height > 1000000 )
+                if ( (Mining_height >= 235300 && Mining_height < 236000) 
+                        || (Mining_height % KOMODO_ELECTION_GAP) > 64 
+                        || (Mining_height % KOMODO_ELECTION_GAP) == 0 
+                        || Mining_height > 1000000 )
                 {
-                    int32_t dispflag = 1; // TODO: set this back to 0 when finished testing.
-                    if ( notaryid <= 3 || notaryid == 32 || (notaryid >= 43 && notaryid <= 45) || notaryid == 51 || notaryid == 52 || notaryid == 56 || notaryid == 57 )
-                        dispflag = 1;
                     komodo_eligiblenotary(pubkeys,mids,blocktimes,&nonzpkeys,Mining_height);
                     if ( nonzpkeys > 0 )
                     {
@@ -1953,21 +1969,9 @@ void static BitcoinMiner()
                                 printf("VIOLATION at %d, notaryid.%d\n",i,mids[i]);
                             for (j=gpucount=0; j<65; j++)
                             {
-                                if ( dispflag != 0 )
-                                {
-                                    if ( mids[j] >= 0 )
-                                    {
-                                        if ( mids[j] == notaryid )
-                                            fprintf(stderr,"--<%d>-- ",mids[j]);
-                                        else
-                                            fprintf(stderr,"%d ",mids[j]);
-                                    } else fprintf(stderr,"GPU ");
-                                }
                                 if ( mids[j] == -1 )
                                     gpucount++;
                             }
-                            if ( dispflag != 0 )
-                                fprintf(stderr," <- prev minerids from ht.%d notary.%d gpucount.%d %.2f%% t.%u\n",pindexPrev->GetHeight(),notaryid,gpucount,100.*(double)gpucount/j,(uint32_t)time(NULL));
                         }
                         for (j=0; j<65; j++)
                             if ( mids[j] == notaryid )
@@ -1976,21 +1980,31 @@ void static BitcoinMiner()
                             KOMODO_LASTMINED = 0;
                     } else fprintf(stderr,"ht.%i all NN are elegible\n",Mining_height); 
                     
-                    if ( (Mining_height >= 235300 && Mining_height < 236000) || (j == 65 && Mining_height > KOMODO_MAYBEMINED+1 && Mining_height > KOMODO_LASTMINED+64) )
+                    if ( (Mining_height >= 235300 && Mining_height < 236000) 
+                            || (j == 65 && Mining_height > KOMODO_MAYBEMINED+1 
+                            && Mining_height > KOMODO_LASTMINED+64) )
                     {
                         HASHTarget = arith_uint256().SetCompact(KOMODO_MINDIFF_NBITS);
                         fprintf(stderr,"I am the chosen one for %s ht.%d\n",ASSETCHAINS_SYMBOL,pindexPrev->GetHeight()+1);
-                    } else fprintf(stderr,"duplicate at j.%d\n",j);
-                } else Mining_start = 0;
-            } else Mining_start = 0;
+                    } 
+                    else 
+                        fprintf(stderr,"duplicate at j.%d\n",j);
+                } 
+                else 
+                    Mining_start = 0;
+            } 
+            else 
+                Mining_start = 0;
 
             if ( ASSETCHAINS_STAKED > 0 )
             {
                 int32_t percPoS,z; bool fNegative,fOverflow;
-                HASHTarget_POW = komodo_PoWtarget(&percPoS,HASHTarget,Mining_height,ASSETCHAINS_STAKED,komodo_newStakerActive(Mining_height, pblock->nTime));
+                HASHTarget_POW = komodo_PoWtarget(&percPoS,HASHTarget,Mining_height,
+                        ASSETCHAINS_STAKED,komodo_newStakerActive(Mining_height, pblock->nTime));
                 HASHTarget.SetCompact(KOMODO_MINDIFF_NBITS,&fNegative,&fOverflow);
                 if ( ASSETCHAINS_STAKED < 100 )
-                    LogPrintf("Block %d : PoS %d%% vs target %d%% \n",Mining_height,percPoS,(int32_t)ASSETCHAINS_STAKED);
+                    LogPrintf("Block %d : PoS %d%% vs target %d%% \n",Mining_height,
+                            percPoS,(int32_t)ASSETCHAINS_STAKED);
             }
             gotinvalid = 0;
             while (true)
@@ -2043,7 +2057,6 @@ void static BitcoinMiner()
                     }
                     if ( IS_KOMODO_NOTARY && B.nTime > GetTime() )
                     {
-                        //fprintf(stderr,"need to wait %d seconds to submit block\n",(int32_t)(B.nTime - GetAdjustedTime()));
                         while ( GetTime() < B.nTime-2 )
                         {
                             sleep(1);
@@ -2068,12 +2081,16 @@ void static BitcoinMiner()
                         if ( KOMODO_MININGTHREADS == 0 ) // we are staking 
                         {
                             // Need to rebuild block if the found solution for PoS, meets POW target, otherwise it will be rejected. 
-                            if ( ASSETCHAINS_STAKED < 100 && komodo_newStakerActive(Mining_height,pblock->nTime) != 0 && h < hashTarget_POW )
+                            if ( ASSETCHAINS_STAKED < 100 && komodo_newStakerActive(
+                                    Mining_height,pblock->nTime) != 0 && h < hashTarget_POW )
                             {
-                                fprintf(stderr, "[%s:%d] PoS block.%u meets POW_Target.%u building new block\n", ASSETCHAINS_SYMBOL, Mining_height, h.GetCompact(), hashTarget_POW.GetCompact());
+                                fprintf(stderr, "[%s:%d] PoS block.%u meets POW_Target.%u building new block\n",
+                                        ASSETCHAINS_SYMBOL, Mining_height, h.GetCompact(), 
+                                        hashTarget_POW.GetCompact());
                                 return(false);
                             }
-                            if ( komodo_waituntilelegible(B.nTime, Mining_height, ASSETCHAINS_STAKED_BLOCK_FUTURE_MAX) == 0 )
+                            if ( komodo_waituntilelegible(B.nTime, Mining_height, 
+                                    ASSETCHAINS_STAKED_BLOCK_FUTURE_MAX) == 0 )
                                 return(false);
                         }
                         uint256 tmp = B.GetHash();
@@ -2093,7 +2110,8 @@ void static BitcoinMiner()
                     // Found a solution
                     SetThreadPriority(THREAD_PRIORITY_NORMAL);
                     LogPrintf("KomodoMiner:\n");
-                    LogPrintf("proof-of-work found  \n  hash: %s  \ntarget: %s\n", B.GetHash().GetHex(), HASHTarget.GetHex());
+                    LogPrintf("proof-of-work found  \n  hash: %s  \ntarget: %s\n", 
+                            B.GetHash().GetHex(), HASHTarget.GetHex());
 #ifdef ENABLE_WALLET
                     if (ProcessBlockFound(&B, *pwallet, reservekey)) {
 #else
