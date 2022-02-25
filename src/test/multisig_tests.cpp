@@ -13,9 +13,7 @@
 #include "uint256.h"
 #include "test/test_bitcoin.h"
 
-#ifdef ENABLE_WALLET
 #include "wallet/wallet_ismine.h"
-#endif
 
 #include <boost/foreach.hpp>
 #include <boost/test/unit_test.hpp>

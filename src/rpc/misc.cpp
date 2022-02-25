@@ -31,10 +31,8 @@
 #include "cc/eval.h"
 #include "cc/CCinclude.h"
 #include "hex.h"
-#ifdef ENABLE_WALLET
 #include "wallet/wallet.h"
 #include "wallet/walletdb.h"
-#endif
 
 #include <stdint.h>
 
@@ -223,11 +221,7 @@ UniValue getinfo(const UniValue& params, bool fHelp, const CPubKey& mypk)
             + HelpExampleCli("getinfo", "")
             + HelpExampleRpc("getinfo", "")
         );
-    //#ifdef ENABLE_WALLET
-    //    LOCK2(cs_main, pwalletMain ? &pwalletMain->cs_wallet : NULL);
-    //#else
     LOCK(cs_main);
-    //#endif
     
     proxyType proxy;
     GetProxy(NET_IPV4, proxy);
@@ -254,7 +248,6 @@ UniValue getinfo(const UniValue& params, bool fHelp, const CPubKey& mypk)
             obj.push_back(Pair("KMDnotarized_height", kmdnotarized_height));
         obj.push_back(Pair("notarized_confirms", txid_height < kmdnotarized_height ? (kmdnotarized_height - txid_height + 1) : 0));
         //fprintf(stderr,"after notarized_confirms %u\n",(uint32_t)time(NULL));
-#ifdef ENABLE_WALLET
         if (pwalletMain) {
             obj.push_back(Pair("walletversion", pwalletMain->GetVersion()));
             if ( ASSETCHAINS_SYMBOL[0] == 0 )
@@ -267,7 +260,6 @@ UniValue getinfo(const UniValue& params, bool fHelp, const CPubKey& mypk)
                 obj.push_back(Pair("balance",       ValueFromAmount(pwalletMain->GetBalance()))); //
             }
         }
-#endif
         //fprintf(stderr,"after wallet %u\n",(uint32_t)time(NULL));
         obj.push_back(Pair("blocks",        (int)chainActive.Height()));
         if ( (longestchain= KOMODO_LONGESTCHAIN) != 0 && chainActive.Height() > longestchain )
@@ -277,7 +269,6 @@ UniValue getinfo(const UniValue& params, bool fHelp, const CPubKey& mypk)
         if ( chainActive.LastTip() != 0 )
             obj.push_back(Pair("tiptime", (int)chainActive.LastTip()->nTime));
         obj.push_back(Pair("difficulty",    (double)GetDifficulty()));
-#ifdef ENABLE_WALLET
         if (pwalletMain) {
             obj.push_back(Pair("keypoololdest", pwalletMain->GetOldestKeyPoolTime()));
             obj.push_back(Pair("keypoolsize",   (int)pwalletMain->GetKeyPoolSize()));
@@ -285,7 +276,6 @@ UniValue getinfo(const UniValue& params, bool fHelp, const CPubKey& mypk)
         if (pwalletMain && pwalletMain->IsCrypted())
             obj.push_back(Pair("unlocked_until", nWalletUnlockTime));
         obj.push_back(Pair("paytxfee",      ValueFromAmount(payTxFee.GetFeePerK())));
-#endif
         obj.push_back(Pair("sapling", ASSETCHAINS_SAPLING));
     }
     obj.push_back(Pair("timeoffset",    0));
@@ -363,7 +353,6 @@ UniValue getinfo(const UniValue& params, bool fHelp, const CPubKey& mypk)
     return obj;
 }
 
-#ifdef ENABLE_WALLET
 class DescribeAddressVisitor : public boost::static_visitor<UniValue>
 {
 public:
@@ -416,7 +405,6 @@ public:
         return obj;
     }
 };
-#endif
 
 UniValue coinsupply(const UniValue& params, bool fHelp, const CPubKey& mypk)
 {
@@ -565,11 +553,7 @@ UniValue validateaddress(const UniValue& params, bool fHelp, const CPubKey& mypk
             + HelpExampleRpc("validateaddress", "\"RTZMZHDFSTFQst8XmX2dR4DaH87cEUs3gC\"")
         );
 
-#ifdef ENABLE_WALLET
     LOCK2(cs_main, pwalletMain ? &pwalletMain->cs_wallet : NULL);
-#else
-    LOCK(cs_main);
-#endif
 
     CTxDestination dest = DecodeDestination(params[0].get_str());
     bool isValid = IsValidDestination(dest);
@@ -584,7 +568,6 @@ UniValue validateaddress(const UniValue& params, bool fHelp, const CPubKey& mypk
         CScript scriptPubKey = GetScriptForDestination(dest);
         ret.push_back(Pair("scriptPubKey", HexStr(scriptPubKey.begin(), scriptPubKey.end())));
         ret.push_back(Pair("segid", (int32_t)komodo_segid32((char *)params[0].get_str().c_str()) & 0x3f));
-#ifdef ENABLE_WALLET
         isminetype mine = pwalletMain ? IsMine(*pwalletMain, dest) : ISMINE_NO;
         ret.push_back(Pair("ismine", (mine & ISMINE_SPENDABLE) ? true : false));
         ret.push_back(Pair("iswatchonly", (mine & ISMINE_WATCH_ONLY) ? true: false));
@@ -592,7 +575,6 @@ UniValue validateaddress(const UniValue& params, bool fHelp, const CPubKey& mypk
         ret.pushKVs(detail);
         if (pwalletMain && pwalletMain->mapAddressBook.count(dest))
             ret.push_back(Pair("account", pwalletMain->mapAddressBook[dest].name));
-#endif
     }
     return ret;
 }
@@ -608,11 +590,9 @@ public:
         obj.push_back(Pair("type", "sprout"));
         obj.push_back(Pair("payingkey", zaddr.a_pk.GetHex()));
         obj.push_back(Pair("transmissionkey", zaddr.pk_enc.GetHex()));
-#ifdef ENABLE_WALLET
         if (pwalletMain) {
             obj.push_back(Pair("ismine", pwalletMain->HaveSproutSpendingKey(zaddr)));
         }
-#endif
         return obj;
     }
 
@@ -621,7 +601,6 @@ public:
         obj.push_back(Pair("type", "sapling"));
         obj.push_back(Pair("diversifier", HexStr(zaddr.d)));
         obj.push_back(Pair("diversifiedtransmissionkey", zaddr.pk_d.GetHex()));
-#ifdef ENABLE_WALLET
         if (pwalletMain) {
             libzcash::SaplingIncomingViewingKey ivk;
             libzcash::SaplingFullViewingKey fvk;
@@ -630,7 +609,6 @@ public:
                 pwalletMain->HaveSaplingSpendingKey(fvk);
             obj.push_back(Pair("ismine", isMine));
         }
-#endif
         return obj;
     }
 };
@@ -661,11 +639,7 @@ UniValue z_validateaddress(const UniValue& params, bool fHelp, const CPubKey& my
         );
 
 
-#ifdef ENABLE_WALLET
     LOCK2(cs_main, pwalletMain->cs_wallet);
-#else
-    LOCK(cs_main);
-#endif
 
     string strAddress = params[0].get_str();
     auto address = DecodePaymentAddress(strAddress);
@@ -705,7 +679,6 @@ CScript _createmultisig_redeemScript(const UniValue& params)
     for (unsigned int i = 0; i < keys.size(); i++)
     {
         const std::string& ks = keys[i].get_str();
-#ifdef ENABLE_WALLET
         // Case 1: Bitcoin address and we have full public key:
         CTxDestination dest = DecodeDestination(ks);
         if (pwalletMain && IsValidDestination(dest)) {
@@ -724,7 +697,6 @@ CScript _createmultisig_redeemScript(const UniValue& params)
 
         // Case 2: hex public key
         else
-#endif
         if (IsHex(ks))
         {
             CPubKey vchPubKey(ParseHex(ks));

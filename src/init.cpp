@@ -54,11 +54,8 @@
 #include "util.h"
 #include "utilmoneystr.h"
 #include "validationinterface.h"
-#ifdef ENABLE_WALLET
 #include "wallet/wallet.h"
 #include "wallet/walletdb.h"
-
-#endif
 #include <stdint.h>
 #include <stdio.h>
 
@@ -103,9 +100,7 @@ extern int32_t KOMODO_SNAPSHOT_INTERVAL;
 
 ZCJoinSplit* pzcashParams = NULL;
 
-#ifdef ENABLE_WALLET
 CWallet* pwalletMain = NULL;
-#endif
 bool fFeeEstimatesInitialized = false;
 
 #if ENABLE_ZMQ
@@ -232,16 +227,10 @@ void Shutdown()
     StopREST();
     StopRPC();
     StopHTTPServer();
-#ifdef ENABLE_WALLET
     if (pwalletMain)
         pwalletMain->Flush(false);
-#endif
 #ifdef ENABLE_MINING
- #ifdef ENABLE_WALLET
     GenerateBitcoins(false, NULL, 0);
- #else
-    GenerateBitcoins(false, 0);
- #endif
 #endif
     StopNode();
     StopTorControl();
@@ -272,10 +261,8 @@ void Shutdown()
         delete pblocktree;
         pblocktree = NULL;
     }
-#ifdef ENABLE_WALLET
     if (pwalletMain)
         pwalletMain->Flush(true);
-#endif
 
 #if ENABLE_ZMQ
     if (pzmqNotificationInterface) {
@@ -301,10 +288,8 @@ void Shutdown()
     }
 #endif
     UnregisterAllValidationInterfaces();
-#ifdef ENABLE_WALLET
     delete pwalletMain;
     pwalletMain = NULL;
-#endif
     delete pzcashParams;
     pzcashParams = NULL;
     globalVerifyHandle.reset();
@@ -443,7 +428,6 @@ std::string HelpMessage(HelpMessageMode mode)
     strUsage += HelpMessageOpt("-whitelist=<netmask>", _("Whitelist peers connecting from the given netmask or IP address. Can be specified multiple times.") +
         " " + _("Whitelisted peers cannot be DoS banned and their transactions are always relayed, even if they are already in the mempool, useful e.g. for a gateway"));
 
-#ifdef ENABLE_WALLET
     strUsage += HelpMessageGroup(_("Wallet options:"));
     strUsage += HelpMessageOpt("-disablewallet", _("Do not load the wallet and disable wallet RPC calls"));
     strUsage += HelpMessageOpt("-keypool=<n>", strprintf(_("Set key pool size to <n> (default: %u)"), 100));
@@ -467,7 +451,6 @@ std::string HelpMessage(HelpMessageMode mode)
     strUsage += HelpMessageOpt("-whitelistaddress=<Raddress>", _("Enable the wallet filter for notary nodes and add one Raddress to the whitelist of the wallet filter. If -whitelistaddress= is used, then the wallet filter is automatically activated. Several Raddresses can be defined using several -whitelistaddress= (similar to -addnode). The wallet filter will filter the utxo to only ones coming from my own Raddress (derived from pubkey) and each Raddress defined using -whitelistaddress= this option is mostly for Notary Nodes)."));
     strUsage += HelpMessageOpt("-zapwallettxes=<mode>", _("Delete all wallet transactions and only recover those parts of the blockchain through -rescan on startup") +
         " " + _("(1 = keep tx meta data e.g. account owner and payment request information, 2 = drop tx meta data)"));
-#endif
 
 #if ENABLE_ZMQ
     strUsage += HelpMessageGroup(_("ZeroMQ notification options:"));
@@ -546,11 +529,7 @@ std::string HelpMessage(HelpMessageMode mode)
     strUsage += HelpMessageOpt("-mineraddress=<addr>", _("Send mined coins to a specific single address"));
     strUsage += HelpMessageOpt("-minetolocalwallet", strprintf(
             _("Require that mined blocks use a coinbase address in the local wallet (default: %u)"),
- #ifdef ENABLE_WALLET
             1
- #else
-            0
- #endif
             ));
 #endif
 
@@ -955,10 +934,8 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
 
 #ifndef _WIN32
     if (GetBoolArg("-sysperms", false)) {
-#ifdef ENABLE_WALLET
         if (!GetBoolArg("-disablewallet", false))
             return InitError("Error: -sysperms is not allowed in combination with enabled wallet functionality");
-#endif
     } else {
         umask(077);
     }
@@ -1106,14 +1083,12 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
     if (GetArg("-prune", 0)) {
         if (GetBoolArg("-txindex", true))
             return InitError(_("Prune mode is incompatible with -txindex."));
-#ifdef ENABLE_WALLET
         if (!GetBoolArg("-disablewallet", false)) {
             if (SoftSetBoolArg("-disablewallet", true))
                 LogPrintf("%s : parameter interaction: -prune -> setting -disablewallet=1\n", __func__);
             else
                 return InitError(_("Can't run with a wallet in prune mode."));
         }
-#endif
     }
 
     // ********************************************************* Step 3: parameter-to-internal-flags
@@ -1180,7 +1155,6 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
     }
 
     RegisterAllCoreRPCCommands(tableRPC);
-#ifdef ENABLE_WALLET
     bool fDisableWallet = GetBoolArg("-disablewallet", false);
     if ( KOMODO_NSPV_SUPERLITE )
     {
@@ -1189,7 +1163,6 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
     }
     if (!fDisableWallet)
         RegisterWalletRPCCommands(tableRPC);
-#endif
 
     nConnectTimeout = GetArg("-timeout", DEFAULT_CONNECT_TIMEOUT);
     if (nConnectTimeout <= 0)
@@ -1210,7 +1183,6 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
             return InitError(strprintf(_("Invalid amount for -minrelaytxfee=<amount>: '%s'"), mapArgs["-minrelaytxfee"]));
     }
 
-#ifdef ENABLE_WALLET
     if (mapArgs.count("-mintxfee"))
     {
         CAmount n = 0;
@@ -1253,7 +1225,6 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
     fSendFreeTransactions = GetBoolArg("-sendfreetransactions", false);
 
     std::string strWalletFile = GetArg("-wallet", "wallet.dat");
-#endif // ENABLE_WALLET
 
     fIsBareMultisigStd = GetBoolArg("-permitbaremultisig", true);
     nMaxDatacarrierBytes = GetArg("-datacarriersize", nMaxDatacarrierBytes);
@@ -1358,11 +1329,9 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
         return InitError(_("Initialization sanity check failed. Komodo is shutting down."));
 
     std::string strDataDir = GetDataDir().string();
-#ifdef ENABLE_WALLET
     // Wallet file must be a plain filename without a directory
     if (strWalletFile != boost::filesystem::basename(strWalletFile) + boost::filesystem::extension(strWalletFile))
         return InitError(strprintf(_("Wallet %s resides outside data directory %s"), strWalletFile, strDataDir));
-#endif
     // Make sure only a single Bitcoin process is using the data directory.
     boost::filesystem::path pathLockFile = GetDataDir() / ".lock";
     FILE* file = fopen(pathLockFile.string().c_str(), "a"); // empty lock file; created if it doesn't exist.
@@ -1387,9 +1356,7 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
     if (fPrintToDebugLog)
         OpenDebugLog();
     LogPrintf("Using OpenSSL version %s\n", SSLeay_version(SSLEAY_VERSION));
-#ifdef ENABLE_WALLET
     LogPrintf("Using BerkeleyDB version %s\n", DbEnv::version(0, 0, 0));
-#endif
     if (!fLogTimestamps)
         LogPrintf("Startup time: %s\n", DateTimeStrFormat("%Y-%m-%d %H:%M:%S", GetTime()));
     LogPrintf("Default data directory %s\n", GetDefaultDataDir().string());
@@ -1444,7 +1411,6 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
     int64_t nStart;
 
     // ********************************************************* Step 5: verify wallet database integrity
-#ifdef ENABLE_WALLET
     if (!fDisableWallet) {
         LogPrintf("Using wallet %s\n", strWalletFile);
         uiInterface.InitMessage(_("Verifying wallet..."));
@@ -1461,7 +1427,6 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
             return InitError(warningString);
 
     } // (!fDisableWallet)
-#endif // ENABLE_WALLET
     // ********************************************************* Step 6: network initialization
 
     RegisterNodeSignals(GetNodeSignals());
@@ -1819,7 +1784,6 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
 
 
     // ********************************************************* Step 8: load wallet
-#ifdef ENABLE_WALLET
     if (fDisableWallet) {
         pwalletMain = NULL;
         LogPrintf("Wallet disabled!\n");
@@ -1962,22 +1926,10 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
         }
         pwalletMain->SetBroadcastTransactions(GetBoolArg("-walletbroadcast", true));
     } // (!fDisableWallet)
-#else // ENABLE_WALLET
-    LogPrintf("No wallet support compiled in!\n");
-#endif // !ENABLE_WALLET
 
 #ifdef ENABLE_MINING
- #ifndef ENABLE_WALLET
-    if (GetBoolArg("-minetolocalwallet", false)) {
-        return InitError(_("Zcash was not built with wallet support. Set -minetolocalwallet=0 to use -mineraddress, or rebuild Zcash with wallet support."));
-    }
-    if (GetArg("-mineraddress", "").empty() && GetBoolArg("-gen", false)) {
-        return InitError(_("Zcash was not built with wallet support. Set -mineraddress, or rebuild Zcash with wallet support."));
-    }
- #endif // !ENABLE_WALLET
-
+ 
     if (mapArgs.count("-mineraddress")) {
- #ifdef ENABLE_WALLET
         bool minerAddressInLocalWallet = false;
         if (pwalletMain) {
             // Address has alreday been validated
@@ -1988,7 +1940,6 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
         if (GetBoolArg("-minetolocalwallet", true) && !minerAddressInLocalWallet) {
             return InitError(_("-mineraddress is not in the local wallet. Either use a local address, or set -minetolocalwallet=0"));
         }
- #endif // ENABLE_WALLET
     }
 #endif // ENABLE_MINING
 
@@ -2048,13 +1999,11 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
     //// debug print
     LogPrintf("mapBlockIndex.size() = %u\n",   mapBlockIndex.size());
     LogPrintf("nBestHeight = %d\n",                   chainActive.Height());
-#ifdef ENABLE_WALLET
     RescanWallets();
 
     LogPrintf("setKeyPool.size() = %u\n",      pwalletMain ? pwalletMain->setKeyPool.size() : 0);
     LogPrintf("mapWallet.size() = %u\n",       pwalletMain ? pwalletMain->mapWallet.size() : 0);
     LogPrintf("mapAddressBook.size() = %u\n",  pwalletMain ? pwalletMain->mapAddressBook.size() : 0);
-#endif
 
     // Start the thread that notifies listeners of transactions that have been
     // recently added to the mempool.
@@ -2070,14 +2019,10 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
 
 #ifdef ENABLE_MINING
     // Generate coins in the background
- #ifdef ENABLE_WALLET
     VERUS_MINTBLOCKS = GetBoolArg("-mint", false);
 
     if (pwalletMain || !GetArg("-mineraddress", "").empty())
         GenerateBitcoins(GetBoolArg("-gen", false), pwalletMain, GetArg("-genproclimit", -1));
- #else
-    GenerateBitcoins(GetBoolArg("-gen", false), GetArg("-genproclimit", -1));
- #endif
 #endif
 
     // ********************************************************* Step 11: finished
@@ -2085,7 +2030,6 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
     SetRPCWarmupFinished();
     uiInterface.InitMessage(_("Done loading"));
 
-#ifdef ENABLE_WALLET
     if (pwalletMain) {
         // Add wallet transactions that aren't already in a block to mapTransactions
         pwalletMain->ReacceptWalletTransactions();
@@ -2093,7 +2037,6 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
         // Run a thread to flush wallet periodically
         threadGroup.create_thread(boost::bind(&ThreadFlushWalletDB, boost::ref(pwalletMain->strWalletFile)));
     }
-#endif
 
     // SENDALERT
     threadGroup.create_thread(boost::bind(ThreadSendAlert));

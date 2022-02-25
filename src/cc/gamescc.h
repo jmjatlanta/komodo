@@ -9,7 +9,6 @@
 
 #ifndef STANDALONE
 
-#define ENABLE_WALLET
 extern CWallet* pwalletMain;
 
 #include "CCinclude.h"

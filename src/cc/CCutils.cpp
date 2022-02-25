@@ -476,7 +476,6 @@ bool Myprivkey(uint8_t myprivkey[])
         dest[i] = 0;
         if ( address.SetString(strAddress) != 0 && address.GetKeyID(keyID) != 0 )
         {
-#ifdef ENABLE_WALLET
             if ( pwalletMain->GetKey(keyID,vchSecret) != 0 )
             {
                 memcpy(myprivkey,vchSecret.begin(),32);
@@ -495,7 +494,6 @@ bool Myprivkey(uint8_t myprivkey[])
                 }
                 return(false);
             }
-#endif
         }
     }
     fprintf(stderr,"privkey for the -pubkey= address is not in the wallet, importprivkey!\n");

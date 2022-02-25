@@ -14,17 +14,25 @@
  ******************************************************************************/
 #include "komodo_globals.h"
 
+/***
+ * @brief return the index id from the CURRENCIES array
+ * @param origbase the coin
+ * @returns the index of the coin or -1 if not found
+ */
 int32_t komodo_baseid(char *origbase)
 {
-    int32_t i; char base[64];
-    for (i=0; origbase[i]!=0&&i<sizeof(base); i++)
+    int32_t i; 
+    // turn the string to upper case
+    char base[64];
+    for (i=0; origbase[i]!=0 && i<sizeof(base); i++)
         base[i] = toupper((int32_t)(origbase[i] & 0xff));
     base[i] = 0;
+    // search for the coin
     for (i=0; i<=MAX_CURRENCIES; i++)
         if ( strcmp(CURRENCIES[i],base) == 0 )
-            return(i);
-    //printf("illegal base.(%s) %s\n",origbase,base);
-    return(-1);
+            return i;
+    // coin not found
+    return -1;
 }
 
 #ifndef SATOSHIDEN

@@ -257,12 +257,7 @@ UniValue help(const UniValue& params, bool fHelp, const CPubKey& mypk)
 
 extern char ASSETCHAINS_SYMBOL[KOMODO_ASSETCHAIN_MAXLEN];
 
-#ifdef ENABLE_WALLET
 void GenerateBitcoins(bool b, CWallet *pw, int t);
-#else
-void GenerateBitcoins(bool b, CWallet *pw);
-#endif
-
 
 UniValue stop(const UniValue& params, bool fHelp, const CPubKey& mypk)
 {
@@ -273,11 +268,7 @@ UniValue stop(const UniValue& params, bool fHelp, const CPubKey& mypk)
             "stop\n"
             "\nStop Komodo server.");
 
-#ifdef ENABLE_WALLET
     GenerateBitcoins(false, pwalletMain, 0);
-#else
-    GenerateBitcoins(false, 0);
-#endif
 
     // Shutdown will take long enough that the response should get back
     StartShutdown();
@@ -400,9 +391,7 @@ static const CRPCCommand vRPCCommands[] =
     { "rawtransactions",    "getrawtransaction",      &getrawtransaction,      true  },
     { "rawtransactions",    "sendrawtransaction",     &sendrawtransaction,     false },
     { "rawtransactions",    "signrawtransaction",     &signrawtransaction,     false }, /* uses wallet if enabled */
-#ifdef ENABLE_WALLET
     { "rawtransactions",    "fundrawtransaction",     &fundrawtransaction,     false },
-#endif
 
     // auction
     { "auction",       "auctionaddress",    &auctionaddress,  true },
@@ -600,7 +589,6 @@ static const CRPCCommand vRPCCommands[] =
     { "hidden",             "setmocktime",            &setmocktime,            true  },
 
 
-#ifdef ENABLE_WALLET
     /* Wallet */
     { "wallet",             "resendwallettransactions", &resendwallettransactions, true},
     { "wallet",             "addmultisigaddress",     &addmultisigaddress,     true  },
@@ -674,7 +662,6 @@ static const CRPCCommand vRPCCommands[] =
     // TODO: rearrange into another category
     { "disclosure",         "z_getpaymentdisclosure", &z_getpaymentdisclosure, true  },
     { "disclosure",         "z_validatepaymentdisclosure", &z_validatepaymentdisclosure, true }
-#endif // ENABLE_WALLET
 };
 
 CRPCTable::CRPCTable()

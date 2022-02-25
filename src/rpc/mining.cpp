@@ -36,9 +36,7 @@
 #include "txmempool.h"
 #include "util.h"
 #include "validationinterface.h"
-#ifdef ENABLE_WALLET
 #include "wallet/wallet.h"
-#endif
 
 #include <stdint.h>
 
@@ -196,7 +194,6 @@ UniValue getgenerate(const UniValue& params, bool fHelp, const CPubKey& mypk)
 
 extern uint8_t NOTARY_PUBKEY33[33];
 
-//Value generate(const Array& params, bool fHelp)
 UniValue generate(const UniValue& params, bool fHelp, const CPubKey& mypk)
 {
     if (fHelp || params.size() < 1 || params.size() > 1)
@@ -214,13 +211,9 @@ UniValue generate(const UniValue& params, bool fHelp, const CPubKey& mypk)
         );
 
     if (GetArg("-mineraddress", "").empty()) {
-#ifdef ENABLE_WALLET
         if (!pwalletMain) {
             throw JSONRPCError(RPC_METHOD_NOT_FOUND, "Wallet disabled and -mineraddress not set");
         }
-#else
-        throw JSONRPCError(RPC_METHOD_NOT_FOUND, "komodod compiled without wallet and -mineraddress not set");
-#endif
     }
     if (!Params().MineBlocksOnDemand())
     {
@@ -240,9 +233,7 @@ UniValue generate(const UniValue& params, bool fHelp, const CPubKey& mypk)
     int nHeightEnd = 0;
     int nHeight = 0;
     int nGenerate = params[0].get_int();
-#ifdef ENABLE_WALLET
     CReserveKey reservekey(pwalletMain);
-#endif
 
     {   // Don't keep cs_main locked
         LOCK(cs_main);
@@ -261,11 +252,7 @@ UniValue generate(const UniValue& params, bool fHelp, const CPubKey& mypk)
         if (GetTime() == lastTime) MilliSleep(1001);
         lastTime = GetTime();
 
-#ifdef ENABLE_WALLET
         std::unique_ptr<CBlockTemplate> pblocktemplate(CreateNewBlockWithKey(reservekey,nHeight,KOMODO_MAXGPUCOUNT));
-#else
-        std::unique_ptr<CBlockTemplate> pblocktemplate(CreateNewBlockWithKey());
-#endif
         if (!pblocktemplate.get())
             throw JSONRPCError(RPC_INTERNAL_ERROR, "Wallet keypool empty");
         CBlock *pblock = &pblocktemplate->block;
@@ -349,13 +336,9 @@ UniValue setgenerate(const UniValue& params, bool fHelp, const CPubKey& mypk)
         );
 
     if (GetArg("-mineraddress", "").empty()) {
-#ifdef ENABLE_WALLET
         if (!pwalletMain) {
             throw JSONRPCError(RPC_METHOD_NOT_FOUND, "Wallet disabled and -mineraddress not set");
         }
-#else
-        throw JSONRPCError(RPC_METHOD_NOT_FOUND, "komodod compiled without wallet and -mineraddress not set");
-#endif
     }
     if (Params().MineBlocksOnDemand())
         throw JSONRPCError(RPC_METHOD_NOT_FOUND, "Use the generate method instead of setgenerate on this network");
@@ -394,11 +377,7 @@ UniValue setgenerate(const UniValue& params, bool fHelp, const CPubKey& mypk)
     mapArgs["-gen"] = (fGenerate ? "1" : "0");
     mapArgs ["-genproclimit"] = itostr(KOMODO_MININGTHREADS);
 
-#ifdef ENABLE_WALLET
     GenerateBitcoins(fGenerate, pwalletMain, nGenProcLimit);
-#else
-    GenerateBitcoins(fGenerate, nGenProcLimit);
-#endif
 
     return NullUniValue;
 }
@@ -629,13 +608,9 @@ UniValue getblocktemplate(const UniValue& params, bool fHelp, const CPubKey& myp
 
     // Wallet or miner address is required because we support coinbasetxn
     if (GetArg("-mineraddress", "").empty()) {
-#ifdef ENABLE_WALLET
         if (!pwalletMain) {
             throw JSONRPCError(RPC_METHOD_NOT_FOUND, "Wallet disabled and -mineraddress not set");
         }
-#else
-        throw JSONRPCError(RPC_METHOD_NOT_FOUND, "komodod compiled without wallet and -mineraddress not set");
-#endif
     }
     
     if ( GetArg("disablemining",false) )
@@ -785,13 +760,9 @@ UniValue getblocktemplate(const UniValue& params, bool fHelp, const CPubKey& myp
             delete pblocktemplate;
             pblocktemplate = NULL;
         }
-#ifdef ENABLE_WALLET
         CReserveKey reservekey(pwalletMain);
         LEAVE_CRITICAL_SECTION(cs_main);
         pblocktemplate = CreateNewBlockWithKey(reservekey,pindexPrevNew->GetHeight()+1,KOMODO_MAXGPUCOUNT,false);
-#else
-        pblocktemplate = CreateNewBlockWithKey();
-#endif
         ENTER_CRITICAL_SECTION(cs_main);
         if (!pblocktemplate)
             throw std::runtime_error("CreateNewBlock(): create block failed");
