@@ -2161,59 +2161,64 @@ void static BitcoinMiner()
         c.disconnect();
     }
 
+/*****
+ * @brief kicks off miner threads
+ * @param fGenerate true to start mining, false to stop
+ * @param pwallet the wallet to use
+ * @param nThreads the number of threads to use
+ */
 #ifdef ENABLE_WALLET
-    void GenerateBitcoins(bool fGenerate, CWallet* pwallet, int nThreads)
+void GenerateBitcoins(bool fGenerate, CWallet* pwallet, int nThreads)
 #else
-    void GenerateBitcoins(bool fGenerate, int nThreads)
+void GenerateBitcoins(bool fGenerate, int nThreads)
 #endif
+{
+    static boost::thread_group* minerThreads = nullptr;
+
+    if (nThreads < 0)
+        nThreads = GetNumCores();
+
+    if (minerThreads != nullptr)
     {
-        static boost::thread_group* minerThreads = NULL;
-
-        if (nThreads < 0)
-            nThreads = GetNumCores();
-
-        if (minerThreads != NULL)
-        {
-            minerThreads->interrupt_all();
-            delete minerThreads;
-            minerThreads = NULL;
-        }
-
-        //fprintf(stderr,"nThreads.%d fGenerate.%d\n",(int32_t)nThreads,fGenerate);
-        if ( ASSETCHAINS_STAKED > 0 && nThreads == 0 && fGenerate )
-        {
-            if ( pwallet != NULL )
-                nThreads = 1;
-            else
-                return;
-        }
-
-        if ((nThreads == 0 || !fGenerate) && (VERUS_MINTBLOCKS == 0 || pwallet == NULL))
-            return;
-
-        minerThreads = new boost::thread_group();
-
-#ifdef ENABLE_WALLET
-        if (ASSETCHAINS_LWMAPOS != 0 && VERUS_MINTBLOCKS)
-        {
-            minerThreads->create_thread(boost::bind(&VerusStaker, pwallet));
-        }
-#endif
-
-        for (int i = 0; i < nThreads; i++) {
-
-#ifdef ENABLE_WALLET
-            if ( ASSETCHAINS_ALGO == ASSETCHAINS_EQUIHASH )
-                minerThreads->create_thread(boost::bind(&BitcoinMiner, pwallet));
-            else
-                minerThreads->create_thread(boost::bind(&BitcoinMiner_noeq, pwallet));
-#else
-            if (ASSETCHAINS_ALGO == ASSETCHAINS_EQUIHASH )
-                minerThreads->create_thread(&BitcoinMiner);
-            else
-                minerThreads->create_thread(&BitcoinMiner_noeq);
-#endif
-        }
+        // This method has been called previously. Reset miners.
+        minerThreads->interrupt_all();
+        delete minerThreads;
+        minerThreads = nullptr;
     }
 
+    if ( ASSETCHAINS_STAKED > 0 && nThreads == 0 && fGenerate )
+    {
+        if ( pwallet != nullptr )
+            nThreads = 1;
+        else
+            return;
+    }
+
+    if ((nThreads == 0 || !fGenerate) && (VERUS_MINTBLOCKS == 0 || pwallet == NULL))
+        return;
+
+    minerThreads = new boost::thread_group();
+
+#ifdef ENABLE_WALLET
+    if (ASSETCHAINS_LWMAPOS != 0 && VERUS_MINTBLOCKS)
+    {
+        minerThreads->create_thread(boost::bind(&VerusStaker, pwallet));
+    }
+#endif
+
+    for (int i = 0; i < nThreads; i++) 
+    {
+#ifdef ENABLE_WALLET
+        if ( ASSETCHAINS_ALGO == ASSETCHAINS_EQUIHASH )
+            minerThreads->create_thread(boost::bind(&BitcoinMiner, pwallet));
+        else
+            minerThreads->create_thread(boost::bind(&BitcoinMiner_noeq, pwallet));
+#else
+        if (ASSETCHAINS_ALGO == ASSETCHAINS_EQUIHASH )
+            minerThreads->create_thread(&BitcoinMiner);
+        else
+            minerThreads->create_thread(&BitcoinMiner_noeq);
+#endif
+    }
+}
 #endif // ENABLE_MINING
