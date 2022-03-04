@@ -775,12 +775,19 @@ int32_t komodo_block2height(CBlock *block)
     return(height);
 }
 
-int32_t komodo_block2pubkey33(uint8_t *pubkey33,CBlock *block)
+/*****
+ * @brief get the public key from the given block
+ * @param pubkey33 where to store the public key
+ * @param block the block to look at
+ * @returns true on success, otherwise key will be 0x0 (or 0xff if loading blocks)
+ */
+int32_t komodo_block2pubkey33(uint8_t *pubkey33, CBlock *block)
 {
     int32_t n;
     if ( KOMODO_LOADINGBLOCKS == 0 )
         memset(pubkey33,0xff,33);
-    else memset(pubkey33,0,33);
+    else 
+        memset(pubkey33,0,33);
     if ( block->vtx[0].vout.size() > 0 )
     {
         txnouttype whichType;
@@ -793,11 +800,13 @@ int32_t komodo_block2pubkey33(uint8_t *pubkey33,CBlock *block)
                 memcpy(pubkey33,vch[0].data(),33);
                 return true;
             }
-            else memset(pubkey33,0,33);
+            else 
+                memset(pubkey33,0,33);
         }
-        else memset(pubkey33,0,33);
+        else 
+            memset(pubkey33,0,33);
     }
-    return(0);
+    return false;
 }
 
 int32_t komodo_blockload(CBlock& block,CBlockIndex *pindex)
@@ -856,21 +865,39 @@ void komodo_index2pubkey33(uint8_t *pubkey33,CBlockIndex *pindex,int32_t height)
     }
 }
 
-int32_t komodo_eligiblenotary(uint8_t pubkeys[66][33],int32_t *mids,uint32_t blocktimes[66],int32_t *nonzpkeysp,int32_t height)
+/****
+ * @brief get eligible notaries
+ * @note looks at the last 66 blocks in reverse order
+ * @param pubkeys the public keys of the last 66 blocks
+ * @param mids the notary ids of the last 66 blocks (-1 if not a notary)
+ * @param blocktimes the blocktimes of the last 66 blocks
+ * @param nonzpkeysp the number of notarized blocks in the last 66 blocks
+ * @param height the height to examine (will start looking at this height)
+ * @return 1 if things look "normal", 0 otherwise
+ */
+int32_t komodo_eligiblenotary(uint8_t pubkeys[66][33],int32_t *mids,
+        uint32_t blocktimes[66],int32_t *nonzpkeysp,int32_t height)
 {
-    // after the season HF block ALL new notaries instantly become elegible. 
-    int32_t i,j,n,duplicate; CBlock block; CBlockIndex *pindex; uint8_t notarypubs33[64][33];
     memset(mids,-1,sizeof(*mids)*66);
-    n = komodo_notaries(notarypubs33,height,0);
-    for (i=duplicate=0; i<66; i++)
+
+    // after the season HF block ALL new notaries instantly become elegible. 
+    uint8_t notarypubs33[64][33];
+    int32_t n = komodo_notaries(notarypubs33,height,0);
+
+    int32_t duplicate = 0;
+    int32_t i;
+    for (i = 0; i<66; i++)
     {
-        if ( (pindex= komodo_chainactive(height-i)) != 0 )
+        CBlockIndex *pindex = komodo_chainactive(height-i);
+        if ( pindex != nullptr )
         {
             blocktimes[i] = pindex->nTime;
+            CBlock block;
             if ( komodo_blockload(block,pindex) == 0 )
             {
                 komodo_block2pubkey33(pubkeys[i],&block);
-                for (j=0; j<n; j++)
+                // see if this key matches any current notary key
+                for (int32_t j=0; j<n; j++)
                 {
                     if ( memcmp(notarypubs33[j],pubkeys[i],33) == 0 )
                     {
@@ -879,14 +906,17 @@ int32_t komodo_eligiblenotary(uint8_t pubkeys[66][33],int32_t *mids,uint32_t blo
                         break;
                     }
                 }
-            } else fprintf(stderr,"couldnt load block.%d\n",height);
+            } 
+            else 
+                fprintf(stderr,"couldnt load block.%d\n",height);
+                
             if ( mids[0] >= 0 && i > 0 && mids[i] == mids[0] )
                 duplicate++;
         }
     }
     if ( i == 66 && duplicate == 0 && (height > 186233 || *nonzpkeysp > 0) )
-        return(1);
-    else return(0);
+        return 1;
+    return 0;
 }
 
 int32_t komodo_minerids(uint8_t *minerids,int32_t height,int32_t width)
