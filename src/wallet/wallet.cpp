@@ -976,6 +976,11 @@ void CWallet::ClearNoteWitnessCache()
     //fprintf(stderr,"Clear witness cache\n");
 }
 
+CReserveKey CWallet::GetReserveKey()
+{
+    return CReserveKey(this);
+}
+
 template<typename NoteDataMap>
 void CopyPreviousWitnesses(NoteDataMap& noteDataMap, int indexHeight, int64_t nWitnessCacheSize)
 {

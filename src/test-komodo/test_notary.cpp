@@ -5,6 +5,8 @@
 
 #include <gtest/gtest.h>
 
+bool CalcPoW(CBlock *pblock); // generate PoW on a block
+
 namespace TestNotary
 {
 
@@ -293,7 +295,44 @@ TEST(TestNotary, HardforkActiveDecember2019)
         // hardfork happened, s4 should be 1 byte bigger
         EXPECT_EQ( s4.size(), s3.size() + 1 );
     }
+}
 
+TEST(TestNotary, NotaryMining)
+{
+    TestChain testChain;
+    std::shared_ptr<TestWallet> notary = testChain.AddWallet(testChain.getNotaryKey());
+    std::shared_ptr<TestWallet> alice = testChain.AddWallet();
+    std::shared_ptr<TestWallet> bob = testChain.AddWallet();
+
+    // Alice should mine some blocks
+    CBlock lastBlock;
+    for(int i = 0; i < 102; ++i)
+    {
+        lastBlock = testChain.generateBlock(alice);
+        std::cout << "Mined block " << std::to_string(testChain.GetIndex()->GetHeight()) << "\n";
+        // this makes some txs for notary mining
+        if (i > 100)
+        {
+            auto result = alice->Transfer(notary, 10000);
+            EXPECT_TRUE( result.IsValid() );
+        }
+    }
+    EXPECT_EQ(testChain.GetIndex()->GetHeight(), 2);
+    uint32_t prevBits = lastBlock.GetBlockHeader().nBits;
+    // a notary should be able to mine with a lower difficulty
+    lastBlock = testChain.generateBlock(notary);
+    EXPECT_GT(lastBlock.GetBlockHeader().nBits, prevBits);
+}
+
+
+TEST(TestNotary, GenesisBlock)
+{
+    CBlock genesis = Params().GenesisBlock();
+    genesis.nNonce = ArithToUint256((UintToArith256(genesis.nNonce)-1));
+    ASSERT_TRUE( CalcPoW(&genesis) );
+    // display solution and nonce
+    std::cout << "Nonce: " << genesis.nNonce.ToString() << "\n";
+    std::cout << "Solution: " << genesis.GetBlockHeader().hashMerkleRoot.ToString() << "\n";
 }
 
 } // namespace TestNotary

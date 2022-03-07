@@ -5492,96 +5492,100 @@ UniValue z_listoperationids(const UniValue& params, bool fHelp, const CPubKey& m
 #include "script/sign.h"
 extern std::string NOTARY_PUBKEY;
 
-int32_t komodo_notaryvin(CMutableTransaction &txNew,uint8_t *notarypub33, void *pTr)
+/****
+ * @brief build a transaction for a notary
+ * @param txNew the transaction
+ * @param notarypub33 the notary public key (33 bytes)
+ * @param txDetails scriptPubKey and nLockTime
+ * @return signature length (0 on error)
+ */
+int32_t komodo_notaryvin(CMutableTransaction &txNew,uint8_t *notarypub33, 
+        std::shared_ptr<TransactionDetails> txDetails)
 {
-    set<CBitcoinAddress> setAddress; uint8_t *script,utxosig[128]; uint256 utxotxid; uint64_t utxovalue; int32_t i,siglen=0,nMinDepth = 0,nMaxDepth = 9999999; vector<COutput> vecOutputs; uint32_t utxovout,eligible,earliest = 0; CScript best_scriptPubKey; bool fNegative,fOverflow;
-    bool signSuccess; SignatureData sigdata; uint64_t txfee; uint8_t *ptr;
-    auto consensusBranchId = CurrentEpochBranchId(chainActive.Height() + 1, Params().GetConsensus());
     if (!EnsureWalletIsAvailable(0))
         return 0;
-
     assert(pwalletMain != NULL);
+
+    // skip outputs where nDepth is outside of this range
+    int32_t nMinDepth = 0;
+    int32_t nMaxDepth = 9999999; 
+
+    auto consensusBranchId = CurrentEpochBranchId(chainActive.Height() + 1, Params().GetConsensus());
+
     const CKeyStore& keystore = *pwalletMain;
     LOCK2(cs_main, pwalletMain->cs_wallet);
-    utxovalue = 0;
-    memset(&utxotxid,0,sizeof(utxotxid));
-    memset(&utxovout,0,sizeof(utxovout));
-    memset(utxosig,0,sizeof(utxosig));
+    uint64_t utxovalue = 0;
+    uint256 utxotxid; 
+    uint32_t utxovout;
+    uint8_t utxosig[128] = {0};
+
+    int32_t siglen=0;
+    // go through wallet's available outputs, looking for 
+    // one with 10000 satoshis and that can be signed
+    std::vector<COutput> vecOutputs; 
     pwalletMain->AvailableCoins(vecOutputs, false, NULL, true);
-    BOOST_FOREACH(const COutput& out, vecOutputs)
+    for(const COutput& out : vecOutputs)
     {
+        // depth check
         if ( out.nDepth < nMinDepth || out.nDepth > nMaxDepth )
             continue;
-        if ( setAddress.size() )
-        {
-            CTxDestination address;
-            if (!ExtractDestination(out.tx->vout[out.i].scriptPubKey, address))
-                continue;
-            if (!setAddress.count(address))
-                continue;
-        }
+        // amount check
         CAmount nValue = out.tx->vout[out.i].nValue;
         if ( nValue != 10000 )
             continue;
+        // script check
         const CScript& pk = out.tx->vout[out.i].scriptPubKey;
         CTxDestination address;
-        if (ExtractDestination(out.tx->vout[out.i].scriptPubKey, address))
+        ExtractDestination(out.tx->vout[out.i].scriptPubKey, address);
+        uint8_t *script = (uint8_t *)&out.tx->vout[out.i].scriptPubKey[0];
+        if ( out.tx->vout[out.i].scriptPubKey.size() != 35 || script[0] != 33 
+                || script[34] != OP_CHECKSIG || memcmp(notarypub33,script+1,33) != 0 )
         {
-            //entry.push_back(Pair("address", CBitcoinAddress(address).ToString()));
-            //if (pwalletMain->mapAddressBook.count(address))
-            //    entry.push_back(Pair("account", pwalletMain->mapAddressBook[address].name));
-        }
-        script = (uint8_t *)&out.tx->vout[out.i].scriptPubKey[0];
-        if ( out.tx->vout[out.i].scriptPubKey.size() != 35 || script[0] != 33 || script[34] != OP_CHECKSIG || memcmp(notarypub33,script+1,33) != 0 )
-        {
-            //fprintf(stderr,"scriptsize.%d [0] %02x\n",(int32_t)out.tx->vout[out.i].scriptPubKey.size(),script[0]);
             continue;
         }
+
+        // now build transaction
         utxovalue = (uint64_t)nValue;
         utxotxid = out.tx->GetHash();
         utxovout = out.i;
-        best_scriptPubKey = out.tx->vout[out.i].scriptPubKey;
-        //fprintf(stderr,"check %s/v%d %llu\n",(char *)utxotxid.GetHex().c_str(),utxovout,(long long)utxovalue);
+        CScript best_scriptPubKey = out.tx->vout[out.i].scriptPubKey;
 
         txNew.vin.resize(1);
-        txNew.vout.resize((pTr!=0)+1);
-        txfee = utxovalue / 2;
-        //for (i=0; i<32; i++)
-        //    ((uint8_t *)&revtxid)[i] = ((uint8_t *)&utxotxid)[31 - i];
-        txNew.vin[0].prevout.hash = utxotxid; //revtxid;
+        txNew.vout.resize((txDetails != nullptr)+1);
+        uint64_t txfee = utxovalue / 2;
+        txNew.vin[0].prevout.hash = utxotxid;
         txNew.vin[0].prevout.n = utxovout;
-        txNew.vout[0].nValue = utxovalue - txfee;
+        txNew.vout[0].nValue = utxovalue - txfee; // half of the nValue of input goes to CRYPTO777
         txNew.vout[0].scriptPubKey = CScript() << ParseHex(CRYPTO777_PUBSECPSTR) << OP_CHECKSIG;
-        if ( pTr != 0 )
+        if ( txDetails != nullptr )
         {
-            void **p = (void**)pTr;
+            // tack on additional vout
             txNew.vout[1].nValue = 0;
-            txNew.vout[1].scriptPubKey = *(CScript*)p[0];
-            txNew.nLockTime = (uint32_t)(unsigned long long)p[1];
+            txNew.vout[1].scriptPubKey = txDetails->scriptPubKey;
+            txNew.nLockTime = txDetails->time;
         }
         CTransaction txNewConst(txNew);
-        signSuccess = ProduceSignature(TransactionSignatureCreator(&keystore, &txNewConst, 0, utxovalue, SIGHASH_ALL), best_scriptPubKey, sigdata, consensusBranchId);
-        if (!signSuccess)
+        SignatureData sigdata;
+        if (!ProduceSignature(TransactionSignatureCreator( &keystore, &txNewConst, 
+                0, utxovalue, SIGHASH_ALL), best_scriptPubKey, sigdata, consensusBranchId))
             fprintf(stderr,"notaryvin failed to create signature\n");
         else
         {
             UpdateTransaction(txNew,0,sigdata);
-            ptr = (uint8_t *)&sigdata.scriptSig[0];
+            uint8_t *ptr = (uint8_t *)&sigdata.scriptSig[0];
             siglen = sigdata.scriptSig.size();
-            for (i=0; i<siglen; i++)
-                utxosig[i] = ptr[i];//, fprintf(stderr,"%02x",ptr[i]);
-            //fprintf(stderr," siglen.%d notaryvin %s/v%d\n",siglen,utxotxid.GetHex().c_str(),utxovout);
+            for (int32_t i=0; i<siglen; i++)
+                utxosig[i] = ptr[i];
             break;
         }
     }
-    return(siglen);
+    return siglen;
 }
 
 int32_t verus_staked(CBlock *pBlock, CMutableTransaction &txNew, uint32_t &nBits, arith_uint256 &hashResult, uint8_t *utxosig, CPubKey &pk)
 {
     return pwalletMain->VerusStakeTransaction(pBlock, txNew, nBits, hashResult, utxosig, pk);
 }
-
 
 #include "../cc/CCfaucet.h"
 #include "../cc/CCassets.h"

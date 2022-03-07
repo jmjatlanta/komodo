@@ -154,7 +154,6 @@ int32_t komodo_staked(CMutableTransaction &txNew,uint32_t nBits,uint32_t *blockt
 int32_t verus_staked(CBlock *pBlock, CMutableTransaction &txNew, uint32_t &nBits, arith_uint256 &hashResult, uint8_t *utxosig, CPubKey &pk);
 uint256 komodo_calcmerkleroot(CBlock *pblock, uint256 prevBlockHash, int32_t nHeight, bool fNew, CScript scriptPubKey);
 int32_t komodo_newStakerActive(int32_t height, uint32_t timestamp);
-int32_t komodo_notaryvin(CMutableTransaction &txNew,uint8_t *notarypub33, void* ptr);
 int32_t komodo_is_notarytx(const CTransaction& tx);
 uint64_t komodo_notarypay(CMutableTransaction &txNew, std::vector<int8_t> &NotarisationNotaries, uint32_t timestamp, int32_t height, uint8_t *script, int32_t len);
 int32_t komodo_notaries(uint8_t pubkeys[64][33],int32_t height,uint32_t timestamp);
@@ -209,15 +208,21 @@ CBlockTemplate* CreateNewBlock(const CPubKey _pk, const CScript& _scriptPubKeyIn
             if (txT == TX_PUBKEY)
                 pk = CPubKey(vAddrs[0]);
         }
-    } else pk = _pk;
+    } 
+    else 
+        pk = _pk;
 
-    uint64_t deposits; int32_t isrealtime,kmdheight; uint32_t blocktime; const CChainParams& chainparams = Params();
-    bool fNotarisationBlock = false; std::vector<int8_t> NotarisationNotaries;
+    uint64_t deposits; 
+    int32_t isrealtime,kmdheight; 
+    uint32_t blocktime; 
+    const CChainParams& chainparams = Params();
+    bool fNotarisationBlock = false; 
+    std::vector<int8_t> NotarisationNotaries;
     
-    //fprintf(stderr,"create new block\n");
     // Create new block
     if ( gpucount < 0 )
         gpucount = KOMODO_MAXGPUCOUNT;
+
     std::unique_ptr<CBlockTemplate> pblocktemplate(new CBlockTemplate());
     if(!pblocktemplate.get())
     {
@@ -325,7 +330,6 @@ CBlockTemplate* CreateNewBlock(const CPubKey _pk, const CScript& _scriptPubKeyIn
 
             if (tx.IsCoinBase() || !IsFinalTx(tx, nHeight, nLockTimeCutoff) || IsExpiredTx(tx, nHeight))
             {
-                //fprintf(stderr,"coinbase.%d finaltx.%d expired.%d\n",tx.IsCoinBase(),IsFinalTx(tx, nHeight, nLockTimeCutoff),IsExpiredTx(tx, nHeight));
                 continue;
             }
             txvalue = tx.GetValueOut();
@@ -853,7 +857,7 @@ CBlockTemplate* CreateNewBlock(const CPubKey _pk, const CScript& _scriptPubKeyIn
         pblocktemplate->vTxSigOps[0] = GetLegacySigOpCount(pblock->vtx[0]);
         if ( ASSETCHAINS_SYMBOL[0] == 0 && IS_KOMODO_NOTARY && My_notaryid >= 0 )
         {
-            uint32_t r; CScript opret; void **ptr=0;
+            uint32_t r; CScript opret;
             CMutableTransaction txNotary = CreateNewContextualCMutableTransaction(Params().GetConsensus(), chainActive.Height() + 1);
             if ( pblock->nTime < pindexPrev->nTime+60 )
                 pblock->nTime = pindexPrev->nTime + 60;
@@ -868,14 +872,14 @@ CBlockTemplate* CreateNewBlock(const CPubKey _pk, const CScript& _scriptPubKeyIn
                 pblock->nTime += (r % (33 - gpucount)*(33 - gpucount));
             }
             pblock->vtx[0] = txNew;
+            std::shared_ptr<TransactionDetails> txDet; 
             if ( Mining_height > nDecemberHardforkHeight ) //December 2019 hardfork
             {
-                opret = komodo_makeopret(pblock, true);
-                ptr = (void**)calloc(0,sizeof(void *)*2);
-                ptr[0] = (void*)(CScript*)&opret;
-                ptr[1] = (void*)(unsigned long long)pblock->nTime;
-            } 
-            if ( komodo_notaryvin(txNotary,NOTARY_PUBKEY33,ptr) > 0 )
+                txDet = std::make_shared<TransactionDetails>();
+                txDet->scriptPubKey = komodo_makeopret(pblock, true);
+                txDet->time = pblock->nTime;
+            }
+            if ( komodo_notaryvin(txNotary,NOTARY_PUBKEY33,txDet) > 0 )
             {
                 CAmount txfees = 5000;
                 pblock->vtx.push_back(txNotary);
@@ -883,8 +887,7 @@ CBlockTemplate* CreateNewBlock(const CPubKey _pk, const CScript& _scriptPubKeyIn
                 pblocktemplate->vTxSigOps.push_back(GetLegacySigOpCount(txNotary));
                 nFees += txfees;
                 pblocktemplate->vTxFees[0] = -nFees;
-                //*(uint64_t *)(&pblock->vtx[0].vout[0].nValue) += txfees;
-                fprintf(stderr,"added notaryvin includes proof.%i\n", ptr!=0);
+                fprintf(stderr,"added notaryvin includes proof.%i\n", txDet != nullptr);
             }
             else
             {
@@ -896,7 +899,6 @@ CBlockTemplate* CreateNewBlock(const CPubKey _pk, const CScript& _scriptPubKeyIn
                 }
                 return(0);
             }
-            if ( ptr!=0 ) free(ptr);
         }
         else if ( ASSETCHAINS_CC == 0 && pindexPrev != 0 && ASSETCHAINS_STAKED == 0 && (ASSETCHAINS_SYMBOL[0] != 0 || !IS_KOMODO_NOTARY || My_notaryid < 0) )
         {
@@ -1361,7 +1363,7 @@ void static BitcoinMiner_noeq()
 
 #ifdef ENABLE_WALLET
     // Each thread has its own key
-    CReserveKey reservekey(pwallet);
+    CReserveKey reservekey = pwallet->GetReserveKey();
 #endif
 
     const CChainParams& chainparams = Params();
@@ -1662,9 +1664,9 @@ int32_t gotinvalid;
 extern int32_t getkmdseason(int32_t height);
 
 #ifdef ENABLE_WALLET
-void static BitcoinMiner(CWallet *pwallet)
+void BitcoinMiner(CWallet *pwallet)
 #else
-void static BitcoinMiner()
+void BitcoinMiner()
 #endif
 {
     LogPrintf("KomodoMiner started\n");
@@ -1674,7 +1676,7 @@ void static BitcoinMiner()
 
 #ifdef ENABLE_WALLET
     // Each thread has its own key
-    CReserveKey reservekey(pwallet);
+    CReserveKey reservekey = pwallet->GetReserveKey();
 #endif
 
     // Each thread has its own counter

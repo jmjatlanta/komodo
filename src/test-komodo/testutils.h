@@ -1,6 +1,7 @@
 #pragma once
 
 #include "main.h"
+#include "wallet/wallet.h" // CWallet, CReserveKey, etc.
 
 #define VCH(a,b) std::vector<unsigned char>(a, a + b)
 
@@ -33,7 +34,6 @@ CTransaction getInputTx(CScript scriptPubKey);
 CMutableTransaction spendTx(const CTransaction &txIn, int nOut=0);
 std::vector<uint8_t> getSig(const CMutableTransaction mtx, CScript inputPubKey, int nIn=0);
 
-
 class TestWallet;
 
 class TestChain
@@ -61,9 +61,10 @@ public:
 
     /**
      * Generate a block
+     * @param who who will mine the block
      * @returns the block generated
      */
-    CBlock generateBlock();
+    CBlock generateBlock(std::shared_ptr<TestWallet> who = nullptr);
 
     /****
      * @brief generate PoW on block and submit to chain
@@ -77,6 +78,8 @@ public:
      * @param who the miner
      */
     CBlock BuildBlock( std::shared_ptr<TestWallet> who );
+
+    CBlock GetBlock(CBlockIndex* idx);
     
     /****
      * @brief set the chain time to something reasonable
@@ -110,6 +113,7 @@ private:
     boost::filesystem::path dataDir;
     std::string previousNetwork;
     void CleanGlobals();
+    void SetupMining(std::shared_ptr<TestWallet> who);
 };
 
 /***
@@ -117,7 +121,7 @@ private:
  * - It does not keep track of spent transactions
  * - Blocks containing vOuts that apply are added to the front of a vector
  */
-class TestWallet
+class TestWallet : public CWallet
 {
 public:
     TestWallet(TestChain* chain);
@@ -154,7 +158,7 @@ public:
      * @param needed how much is needed
      * @returns a pair of CTransaction and the n value of the vout
      */
-    std::pair<CTransaction, uint32_t> GetAvailable(CAmount needed);
+    std::pair<CTransaction, uint32_t> GetAvailable(CAmount needed) const;
     /***
      * Add a transaction to the list of available vouts
      * @param tx the transaction
@@ -176,9 +180,23 @@ public:
      * @returns the results
      */
     CValidationState Transfer(std::shared_ptr<TestWallet> to, CAmount amount, CAmount fee = 0);
+    virtual CReserveKey GetReserveKey();
+
+    /****
+     * @brief get avalable outputs
+     * @param[out] vCoins available outputs
+     * @param fOnlyConfirmed only include confirmed txs
+     * @param coinControl
+     * @param fIncludeZeroValue
+     * @param fIncludeCoinBase
+     */
+    virtual void AvailableCoins(std::vector<COutput>& vCoins, 
+            bool fOnlyConfirmed=true, const CCoinControl *coinControl = NULL, 
+            bool fIncludeZeroValue=false, bool fIncludeCoinBase=true) const override;
+
 private:
     TestChain *chain;
     CKey key;
-    std::vector<std::pair<CTransaction, uint8_t>> availableTransactions;
+    std::vector<CWalletTx> availableTransactions;
     CScript destScript;
 };
