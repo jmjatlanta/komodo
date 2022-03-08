@@ -117,6 +117,11 @@ struct Params {
     int64_t nPowMaxAdjustUp; // max percentage difficulty level should be raised
     int64_t nPowTargetSpacing; // the target block production speed (in seconds)
     int64_t nLwmaAjustedWeight; // k value for work calculation (for non-staked, non-equihash chains)
+    uint64_t mindiff_nbits = 0x200f0f0f;
+    /** Coinbase transaction outputs can only be spent after this number of new blocks (network rule) */
+    mutable int32_t coinbase_maturity = 100;
+    int32_t orig_coinbase_maturity = 100;
+    mutable int32_t witness_cache_size = 110;
 
     /* Proof of stake parameters */
     uint256 posLimit;
@@ -141,6 +146,9 @@ struct Params {
     int64_t MaxActualTimespan() const { return (AveragingWindowTimespan() * (100 + nPowMaxAdjustDown)) / 100; }
     void SetSaplingHeight(int32_t height) { vUpgrades[Consensus::UPGRADE_SAPLING].nActivationHeight = height; }
     void SetOverwinterHeight(int32_t height) { vUpgrades[Consensus::UPGRADE_OVERWINTER].nActivationHeight = height; }
+    void SetCoinbaseMaturity(uint32_t in) const { coinbase_maturity = in; }
+    void ResetCoinbaseMaturity() const { coinbase_maturity = orig_coinbase_maturity; }
+    void SetWitnessCacheSize(int32_t in) const { witness_cache_size = in; }
 };
 
 } // namespace Consensus

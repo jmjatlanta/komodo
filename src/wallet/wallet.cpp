@@ -1001,7 +1001,7 @@ void CopyPreviousWitnesses(NoteDataMap& noteDataMap, int indexHeight, int64_t nW
             if (nd->witnesses.size() > 0) {
                 nd->witnesses.push_front(nd->witnesses.front());
             }
-            if (nd->witnesses.size() > WITNESS_CACHE_SIZE) {
+            if (nd->witnesses.size() > Params().GetConsensus().witness_cache_size) {
                 nd->witnesses.pop_back();
             }
         }
@@ -1078,7 +1078,7 @@ void CWallet::IncrementNoteWitnesses(const CBlockIndex* pindex,
        ::CopyPreviousWitnesses(wtxItem.second.mapSaplingNoteData, pindex->GetHeight(), nWitnessCacheSize);
     }
 
-    if (nWitnessCacheSize < WITNESS_CACHE_SIZE) {
+    if (nWitnessCacheSize < Params().GetConsensus().witness_cache_size) {
         nWitnessCacheSize += 1;
     }
 
@@ -1184,7 +1184,8 @@ bool DecrementNoteWitnesses(NoteDataMap& noteDataMap, int indexHeight, int64_t n
             assert((nWitnessCacheSize - 1) >= nd->witnesses.size());
         }
     }
-    assert(KOMODO_REWIND != 0 || nWitnessCacheSize > 0 || WITNESS_CACHE_SIZE != _COINBASE_MATURITY+10);
+    assert(KOMODO_REWIND != 0 || nWitnessCacheSize > 0 
+            || Params().GetConsensus().witness_cache_size != Params().GetConsensus().coinbase_maturity+10);
     return true;
 }
 
@@ -1198,7 +1199,7 @@ void CWallet::DecrementNoteWitnesses(const CBlockIndex* pindex)
         if (!::DecrementNoteWitnesses(wtxItem.second.mapSaplingNoteData, pindex->GetHeight(), nWitnessCacheSize))
             needsRescan = true;
     }
-    if ( WITNESS_CACHE_SIZE == _COINBASE_MATURITY+10 )
+    if ( Params().GetConsensus().witness_cache_size == Params().GetConsensus().coinbase_maturity+10 )
     {
         nWitnessCacheSize -= 1;
         // TODO: If nWitnessCache is zero, we need to regenerate the caches (#1302)
@@ -4980,15 +4981,16 @@ int CMerkleTx::GetDepthInMainChain(const CBlockIndex* &pindexRet) const
 
 int CMerkleTx::GetBlocksToMaturity() const
 {
+    auto consensus = Params().GetConsensus();
     if ( ASSETCHAINS_SYMBOL[0] == 0 )
-        COINBASE_MATURITY = _COINBASE_MATURITY;
+        consensus.ResetCoinbaseMaturity();
     if (!IsCoinBase())
         return 0;
     int32_t depth = GetDepthInMainChain();
     int32_t ut = UnlockTime(0);
     int32_t toMaturity = (ut - chainActive.Height()) < 0 ? 0 : ut - chainActive.Height();
     //printf("depth.%i, unlockTime.%i, toMaturity.%i\n", depth, ut, toMaturity);
-    ut = (COINBASE_MATURITY - depth) < 0 ? 0 : COINBASE_MATURITY - depth;
+    ut = (consensus.coinbase_maturity - depth) < 0 ? 0 : consensus.coinbase_maturity - depth;
     return(ut < toMaturity ? toMaturity : ut);
 }
 

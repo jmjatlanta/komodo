@@ -885,9 +885,12 @@ TEST(TestCoins, coins_coinbase_spends)
     mtx2.vin[0].scriptSig = CScript() << OP_1;
     mtx2.vin[0].nSequence = 0;
 
+    auto consensus = Params().GetConsensus();
+
     {
         CTransaction tx2(mtx2);
-        EXPECT_TRUE(Consensus::CheckTxInputs(tx2, state, cache, 100+COINBASE_MATURITY, Params().GetConsensus()));
+        EXPECT_TRUE(Consensus::CheckTxInputs(tx2, state, cache, 100+consensus.coinbase_maturity,
+                consensus));
     }
 
     mtx2.vout.resize(1);
@@ -896,7 +899,7 @@ TEST(TestCoins, coins_coinbase_spends)
 
     {
         CTransaction tx2(mtx2);
-        EXPECT_FALSE(Consensus::CheckTxInputs(tx2, state, cache, 100+COINBASE_MATURITY, Params().GetConsensus()));
+        EXPECT_FALSE(Consensus::CheckTxInputs(tx2, state, cache, 100+consensus.coinbase_maturity, consensus));
         EXPECT_TRUE(state.GetRejectReason() == "bad-txns-coinbase-spend-has-transparent-outputs");
     }
 }

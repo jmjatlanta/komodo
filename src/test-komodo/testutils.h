@@ -64,14 +64,14 @@ public:
      * @param who who will mine the block
      * @returns the block generated
      */
-    CBlock generateBlock(std::shared_ptr<TestWallet> who = nullptr);
+    std::shared_ptr<CBlock> generateBlock(std::shared_ptr<TestWallet> who = nullptr);
 
     /****
      * @brief generate PoW on block and submit to chain
      * @param in the block to push
      * @return the block
      */
-    CBlock generateBlock(const CBlock& in);
+    std::shared_ptr<CBlock> generateBlock(const CBlock& in);
 
     /***
      * @brief Build a block, but do not add PoW or submit to chain
@@ -114,6 +114,7 @@ private:
     std::string previousNetwork;
     void CleanGlobals();
     void SetupMining(std::shared_ptr<TestWallet> who);
+    std::vector<std::shared_ptr<CBlock>> minedBlocks;
 };
 
 /***
@@ -151,14 +152,8 @@ public:
     /***
      * Notifies this wallet of a new block
      */
-    void BlockNotification(const CBlock& block);
-    /***
-     * Get a transaction that has funds
-     * NOTE: If no single transaction matches, throws
-     * @param needed how much is needed
-     * @returns a pair of CTransaction and the n value of the vout
-     */
-    std::pair<CTransaction, uint32_t> GetAvailable(CAmount needed) const;
+    void BlockNotification(std::shared_ptr<CBlock> block);
+
     /***
      * Add a transaction to the list of available vouts
      * @param tx the transaction
@@ -180,7 +175,9 @@ public:
      * @returns the results
      */
     CValidationState Transfer(std::shared_ptr<TestWallet> to, CAmount amount, CAmount fee = 0);
-    virtual CReserveKey GetReserveKey();
+    virtual CReserveKey GetReserveKey() override;
+    virtual void ReserveKeyFromKeyPool(int64_t& nIndex, CKeyPool& keypool) override;
+
 
     /****
      * @brief get avalable outputs

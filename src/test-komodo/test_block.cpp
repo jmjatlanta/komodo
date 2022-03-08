@@ -22,7 +22,7 @@ TEST(block_tests, TestStopAt)
 {
     TestChain chain;
     auto notary = chain.AddWallet(chain.getNotaryKey());
-    CBlock lastBlock = chain.generateBlock(); // genesis block
+    std::shared_ptr<CBlock> lastBlock = chain.generateBlock(); // genesis block
     ASSERT_GT( chain.GetIndex()->GetHeight(), 0 );
     lastBlock = chain.generateBlock(); // now we should be above 1
     ASSERT_GT( chain.GetIndex()->GetHeight(), 1);
@@ -38,7 +38,7 @@ TEST(block_tests, TestConnectWithoutChecks)
     TestChain chain;
     auto notary = chain.AddWallet(chain.getNotaryKey());
     auto alice = chain.AddWallet();
-    CBlock lastBlock = chain.generateBlock(); // genesis block
+    std::shared_ptr<CBlock> lastBlock = chain.generateBlock(); // genesis block
     ASSERT_GT( chain.GetIndex()->GetHeight(), 0 );
     // Add some transaction to a block
     int32_t newHeight = chain.GetIndex()->GetHeight() + 1;
@@ -74,7 +74,7 @@ TEST(block_tests, TestSpendInSameBlock)
     auto notary = chain.AddWallet(chain.getNotaryKey());
     auto alice = chain.AddWallet();
     auto bob = chain.AddWallet();
-    CBlock lastBlock = chain.generateBlock(); // genesis block
+    std::shared_ptr<CBlock> lastBlock = chain.generateBlock(); // genesis block
     ASSERT_GT( chain.GetIndex()->GetHeight(), 0 );
     // Start to build a block
     int32_t newHeight = chain.GetIndex()->GetHeight() + 1;
@@ -128,7 +128,7 @@ TEST(block_tests, TestDoubleSpendInSameBlock)
     auto alice = chain.AddWallet();
     auto bob = chain.AddWallet();
     auto charlie = chain.AddWallet();
-    CBlock lastBlock = chain.generateBlock(); // genesis block
+    std::shared_ptr<CBlock> lastBlock = chain.generateBlock(); // genesis block
     ASSERT_GT( chain.GetIndex()->GetHeight(), 0 );
     // Start to build a block
     int32_t newHeight = chain.GetIndex()->GetHeight() + 1;
@@ -202,10 +202,9 @@ TEST(block_tests, TestProcessBlock)
     auto alice = chain.AddWallet();
     auto bob = chain.AddWallet();
     auto charlie = chain.AddWallet();
-    CBlock lastBlock = chain.generateBlock(); // gives notary everything
+    std::shared_ptr<CBlock> lastBlock = chain.generateBlock(); // gives notary everything
     EXPECT_EQ(chain.GetIndex()->GetHeight(), 1);
     chain.IncrementChainTime();
-    auto notaryPrevOut = notary->GetAvailable(100000);
     // add a transaction to the mempool
     CTransaction fundAlice = notary->CreateSpendTransaction(alice, 100000);
     EXPECT_TRUE( chain.acceptTx(fundAlice).IsValid() );
@@ -235,7 +234,7 @@ TEST(block_tests, TestProcessBlock)
     // finish constructing the block
     block.nBits = GetNextWorkRequired( chain.GetIndex(), &block, Params().GetConsensus());
     block.nTime = GetTime();
-    block.hashPrevBlock = lastBlock.GetHash();
+    block.hashPrevBlock = lastBlock->GetHash();
     block.hashMerkleRoot = block.BuildMerkleTree();
     // Add the PoW
     EXPECT_TRUE(CalcPoW(&block));
@@ -254,8 +253,7 @@ TEST(block_tests, TestProcessBadBlock)
     auto alice = chain.AddWallet();
     auto bob = chain.AddWallet();
     auto charlie = chain.AddWallet();
-    CBlock lastBlock = chain.generateBlock(); // genesis block
-    auto notaryPrevOut = notary->GetAvailable(100000);
+    std::shared_ptr<CBlock> lastBlock = chain.generateBlock(); // genesis block
     // add a transaction to the mempool
     CTransaction fundAlice = notary->CreateSpendTransaction(alice, 100000);
     EXPECT_TRUE( chain.acceptTx(fundAlice).IsValid() );

@@ -297,42 +297,61 @@ TEST(TestNotary, HardforkActiveDecember2019)
     }
 }
 
+void displayWallet(std::shared_ptr<TestWallet> wallet, const std::string& name)
+{
+    std::vector<COutput> vec;
+    wallet->AvailableCoins(vec);
+    if (vec.size() > 0)
+        std::cout << name << " has " << vec.size() << " transactions in their wallet\n";
+}
+
 TEST(TestNotary, NotaryMining)
 {
     TestChain testChain;
     std::shared_ptr<TestWallet> notary = testChain.AddWallet(testChain.getNotaryKey());
     std::shared_ptr<TestWallet> alice = testChain.AddWallet();
-    std::shared_ptr<TestWallet> bob = testChain.AddWallet();
 
     // Alice should mine some blocks
-    CBlock lastBlock;
-    for(int i = 0; i < 102; ++i)
+    std::shared_ptr<CBlock> lastBlock;
+    for(int i = 0; i < 5; ++i)
     {
         lastBlock = testChain.generateBlock(alice);
         std::cout << "Mined block " << std::to_string(testChain.GetIndex()->GetHeight()) << "\n";
+        displayWallet(notary, "Notary");
+        displayWallet(alice, "Alice");
         // this makes some txs for notary mining
-        if (i > 100)
+        if (i > 3)
         {
             auto result = alice->Transfer(notary, 10000);
             EXPECT_TRUE( result.IsValid() );
         }
     }
-    EXPECT_EQ(testChain.GetIndex()->GetHeight(), 2);
-    uint32_t prevBits = lastBlock.GetBlockHeader().nBits;
+    EXPECT_GT(testChain.GetIndex()->GetHeight(), 2);
+    uint32_t prevBits = lastBlock->GetBlockHeader().nBits;
     // a notary should be able to mine with a lower difficulty
     lastBlock = testChain.generateBlock(notary);
-    EXPECT_GT(lastBlock.GetBlockHeader().nBits, prevBits);
+    EXPECT_GT(lastBlock->GetBlockHeader().nBits, prevBits);
 }
 
 
 TEST(TestNotary, GenesisBlock)
 {
+    TestChain testChain;
+    std::shared_ptr<TestWallet> notary = testChain.AddWallet( testChain.getNotaryKey() );
+    std::shared_ptr<TestWallet> alice = testChain.AddWallet();
     CBlock genesis = Params().GenesisBlock();
     genesis.nNonce = ArithToUint256((UintToArith256(genesis.nNonce)-1));
     ASSERT_TRUE( CalcPoW(&genesis) );
     // display solution and nonce
     std::cout << "Nonce: " << genesis.nNonce.ToString() << "\n";
     std::cout << "Solution: " << genesis.GetBlockHeader().hashMerkleRoot.ToString() << "\n";
+
+    // attempt to mine blocks
+    for(int i = 0; i < 2; ++i)
+    {
+        std::cout << "Mining block " << std::to_string(i+1) << "...\n";
+        testChain.generateBlock( alice );
+    }
 }
 
 } // namespace TestNotary

@@ -46,9 +46,9 @@ void setupChain(CBaseChainParams::Network network)
     // Settings to get block reward
     NOTARY_PUBKEY = notaryPubkey;
     STAKED_NOTARY_ID = -1;
-    USE_EXTERNAL_PUBKEY = 1;
+    USE_EXTERNAL_PUBKEY = 0;
     mapArgs["-mineraddress"] = "bogus";
-    COINBASE_MATURITY = 1;
+    Params().GetConsensus().SetCoinbaseMaturity(1);
     // Global mock time
     nMockTime = GetTime();
     
@@ -254,14 +254,14 @@ CBlock TestChain::GetBlock(CBlockIndex* idx)
     return getBlock( idx->GetBlockHash() );
 }
 
-CBlock TestChain::generateBlock(std::shared_ptr<TestWallet> who)
+std::shared_ptr<CBlock> TestChain::generateBlock(std::shared_ptr<TestWallet> who)
 {
-    CBlock block;
+    std::shared_ptr<CBlock> block = std::make_shared<CBlock>();
     SetupMining(who);
     if (who == nullptr)
     {
         // use the RPC method
-        ::generateBlock(&block);
+        ::generateBlock(block.get());
     }
     else
     {
@@ -275,11 +275,15 @@ CBlock TestChain::generateBlock(std::shared_ptr<TestWallet> who)
         {
             // this is normal
             if (height != this->GetIndex()->GetHeight())
-                block = this->GetBlock(this->GetIndex());
+            {
+                CBlock currBlock = this->GetBlock(this->GetIndex());
+                *(block) = currBlock;
+            }
         }
     }
-    if (!block.IsNull())
+    if (block != nullptr && !block->IsNull())
     {
+        minedBlocks.push_back(block);
         for(auto wallet : toBeNotified)
         {
             wallet->BlockNotification(block);
@@ -291,12 +295,12 @@ CBlock TestChain::generateBlock(std::shared_ptr<TestWallet> who)
 class MockReserveKey : public CReserveKey
 {
 public:
-    MockReserveKey(TestWallet* wallet) : CReserveKey(nullptr)
+    MockReserveKey(TestWallet* wallet) : CReserveKey(wallet)
     {
         pubKey = wallet->GetPubKey();
     }
     ~MockReserveKey() {}
-    virtual bool GetReservedKey(CPubKey& pubKey)
+    virtual bool GetReservedKey(CPubKey& pubKey) override
     {
         pubKey = this->pubKey;
         return true;
@@ -305,13 +309,15 @@ protected:
     CPubKey pubKey;
 };
 
-CBlock TestChain::generateBlock(const CBlock& in)
+std::shared_ptr<CBlock> TestChain::generateBlock(const CBlock& in)
 {
-    CBlock retVal = in;
-    CalcPoW(&retVal);
+    std::shared_ptr<CBlock> retVal = std::make_shared<CBlock>();
+    *(retVal) = in;
+    CalcPoW(retVal.get());
     CValidationState state;
-    if (!ProcessNewBlock(1,chainActive.LastTip()->GetHeight()+1,state, NULL, &retVal, true, NULL))
+    if (!ProcessNewBlock(1,chainActive.LastTip()->GetHeight()+1,state, NULL, retVal.get(), true, NULL))
         throw JSONRPCError(RPC_INTERNAL_ERROR, "ProcessNewBlock, block not accepted");
+    minedBlocks.push_back(retVal);
     return retVal;
 }
 
@@ -427,6 +433,14 @@ CReserveKey TestWallet::GetReserveKey()
 {
     return MockReserveKey(this);
 }
+
+void TestWallet::ReserveKeyFromKeyPool(int64_t& nIndex, CKeyPool& keypool)
+{
+    nIndex = 0;
+    keypool.vchPubKey = this->GetPubKey();
+}
+
+
 /***
  * Sign a typical transaction
  * @param hash the hash to sign
@@ -456,11 +470,11 @@ std::vector<unsigned char> TestWallet::Sign(CC* cc, uint256 hash)
 /***
  * Notifies this wallet of a new block
  */
-void TestWallet::BlockNotification(const CBlock& block)
+void TestWallet::BlockNotification(std::shared_ptr<CBlock> block)
 {
     // TODO: remove spent txs from availableTransactions
     // see if this block has any outs for me
-    for( auto tx : block.vtx )
+    for( auto& tx : block->vtx )
     {
         for(uint32_t i = 0; i < tx.vout.size(); ++i)
         {
@@ -471,22 +485,6 @@ void TestWallet::BlockNotification(const CBlock& block)
             }
         }
     }
-}
-
-/***
- * Get a transaction that has funds
- * NOTE: If no single transaction matches, throws
- * @param needed how much is needed
- * @returns a pair of CTransaction and the n value of the vout
- */
-std::pair<CTransaction, uint32_t> TestWallet::GetAvailable(CAmount needed) const
-{
-    for(auto txp : availableTransactions)
-    {
-        if (txp.GetAvailableCredit() > needed)
-            return std::pair<CTransaction, uint32_t>(txp, txp.nIndex);
-    }
-    throw std::logic_error("No Funds");
 }
 
 /***
@@ -513,12 +511,34 @@ CValidationState TestWallet::Transfer(std::shared_ptr<TestWallet> to, CAmount am
 
 CTransaction TestWallet::CreateSpendTransaction(std::shared_ptr<TestWallet> to, CAmount amount, CAmount fee)
 {
-    std::pair<CTransaction, uint32_t> available = GetAvailable(amount + fee);
+    std::vector<COutput> available;
+    this->AvailableCoins(available);
     CMutableTransaction tx;
-    CTxIn incoming;
-    incoming.prevout.hash = available.first.GetHash();
-    incoming.prevout.n = available.second;
-    tx.vin.push_back(incoming);
+    // add txs until we do not need more
+    CAmount collected = 0;
+    for(auto output : available)
+    {
+        // go through and add up all my available outs
+        if (output.fSpendable)
+        {
+            for(int idx = 0; idx < output.tx->vout.size(); ++idx)
+            {
+                const CTxOut& out = output.tx->vout[idx];
+                if (out.scriptPubKey == destScript)
+                {
+                    CTxIn incoming;
+                    incoming.prevout.hash = out.GetHash();
+                    incoming.prevout.n = idx;
+                    tx.vin.push_back(incoming);
+                    collected += out.nValue;
+                }
+            }
+        }
+        if (collected >= amount + fee)
+            break;
+    }
+    if (collected < amount + fee)
+        throw std::logic_error("No Funds");
     CTxOut out1;
     out1.scriptPubKey = GetScriptForDestination(to->GetPubKey());
     out1.nValue = amount;
@@ -526,10 +546,10 @@ CTransaction TestWallet::CreateSpendTransaction(std::shared_ptr<TestWallet> to, 
     // give the rest back to wallet owner
     CTxOut out2;
     out2.scriptPubKey = GetScriptForDestination(key.GetPubKey());
-    out2.nValue = available.first.vout[available.second].nValue - amount - fee;
+    out2.nValue = collected - amount - fee;
     tx.vout.push_back(out2);
 
-    uint256 hash = SignatureHash(available.first.vout[available.second].scriptPubKey, tx, 0, SIGHASH_ALL, 0, 0);
+    uint256 hash = SignatureHash(destScript, tx, 0, SIGHASH_ALL, 0, 0);
     tx.vin[0].scriptSig << Sign(hash, SIGHASH_ALL);
 
     return CTransaction(tx);

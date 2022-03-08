@@ -1342,7 +1342,7 @@ void komodo_args(char *argv0)
     }
     KOMODO_STOPAT = GetArg("-stopat",0);
     MAX_REORG_LENGTH = GetArg("-maxreorg",MAX_REORG_LENGTH);
-    WITNESS_CACHE_SIZE = MAX_REORG_LENGTH+10;
+    Params().GetConsensus().SetWitnessCacheSize(MAX_REORG_LENGTH+10);
     ASSETCHAINS_CC = GetArg("-ac_cc",0);
     KOMODO_CCACTIVATE = GetArg("-ac_ccactivate",0);
     ASSETCHAINS_BLOCKTIME = GetArg("-ac_blocktime",60);
@@ -1838,7 +1838,6 @@ void komodo_args(char *argv0)
         if ( ASSETCHAINS_SYMBOL[0] != 0 )
         {
             int32_t komodo_baseid(char *origbase);
-            extern int COINBASE_MATURITY;
             if ( strcmp(ASSETCHAINS_SYMBOL,"KMD") == 0 )
             {
                 fprintf(stderr,"cant have assetchain named KMD\n");
@@ -1849,10 +1848,10 @@ void komodo_args(char *argv0)
             else komodo_configfile(ASSETCHAINS_SYMBOL,ASSETCHAINS_P2PPORT + 1);
 
             if (ASSETCHAINS_CBMATURITY != 0)
-                COINBASE_MATURITY = ASSETCHAINS_CBMATURITY;
+                Params().GetConsensus().SetCoinbaseMaturity(ASSETCHAINS_CBMATURITY);
             else if (ASSETCHAINS_LASTERA == 0 || is_STAKED(ASSETCHAINS_SYMBOL) != 0)
-                COINBASE_MATURITY = 1;
-            if (COINBASE_MATURITY < 1)
+                Params().GetConsensus().SetCoinbaseMaturity(1);
+            if (Params().GetConsensus().coinbase_maturity < 1)
             {
                 fprintf(stderr,"ac_cbmaturity must be >0, shutting down\n");
                 StartShutdown();

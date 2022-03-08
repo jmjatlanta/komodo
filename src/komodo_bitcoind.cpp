@@ -1361,7 +1361,7 @@ arith_uint256 komodo_adaptivepow_target(int32_t height,arith_uint256 bnTarget,ui
             mult = (mult / ASSETCHAINS_BLOCKTIME) * ASSETCHAINS_BLOCKTIME + ASSETCHAINS_BLOCKTIME / 2;
             origtarget = bnTarget;
             bnTarget = bnTarget * arith_uint256(mult * mult);
-            easy.SetCompact(KOMODO_MINDIFF_NBITS,&fNegative,&fOverflow);
+            easy.SetCompact(Params().GetConsensus().mindiff_nbits,&fNegative,&fOverflow);
             if ( bnTarget < origtarget || bnTarget > easy ) // deal with overflow
             {
                 bnTarget = easy;

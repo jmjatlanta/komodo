@@ -398,7 +398,7 @@ unsigned int GetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHead
         bnTarget = arith_uint256().SetCompact(nbits);
         if ( height > (int32_t)(sizeof(ct)/sizeof(*ct)) && pblock != 0 && tipdiff > 0 )
         {
-            easy.SetCompact(KOMODO_MINDIFF_NBITS & (~3),&fNegative,&fOverflow);
+            easy.SetCompact(Params().GetConsensus().mindiff_nbits & (~3),&fNegative,&fOverflow);
             if ( pblock != 0 )
             {
                 origtarget = bnTarget;
@@ -483,7 +483,7 @@ unsigned int GetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHead
                 {
                     bnTarget = easy;
                     fprintf(stderr,"cmp.%d mult.%d ht.%d -> easy target\n",mult>1,(int32_t)mult,height);
-                    return(KOMODO_MINDIFF_NBITS & (~3));
+                    return(Params().GetConsensus().mindiff_nbits & (~3));
                 }
                 {
                     int32_t z;
@@ -819,13 +819,11 @@ bool CheckProofOfWork(const CBlockHeader &blkHeader, uint8_t *pubkey33, int32_t 
     extern int32_t KOMODO_REWIND;
     uint256 hash;
     bool fNegative,fOverflow; uint8_t origpubkey33[33]; int32_t i,nonzpkeys=0,nonz=0,special=0,special2=0,notaryid=-1,flag = 0, mids[66]; uint32_t tiptime,blocktimes[66];
-    arith_uint256 bnTarget; uint8_t pubkeys[66][33];
-    //for (i=31; i>=0; i--)
-    //    fprintf(stderr,"%02x",((uint8_t *)&hash)[i]);
-    //fprintf(stderr," checkpow\n");
+    uint8_t pubkeys[66][33];
     memcpy(origpubkey33,pubkey33,33);
     memset(blocktimes,0,sizeof(blocktimes));
     tiptime = komodo_chainactive_timestamp();
+    arith_uint256 bnTarget;
     bnTarget.SetCompact(blkHeader.nBits, &fNegative, &fOverflow);
     if ( height == 0 )
     {
@@ -865,7 +863,7 @@ bool CheckProofOfWork(const CBlockHeader &blkHeader, uint8_t *pubkey33, int32_t 
             }
             if ( (flag != 0 || special2 > 0) && special2 != -2 )
             {
-                bnTarget.SetCompact(KOMODO_MINDIFF_NBITS,&fNegative,&fOverflow);
+                bnTarget.SetCompact(Params().GetConsensus().mindiff_nbits,&fNegative,&fOverflow);
                 /*
                 const void* pblock = &blkHeader;
                 CScript merkleroot = CScript();
@@ -884,7 +882,7 @@ bool CheckProofOfWork(const CBlockHeader &blkHeader, uint8_t *pubkey33, int32_t 
     if ( ASSETCHAINS_STAKED != 0 )
     {
         arith_uint256 bnMaxPoSdiff;
-        bnTarget.SetCompact(KOMODO_MINDIFF_NBITS,&fNegative,&fOverflow);
+        bnTarget.SetCompact(Params().GetConsensus().mindiff_nbits,&fNegative,&fOverflow);
     }
     //else if ( ASSETCHAINS_ADAPTIVEPOW > 0 && ASSETCHAINS_STAKED == 0 )
     //    bnTarget = komodo_adaptivepow_target(height,bnTarget,blkHeader.nTime);

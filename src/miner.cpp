@@ -1503,7 +1503,7 @@ void static BitcoinMiner_noeq()
             {
                 int32_t percPoS,z; bool fNegative,fOverflow;
                 HASHTarget_POW = komodo_PoWtarget(&percPoS,HASHTarget,Mining_height,ASSETCHAINS_STAKED,komodo_newStakerActive(Mining_height, pblock->nTime));
-                HASHTarget.SetCompact(KOMODO_MINDIFF_NBITS,&fNegative,&fOverflow);
+                HASHTarget.SetCompact(Params().GetConsensus().mindiff_nbits,&fNegative,&fOverflow);
                 LogPrintf("Block %d : PoS %d%% vs target %d%%\n", Mining_height, percPoS, (int32_t)ASSETCHAINS_STAKED);
             }
             //else if ( ASSETCHAINS_ADAPTIVEPOW > 0 && ASSETCHAINS_STAKED == 0 )
@@ -1870,7 +1870,7 @@ void BitcoinMiner()
                     
                     if ( (Mining_height >= 235300 && Mining_height < 236000) || (j == 65 && Mining_height > KOMODO_MAYBEMINED+1 && Mining_height > KOMODO_LASTMINED+64) )
                     {
-                        HASHTarget = arith_uint256().SetCompact(KOMODO_MINDIFF_NBITS);
+                        HASHTarget = arith_uint256().SetCompact(Params().GetConsensus().mindiff_nbits);
                         fprintf(stderr,"I am the chosen one for %s ht.%d\n",ASSETCHAINS_SYMBOL,pindexPrev->GetHeight()+1);
                     } else fprintf(stderr,"duplicate at j.%d\n",j);
                 } else Mining_start = 0;
@@ -1880,7 +1880,7 @@ void BitcoinMiner()
             {
                 int32_t percPoS,z; bool fNegative,fOverflow;
                 HASHTarget_POW = komodo_PoWtarget(&percPoS,HASHTarget,Mining_height,ASSETCHAINS_STAKED,komodo_newStakerActive(Mining_height, pblock->nTime));
-                HASHTarget.SetCompact(KOMODO_MINDIFF_NBITS,&fNegative,&fOverflow);
+                HASHTarget.SetCompact(Params().GetConsensus().mindiff_nbits,&fNegative,&fOverflow);
                 if ( ASSETCHAINS_STAKED < 100 )
                     LogPrintf("Block %d : PoS %d%% vs target %d%% \n",Mining_height,percPoS,(int32_t)ASSETCHAINS_STAKED);
             }
