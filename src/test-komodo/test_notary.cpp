@@ -297,32 +297,49 @@ TEST(TestNotary, HardforkActiveDecember2019)
     }
 }
 
-void displayWallet(std::shared_ptr<TestWallet> wallet, const std::string& name)
+void displayBlock(std::shared_ptr<CBlock> block)
 {
-    std::vector<COutput> vec;
-    wallet->AvailableCoins(vec);
-    if (vec.size() > 0)
-        std::cout << name << " has " << vec.size() << " transactions in their wallet\n";
+    std::cout << "Block hash: " << block->GetHash().ToString() 
+            << " contains " << std::to_string( block->vtx.size() ) 
+            << " transactions.\n";
+    for (auto& tx : block->vtx)
+    {
+        std::cout << " Transaction hash: " << tx.GetHash().ToString() << "\n";
+        std::cout << "  Inputs:\n";
+        for( auto i : tx.vin)
+        {
+            std::cout << "  Hash of prevout: " << i.prevout.hash.ToString() << "\n";
+        }
+        std::cout << "  Outputs:\n";
+        for( auto o : tx.vout )
+        {
+            std::cout << "  Hash of out: " << o.GetHash().ToString() << "\n";
+        }
+    }
 }
 
 TEST(TestNotary, NotaryMining)
 {
     TestChain testChain;
-    std::shared_ptr<TestWallet> notary = testChain.AddWallet(testChain.getNotaryKey());
-    std::shared_ptr<TestWallet> alice = testChain.AddWallet();
+    std::shared_ptr<TestWallet> notary = testChain.AddWallet(testChain.getNotaryKey(), "notary");
+    std::shared_ptr<TestWallet> alice = testChain.AddWallet("alice");
 
     // Alice should mine some blocks
     std::shared_ptr<CBlock> lastBlock;
-    for(int i = 0; i < 5; ++i)
+    for(int i = 0; i < 4; ++i)
     {
         lastBlock = testChain.generateBlock(alice);
+        displayBlock(lastBlock);
         std::cout << "Mined block " << std::to_string(testChain.GetIndex()->GetHeight()) << "\n";
-        displayWallet(notary, "Notary");
-        displayWallet(alice, "Alice");
+        notary->DisplayContents();
+        alice->DisplayContents();
         // this makes some txs for notary mining
-        if (i > 3)
+        if (i > 1)
         {
             auto result = alice->Transfer(notary, 10000);
+            if (!result.IsValid())
+                std::cerr << "Unable to transfer to notary. Reason: " 
+                        << result.GetRejectReason() << "\n";
             EXPECT_TRUE( result.IsValid() );
         }
     }
@@ -330,7 +347,7 @@ TEST(TestNotary, NotaryMining)
     uint32_t prevBits = lastBlock->GetBlockHeader().nBits;
     // a notary should be able to mine with a lower difficulty
     lastBlock = testChain.generateBlock(notary);
-    EXPECT_GT(lastBlock->GetBlockHeader().nBits, prevBits);
+    EXPECT_LT(lastBlock->GetBlockHeader().nBits, prevBits);
 }
 
 

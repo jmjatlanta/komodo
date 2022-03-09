@@ -2817,10 +2817,12 @@ namespace Consensus {
                 }
 
                 // Ensure that coinbases are matured, no DoS as retry may work later
-                if (nSpendHeight - coins->nHeight < Params().coinbase_maturity) {
+                if (nSpendHeight - coins->nHeight < ::Params().GetConsensus().coinbase_maturity) {
                     return state.Invalid(
-                                         error("CheckInputs(): tried to spend coinbase at depth %d/%d", nSpendHeight - coins->nHeight, (int32_t)Params().coinbase_maturity),
-                                         REJECT_INVALID, "bad-txns-premature-spend-of-coinbase");
+                            error("CheckInputs(): tried to spend coinbase at depth %d/%d",
+                            nSpendHeight - coins->nHeight, 
+                            (int32_t)::Params().GetConsensus().coinbase_maturity),
+                            REJECT_INVALID, "bad-txns-premature-spend-of-coinbase");
                 }
 
                 // Ensure that coinbases cannot be spent to transparent outputs

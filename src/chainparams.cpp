@@ -357,8 +357,8 @@ public:
         consensus.nPowAveragingWindow = 1;
         consensus.nMaxFutureBlockTime = 7 * 60; // 7 mins
         assert(maxUint/UintToArith256(consensus.powLimit) >= consensus.nPowAveragingWindow);
-        consensus.nPowMaxAdjustDown = 0; // Turn off adjustment down
-        consensus.nPowMaxAdjustUp = 0; // Turn off adjustment up
+        consensus.nPowMaxAdjustDown = 1; // adjust down slowly (1%)
+        consensus.nPowMaxAdjustUp = 1; // adjustment up slowly (1%)
         consensus.nPowTargetSpacing = 5; // 1 every 5 seconds
         consensus.nPowAllowMinDifficultyBlocksAfterHeight = 0;
         consensus.vUpgrades[Consensus::BASE_SPROUT].nProtocolVersion = 170002;
@@ -374,6 +374,8 @@ public:
         consensus.vUpgrades[Consensus::UPGRADE_SAPLING].nActivationHeight =
             Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
         consensus.mindiff_nbits = 16842752;
+        consensus.coinbase_maturity = 1;
+        consensus.orig_coinbase_maturity = 1;
 
         pchMessageStart[0] = 0xaa;
         pchMessageStart[1] = 0x8e;

@@ -1011,7 +1011,7 @@ public:
             bool fIncludeZeroValue=false, bool fIncludeCoinBase=true) const;
     bool SelectCoinsMinConf(const CAmount& nTargetValue, int nConfMine, int nConfTheirs, std::vector<COutput> vCoins, std::set<std::pair<const CWalletTx*,unsigned int> >& setCoinsRet, CAmount& nValueRet) const;
 
-    bool IsSpent(const uint256& hash, unsigned int n) const;
+    virtual bool IsSpent(const uint256& hash, unsigned int n) const;
     bool IsSproutSpent(const uint256& nullifier) const;
     bool IsSaplingSpent(const uint256& nullifier) const;
 

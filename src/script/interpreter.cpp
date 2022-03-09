@@ -1204,6 +1204,17 @@ SigVersion SignatureHashVersion(const CTransaction& txTo)
     }
 }
 
+/****
+ * @brief sign
+ * @param scriptCode
+ * @param txTo
+ * @param nIn
+ * @param nHashType
+ * @param amount
+ * @param consensusBranchId
+ * @param cache
+ * @return the signature hash
+ */
 uint256 SignatureHash(
     const CScript& scriptCode,
     const CTransaction& txTo,

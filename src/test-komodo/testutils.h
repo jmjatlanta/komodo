@@ -21,7 +21,7 @@ void setupChain(CBaseChainParams::Network network = CBaseChainParams::REGTEST);
  * Generate a block
  * @param block a place to store the block (read from disk)
  */
-void generateBlock(CBlock *block=NULL);
+void generateBlock(std::shared_ptr<CBlock> block = nullptr);
 bool acceptTx(const CTransaction tx, CValidationState &state);
 void acceptTxFail(const CTransaction tx);
 /****
@@ -79,7 +79,7 @@ public:
      */
     CBlock BuildBlock( std::shared_ptr<TestWallet> who );
 
-    CBlock GetBlock(CBlockIndex* idx);
+    std::shared_ptr<CBlock> GetBlock(CBlockIndex* idx);
     
     /****
      * @brief set the chain time to something reasonable
@@ -102,12 +102,12 @@ public:
      * @param key the key
      * @returns the wallet
      */
-    std::shared_ptr<TestWallet> AddWallet(const CKey &key);
+    std::shared_ptr<TestWallet> AddWallet(const CKey &key, const std::string& name = "");
     /****
      * Create a wallet
      * @returns the wallet
      */
-    std::shared_ptr<TestWallet> AddWallet();
+    std::shared_ptr<TestWallet> AddWallet(const std::string& name = "");
 private:
     std::vector<std::shared_ptr<TestWallet>> toBeNotified;
     boost::filesystem::path dataDir;
@@ -115,6 +115,14 @@ private:
     void CleanGlobals();
     void SetupMining(std::shared_ptr<TestWallet> who);
     std::vector<std::shared_ptr<CBlock>> minedBlocks;
+};
+
+class TransactionReference
+{
+public:
+    uint256 hash;
+    uint32_t index;
+    TransactionReference(uint256 h, uint32_t i) : hash(h), index(i) {}
 };
 
 /***
@@ -125,8 +133,8 @@ private:
 class TestWallet : public CWallet
 {
 public:
-    TestWallet(TestChain* chain);
-    TestWallet(TestChain* chain, const CKey& in);
+    TestWallet(TestChain* chain, const std::string& name = "");
+    TestWallet(TestChain* chain, const CKey& in, const std::string& name = "");
     /***
      * @returns the public key
      */
@@ -135,6 +143,12 @@ public:
      * @returns the private key
      */
     CKey GetPrivKey() const;
+    /****
+     * @brief shortcuts the real wallet to return the private key
+     * @return true
+     */
+    virtual bool GetKey(const CKeyID &address, CKey &keyOut) const override 
+            { keyOut = GetPrivKey(); return true; }
     /***
      * Sign a typical transaction
      * @param hash the hash to sign
@@ -191,9 +205,15 @@ public:
             bool fOnlyConfirmed=true, const CCoinControl *coinControl = NULL, 
             bool fIncludeZeroValue=false, bool fIncludeCoinBase=true) const override;
 
+    bool IsSpent(const uint256& hash, unsigned int n) const override;
+
+    void DisplayContents();
+
 private:
     TestChain *chain;
     CKey key;
     std::vector<CWalletTx> availableTransactions;
+    std::vector<TransactionReference> spentTransactions;
     CScript destScript;
+    const std::string name;
 };

@@ -47,8 +47,10 @@ void setupChain(CBaseChainParams::Network network)
     NOTARY_PUBKEY = notaryPubkey;
     STAKED_NOTARY_ID = -1;
     USE_EXTERNAL_PUBKEY = 0;
+    // dirty trick to release coinbase funds
+    ASSETCHAINS_TIMEUNLOCKFROM = 100;
+    ASSETCHAINS_TIMEUNLOCKTO = 100;
     mapArgs["-mineraddress"] = "bogus";
-    Params().GetConsensus().SetCoinbaseMaturity(1);
     // Global mock time
     nMockTime = GetTime();
     
@@ -69,10 +71,10 @@ void setupChain()
     setupChain(CBaseChainParams::REGTEST);
 }
 
-CBlock getBlock(const uint256& blockId)
+std::shared_ptr<CBlock> getBlock(const uint256& blockId)
 {
-    CBlock retVal;
-    if (!ReadBlockFromDisk(retVal, mapBlockIndex[blockId], false))
+    std::shared_ptr<CBlock> retVal = std::make_shared<CBlock>();
+    if (!ReadBlockFromDisk( *(retVal), mapBlockIndex[blockId], false))
         throw;
     return retVal;
 }
@@ -81,7 +83,7 @@ CBlock getBlock(const uint256& blockId)
  * Generate a block
  * @param block a place to store the block (nullptr skips the disk read)
  */
-void generateBlock(CBlock *block)
+void generateBlock(std::shared_ptr<CBlock> block)
 {
     SetMockTime(nMockTime+=100);  // CreateNewBlock can fail if not enough time passes
 
@@ -93,7 +95,7 @@ void generateBlock(CBlock *block)
         UniValue out = generate(params, false, CPubKey());
         uint256 blockId;
         blockId.SetHex(out[0].getValStr());
-        *block = getBlock(blockId);
+        block = getBlock(blockId);
     } catch (const UniValue& e) {
         FAIL() << "failed to create block: " << e.write().data();
     }
@@ -116,6 +118,19 @@ bool acceptTx(const CTransaction tx, CValidationState &state)
     LOCK(cs_main);
     bool missingInputs = false;
     bool accepted = AcceptToMemoryPool(mempool, state, tx, false, &missingInputs, false, -1);
+    if (state.IsValid() && (!accepted || missingInputs))
+    {
+        std::string message;
+        if (!accepted)
+            message = "Not accepted";
+        if (missingInputs)
+        {
+            if (message.size() > 0)
+                message += " due to ";
+            message += "Missing Inputs";
+        }
+        state.DoS(100, false, 0U, message);
+    }
     return accepted && !missingInputs;
 }
 
@@ -154,9 +169,9 @@ std::vector<uint8_t> getSig(const CMutableTransaction mtx, CScript inputPubKey, 
 CTransaction getInputTx(CScript scriptPubKey)
 {
     // Get coinbase
-    CBlock block;
-    generateBlock(&block);
-    CTransaction coinbase = block.vtx[0];
+    std::shared_ptr<CBlock> block = std::make_shared<CBlock>();
+    generateBlock(block);
+    CTransaction coinbase = block->vtx[0];
 
     // Create tx
     auto mtx = spendTx(coinbase);
@@ -249,9 +264,20 @@ CCoinsViewCache *TestChain::GetCoinsViewCache()
     return pcoinsTip;
 }
 
-CBlock TestChain::GetBlock(CBlockIndex* idx)
+/****
+ * @brief find a block by its index
+ * @param idx the index
+ * @return the block
+ */
+std::shared_ptr<CBlock> TestChain::GetBlock(CBlockIndex* idx)
 {
-    return getBlock( idx->GetBlockHash() );
+    uint256 hash = idx->GetBlockHash();
+    for(auto itr = minedBlocks.rbegin(); itr != minedBlocks.rend(); ++itr)
+    {
+        if ( (*(itr))->GetHash() == hash)
+            return *itr;
+    }
+    return nullptr;
 }
 
 std::shared_ptr<CBlock> TestChain::generateBlock(std::shared_ptr<TestWallet> who)
@@ -261,7 +287,7 @@ std::shared_ptr<CBlock> TestChain::generateBlock(std::shared_ptr<TestWallet> who
     if (who == nullptr)
     {
         // use the RPC method
-        ::generateBlock(block.get());
+        ::generateBlock(block);
     }
     else
     {
@@ -273,11 +299,11 @@ std::shared_ptr<CBlock> TestChain::generateBlock(std::shared_ptr<TestWallet> who
         }
         catch (const boost::thread_interrupted& ex)
         {
-            // this is normal
+            // this exception is normal, it is used to get out of the mining loop
+            // when on the regtest chain
             if (height != this->GetIndex()->GetHeight())
             {
-                CBlock currBlock = this->GetBlock(this->GetIndex());
-                *(block) = currBlock;
+                block = getBlock(GetIndex()->GetBlockHash());
             }
         }
     }
@@ -309,6 +335,11 @@ protected:
     CPubKey pubKey;
 };
 
+/***
+ * @brief mine a block using a simple PoW algo (as RPC does)
+ * @param in the block to mine
+ * @returns the mined block
+ */
 std::shared_ptr<CBlock> TestChain::generateBlock(const CBlock& in)
 {
     std::shared_ptr<CBlock> retVal = std::make_shared<CBlock>();
@@ -387,16 +418,16 @@ CValidationState TestChain::acceptTx(const CTransaction& tx)
     return retVal;
 }
 
-std::shared_ptr<TestWallet> TestChain::AddWallet(const CKey& in)
+std::shared_ptr<TestWallet> TestChain::AddWallet(const CKey& in, const std::string& name)
 {
-    std::shared_ptr<TestWallet> retVal = std::make_shared<TestWallet>(this, in);
+    std::shared_ptr<TestWallet> retVal = std::make_shared<TestWallet>(this, in, name);
     toBeNotified.push_back(retVal);
     return retVal;
 }
 
-std::shared_ptr<TestWallet> TestChain::AddWallet()
+std::shared_ptr<TestWallet> TestChain::AddWallet(const std::string& name)
 {
-    std::shared_ptr<TestWallet> retVal = std::make_shared<TestWallet>(this);
+    std::shared_ptr<TestWallet> retVal = std::make_shared<TestWallet>(this, name);
     toBeNotified.push_back(retVal);
     return retVal;
 }
@@ -408,13 +439,14 @@ std::shared_ptr<TestWallet> TestChain::AddWallet()
  * - Blocks containing vOuts that apply are added to the front of a vector
  */
 
-TestWallet::TestWallet(TestChain* chain) : chain(chain)
+TestWallet::TestWallet(TestChain* chain, const std::string& name) : chain(chain), name(name)
 {
     key.MakeNewKey(true);
     destScript = GetScriptForDestination(key.GetPubKey());
 }
 
-TestWallet::TestWallet(TestChain* chain, const CKey& in) : chain(chain), key(in)
+TestWallet::TestWallet(TestChain* chain, const CKey& in, const std::string& name)
+        : chain(chain), key(in), name(name)
 {
     destScript = GetScriptForDestination(key.GetPubKey());
 }
@@ -472,15 +504,37 @@ std::vector<unsigned char> TestWallet::Sign(CC* cc, uint256 hash)
  */
 void TestWallet::BlockNotification(std::shared_ptr<CBlock> block)
 {
-    // TODO: remove spent txs from availableTransactions
-    // see if this block has any outs for me
-    for( auto& tx : block->vtx )
+    // see if this block involves me
+    for(auto txIndex = 0; txIndex < block->vtx.size(); ++txIndex)
     {
+        const auto& tx = block->vtx[txIndex];
+
+        // Did I spend something?
+        for(uint32_t i = 0; i < tx.vin.size(); ++i)
+        {
+            const CTxIn& in = tx.vin[i];
+            std::vector<COutput> available;
+            AvailableCoins(available);
+            for(const auto& a : available)
+            {
+                if (a.tx->GetHash() == in.prevout.hash && a.i == in.prevout.n)
+                {
+                    spentTransactions.push_back( TransactionReference(in.prevout.hash, in.prevout.n));
+                }
+            }
+        }
+        // Did I get something?
         for(uint32_t i = 0; i < tx.vout.size(); ++i)
         {
             if (tx.vout[i].scriptPubKey == destScript)
             {
-                availableTransactions.push_back(CWalletTx(this, tx));
+                // creating a CWalletTx move()s the tx, so wrap in CMutableTx to do a copy
+                CTransaction cp((const CTransaction)tx);
+                availableTransactions.push_back(CWalletTx(this, cp));
+                CWalletTx& curr = availableTransactions.back();
+                curr.nIndex = i;
+                curr.hashBlock = block->GetHash();
+                curr.SetMerkleBranch( *block );
                 break; // skip to next tx
             }
         }
@@ -509,13 +563,23 @@ CValidationState TestWallet::Transfer(std::shared_ptr<TestWallet> to, CAmount am
     return chain->acceptTx(fundTo);
 }
 
-CTransaction TestWallet::CreateSpendTransaction(std::shared_ptr<TestWallet> to, CAmount amount, CAmount fee)
+/***
+ * @brief create a transaction
+ * @param to who to send to
+ * @param amount the amount to transfer
+ * @param fee the fee amount
+ * @return the transaction
+ */
+CTransaction TestWallet::CreateSpendTransaction(
+        std::shared_ptr<TestWallet> to, CAmount amount, CAmount fee)
 {
     std::vector<COutput> available;
     this->AvailableCoins(available);
     CMutableTransaction tx;
     // add txs until we do not need more
     CAmount collected = 0;
+    CScript scriptToSign;
+    uint32_t inIndex;
     for(auto output : available)
     {
         // go through and add up all my available outs
@@ -526,10 +590,11 @@ CTransaction TestWallet::CreateSpendTransaction(std::shared_ptr<TestWallet> to, 
                 const CTxOut& out = output.tx->vout[idx];
                 if (out.scriptPubKey == destScript)
                 {
-                    CTxIn incoming;
-                    incoming.prevout.hash = out.GetHash();
-                    incoming.prevout.n = idx;
-                    tx.vin.push_back(incoming);
+                    std::cout << "Spending txout hash: " 
+                            << output.tx->GetHash().ToString() << "\n";
+                    tx.vin.push_back(CTxIn(output.tx->GetHash(), idx));
+                    scriptToSign = output.tx->vout[idx].scriptPubKey;
+                    inIndex = idx;
                     collected += out.nValue;
                 }
             }
@@ -539,17 +604,19 @@ CTransaction TestWallet::CreateSpendTransaction(std::shared_ptr<TestWallet> to, 
     }
     if (collected < amount + fee)
         throw std::logic_error("No Funds");
-    CTxOut out1;
-    out1.scriptPubKey = GetScriptForDestination(to->GetPubKey());
-    out1.nValue = amount;
-    tx.vout.push_back(out1);
     // give the rest back to wallet owner
+    CTxOut out1;
+    out1.scriptPubKey = GetScriptForDestination(key.GetPubKey());
+    out1.nValue = collected - amount - fee;
+    tx.vout.push_back(out1);
+    // spend
     CTxOut out2;
-    out2.scriptPubKey = GetScriptForDestination(key.GetPubKey());
-    out2.nValue = collected - amount - fee;
+    out2.scriptPubKey = GetScriptForDestination(to->GetPubKey());
+    out2.nValue = amount;
     tx.vout.push_back(out2);
 
-    uint256 hash = SignatureHash(destScript, tx, 0, SIGHASH_ALL, 0, 0);
+    uint256 hash = SignatureHash(scriptToSign, tx, inIndex, SIGHASH_ALL, amount, 
+        CurrentEpochBranchId(chainActive.Height() + 1, Params().GetConsensus()));
     tx.vin[0].scriptSig << Sign(hash, SIGHASH_ALL);
 
     return CTransaction(tx);
@@ -566,8 +633,42 @@ CTransaction TestWallet::CreateSpendTransaction(std::shared_ptr<TestWallet> to, 
 void TestWallet::AvailableCoins(std::vector<COutput>& vCoins, bool fOnlyConfirmed, const CCoinControl *coinControl, 
             bool fIncludeZeroValue, bool fIncludeCoinBase) const
 {
-    for( auto p : this->availableTransactions)
+    for( auto& p : this->availableTransactions)
     {
-        vCoins.push_back(COutput(&p, p.nIndex, p.GetDepthInMainChain(), p.GetBlocksToMaturity()));
+        if (!IsSpent(p.GetHash(), p.nIndex))
+            vCoins.push_back(COutput(&p, p.nIndex, p.GetDepthInMainChain(), true));
     }
+}
+
+bool TestWallet::IsSpent(const uint256& hash, unsigned int n) const
+{
+    bool retVal = false;
+    for( auto o : spentTransactions )
+    {
+        if (o.hash == hash)
+            return true;
+    }
+    return false;
+}
+
+void TestWallet::DisplayContents()
+{
+    std::vector<COutput> available;
+    AvailableCoins(available);
+    std::cout << "Wallet of " << name << " contains " 
+            << std::to_string(available.size()) << " transactions.\n";
+    CAmount total = 0;
+    for( const auto& out : available )
+    {
+        for (const auto& vout : out.tx->vout)
+        {
+            if (vout.scriptPubKey == destScript)
+            {
+                total += vout.nValue;
+                std::cout << "  Transaction with a value of " 
+                        << std::to_string(vout.nValue) << "\n";
+            }
+        }
+    }
+    std::cout << "Total: " << std::to_string(total) << "\n";
 }
