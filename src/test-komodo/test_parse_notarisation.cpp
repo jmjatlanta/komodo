@@ -406,8 +406,9 @@ TEST(TestParseNotarisation, test_notarizeddata)
     EXPECT_EQ(txid, expected_txid);
  }
 
-TEST(TestParseNotarisation, OldVsNew)
+TEST(TestParseNotarisation, DISABLED_OldVsNew)
 {
+    // Needs a komodostate file to run against
     ASSETCHAINS_SYMBOL[0] = 0;
     char symbol[4] = { 0 };
     char dest[4] = { 0 };

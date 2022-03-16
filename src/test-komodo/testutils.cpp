@@ -195,6 +195,7 @@ TestChain::TestChain(CBaseChainParams::Network desiredNetwork)
     CleanGlobals();
     previousNetwork = Params().NetworkIDString();
     dataDir = GetTempPath() / strprintf("test_komodo_%li_%i", GetTime(), GetRand(100000));
+    ASSETCHAINS_STAKED = 0;
     if (ASSETCHAINS_SYMBOL[0])
         dataDir = dataDir / strprintf("_%s", ASSETCHAINS_SYMBOL);
     boost::filesystem::create_directories(dataDir);
@@ -206,14 +207,15 @@ TestChain::TestChain(CBaseChainParams::Network desiredNetwork)
     notaryKey = vchSecret.GetKey();
     // set up the Pubkeys array
     komodo_init(1);
-    // now add to the Pubkeys array
+    // now add the notary to the Pubkeys array for era 0
     knotary_entry *kp = (knotary_entry*)calloc(1, sizeof(knotary_entry));
-    int nextId = Pubkeys->numnotaries;
+    int nextId = Pubkeys[0].numnotaries;
     memcpy(kp->pubkey, &notaryKey.GetPubKey()[0],33);
     kp->notaryid = nextId;
     HASH_ADD_KEYPTR(hh,Pubkeys[0].Notaries,kp->pubkey,33,kp);
-    Pubkeys[0].numnotaries++;
-
+    // fix the numnotaries for all arrays
+    for(int i = 0; i < 125; ++i)
+        Pubkeys[i].numnotaries++;
 }
 
 TestChain::~TestChain()
@@ -246,7 +248,7 @@ void TestChain::CleanGlobals()
  * @param height the height (0 indicates current height)
  * @returns the block index
  */
-CBlockIndex *TestChain::GetIndex(uint32_t height)
+CBlockIndex *TestChain::GetIndex(uint32_t height) const
 {
     if (height == 0)
         return chainActive.LastTip();
@@ -269,7 +271,7 @@ CCoinsViewCache *TestChain::GetCoinsViewCache()
  * @param idx the index
  * @return the block
  */
-std::shared_ptr<CBlock> TestChain::GetBlock(CBlockIndex* idx)
+std::shared_ptr<CBlock> TestChain::GetBlock(CBlockIndex* idx) const
 {
     uint256 hash = idx->GetBlockHash();
     for(auto itr = minedBlocks.rbegin(); itr != minedBlocks.rend(); ++itr)
@@ -365,6 +367,8 @@ void TestChain::SetupMining(std::shared_ptr<TestWallet> who)
         CPubKey notary_pubkey = notaryKey.GetPubKey();
         if (who != nullptr)
             pwalletMain = who.get();
+        else
+            pwalletMain = toBeNotified[0].get();
         int keylen = notary_pubkey.size();
         for(int i = 0; i < keylen; ++i)
             NOTARY_PUBKEY33[i] = notary_pubkey[i];
@@ -504,22 +508,29 @@ std::vector<unsigned char> TestWallet::Sign(CC* cc, uint256 hash)
  */
 void TestWallet::BlockNotification(std::shared_ptr<CBlock> block)
 {
-    // see if this block involves me
+    // Loop through all transactions in the block
     for(auto txIndex = 0; txIndex < block->vtx.size(); ++txIndex)
     {
         const auto& tx = block->vtx[txIndex];
 
-        // Did I spend something?
+        // loop through all vIns in the transaction
         for(uint32_t i = 0; i < tx.vin.size(); ++i)
         {
             const CTxIn& in = tx.vin[i];
-            std::vector<COutput> available;
-            AvailableCoins(available);
-            for(const auto& a : available)
+            // find available transactions where the hash matches the 
+            for( auto itr = availableTransactions.find(in.prevout.hash.ToString())
+                    ; itr != availableTransactions.end(); ++itr)
             {
-                if (a.tx->GetHash() == in.prevout.hash && a.i == in.prevout.n)
+                if ((*itr).first != in.prevout.hash.ToString())
+                    break;
+                auto& mytx = (*itr).second;
+                // loop through the vouts of the CWalletTx to see if we just spent it
+                for(int i = 0; i < mytx.vout.size(); ++i)
                 {
-                    spentTransactions.push_back( TransactionReference(in.prevout.hash, in.prevout.n));
+                    auto& out = mytx.vout[i];
+                    // are we spending this one?
+                    if (in.prevout.hash == mytx.GetHash() && in.prevout.n == i)
+                        spentTransactions.insert( {in.prevout.hash.ToString(), i} );
                 }
             }
         }
@@ -528,13 +539,8 @@ void TestWallet::BlockNotification(std::shared_ptr<CBlock> block)
         {
             if (tx.vout[i].scriptPubKey == destScript)
             {
-                // creating a CWalletTx move()s the tx, so wrap in CMutableTx to do a copy
-                CTransaction cp((const CTransaction)tx);
-                availableTransactions.push_back(CWalletTx(this, cp));
-                CWalletTx& curr = availableTransactions.back();
-                curr.nIndex = i;
-                curr.hashBlock = block->GetHash();
-                curr.SetMerkleBranch( *block );
+                CWalletTx& curr = AddOut(tx, i);
+                curr.SetMerkleBranch( *block ); // also sets nIndex
                 break; // skip to next tx
             }
         }
@@ -546,9 +552,10 @@ void TestWallet::BlockNotification(std::shared_ptr<CBlock> block)
  * @param tx the transaction
  * @param n the n value of the vout
  */
-void TestWallet::AddOut(CTransaction tx, uint32_t n)
+CWalletTx& TestWallet::AddOut(const CTransaction& tx, uint32_t n)
 {
-    availableTransactions.push_back(CWalletTx(this, tx));
+    auto itr = availableTransactions.insert( {tx.GetHash().ToString(), CWalletTx(this, tx) } );
+    return (*itr).second;
 }
 
 /***
@@ -560,6 +567,13 @@ void TestWallet::AddOut(CTransaction tx, uint32_t n)
 CValidationState TestWallet::Transfer(std::shared_ptr<TestWallet> to, CAmount amount, CAmount fee)
 {
     CTransaction fundTo(CreateSpendTransaction(to, amount, fee));
+    /*
+    std::cerr << "There are " << fundTo.vin.size() << " vin transactions.\n";
+    for(int i = 0; i < fundTo.vin.size(); ++i)
+        std::cerr << "Transaction " << std::to_string(i)
+                << " uses transaction " << fundTo.vin[i].prevout.hash.ToString()
+                << " vout " << std::to_string(fundTo.vin[i].prevout.n) << "\n";
+    */
     return chain->acceptTx(fundTo);
 }
 
@@ -590,9 +604,7 @@ CTransaction TestWallet::CreateSpendTransaction(
                 const CTxOut& out = output.tx->vout[idx];
                 if (out.scriptPubKey == destScript)
                 {
-                    std::cout << "Spending txout hash: " 
-                            << output.tx->GetHash().ToString() << "\n";
-                    tx.vin.push_back(CTxIn(output.tx->GetHash(), idx));
+                    tx.vin.push_back( CTxIn( output.tx->GetHash(), idx ) );
                     scriptToSign = output.tx->vout[idx].scriptPubKey;
                     inIndex = idx;
                     collected += out.nValue;
@@ -633,20 +645,38 @@ CTransaction TestWallet::CreateSpendTransaction(
 void TestWallet::AvailableCoins(std::vector<COutput>& vCoins, bool fOnlyConfirmed, const CCoinControl *coinControl, 
             bool fIncludeZeroValue, bool fIncludeCoinBase) const
 {
-    for( auto& p : this->availableTransactions)
+    for( auto itr = availableTransactions.begin(); itr != availableTransactions.end(); ++itr)
     {
-        if (!IsSpent(p.GetHash(), p.nIndex))
-            vCoins.push_back(COutput(&p, p.nIndex, p.GetDepthInMainChain(), true));
+        auto& tx = (*itr).second;
+        // loop through outs of tx
+        for(int i = 0; i < tx.vout.size(); ++i)
+            if (IsMine(tx.GetHash(), i) && !IsSpent(tx.GetHash(), i))
+                vCoins.push_back(COutput(&tx, tx.nIndex, tx.GetDepthInMainChain(), true));
     }
+}
+
+bool TestWallet::IsMine(const uint256& hash, uint32_t n) const
+{
+    auto itr = availableTransactions.find(hash.ToString());
+    while (itr != availableTransactions.end() && (*itr).first == hash.ToString())
+    {
+        auto& walletTx = (*itr).second;
+        if (walletTx.vout.size() > n && walletTx.vout[n].scriptPubKey == destScript)
+            return true;
+        ++itr;
+    }
+    return false;
 }
 
 bool TestWallet::IsSpent(const uint256& hash, unsigned int n) const
 {
     bool retVal = false;
-    for( auto o : spentTransactions )
+    auto itr = spentTransactions.find(hash.ToString());
+    while ( itr != spentTransactions.end() && (*itr).first == hash.ToString())
     {
-        if (o.hash == hash)
+        if (n == (*itr).second)
             return true;
+        ++itr;
     }
     return false;
 }

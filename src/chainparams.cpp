@@ -359,7 +359,7 @@ public:
         assert(maxUint/UintToArith256(consensus.powLimit) >= consensus.nPowAveragingWindow);
         consensus.nPowMaxAdjustDown = 1; // adjust down slowly (1%)
         consensus.nPowMaxAdjustUp = 1; // adjustment up slowly (1%)
-        consensus.nPowTargetSpacing = 5; // 1 every 5 seconds
+        consensus.nPowTargetSpacing = 6; // 1 every 12 seconds
         consensus.nPowAllowMinDifficultyBlocksAfterHeight = 0;
         consensus.vUpgrades[Consensus::BASE_SPROUT].nProtocolVersion = 170002;
         consensus.vUpgrades[Consensus::BASE_SPROUT].nActivationHeight =
@@ -373,7 +373,7 @@ public:
         consensus.vUpgrades[Consensus::UPGRADE_SAPLING].nProtocolVersion = 170006;
         consensus.vUpgrades[Consensus::UPGRADE_SAPLING].nActivationHeight =
             Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
-        consensus.mindiff_nbits = 16842752;
+        consensus.mindiff_nbits =  541516342;
         consensus.coinbase_maturity = 1;
         consensus.orig_coinbase_maturity = 1;
 

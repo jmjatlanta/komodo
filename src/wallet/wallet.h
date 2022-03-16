@@ -351,8 +351,10 @@ private:
     int GetDepthInMainChainINTERNAL(const CBlockIndex* &pindexRet) const;
 
 public:
+    // the hash of the block this tx belongs in
     uint256 hashBlock;
     std::vector<uint256> vMerkleBranch;
+    // the index of this transaction within the block
     int nIndex;
 
     // memory only

@@ -2360,6 +2360,13 @@ CAmount CWallet::GetDebit(const CTransaction& tx, const isminefilter& filter) co
     return nDebit;
 }
 
+/***
+ * Get amount for this vout if it is mine
+ * @param tx the transaction
+ * @param voutNum the vout
+ * @param isminefilter the filter
+ * @return the amount
+ */
 CAmount CWallet::GetCredit(const CTransaction& tx, int32_t voutNum, const isminefilter& filter) const
 {
     if (voutNum >= tx.vout.size() || !MoneyRange(tx.vout[voutNum].nValue))
@@ -2367,6 +2374,12 @@ CAmount CWallet::GetCredit(const CTransaction& tx, int32_t voutNum, const ismine
     return ((IsMine(tx.vout[voutNum]) & filter) ? tx.vout[voutNum].nValue : 0);
 }
 
+/****
+ * Get amount that belongs to me for this transaction
+ * @param tx the transaction
+ * @param filter the filter
+ * @return the amount
+ */
 CAmount CWallet::GetCredit(const CTransaction& tx, const isminefilter& filter) const
 {
     CAmount nCredit = 0;

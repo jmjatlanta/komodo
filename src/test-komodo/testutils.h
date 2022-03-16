@@ -2,6 +2,7 @@
 
 #include "main.h"
 #include "wallet/wallet.h" // CWallet, CReserveKey, etc.
+#include <unordered_map>
 
 #define VCH(a,b) std::vector<unsigned char>(a, a + b)
 
@@ -52,7 +53,7 @@ public:
      * @param height the height (0 indicates current height
      * @returns the block index
      */
-    CBlockIndex *GetIndex(uint32_t height = 0);
+    CBlockIndex *GetIndex(uint32_t height = 0) const;
     /***
      * Get this chains view of the state of the chain
      * @returns the view
@@ -79,7 +80,7 @@ public:
      */
     CBlock BuildBlock( std::shared_ptr<TestWallet> who );
 
-    std::shared_ptr<CBlock> GetBlock(CBlockIndex* idx);
+    std::shared_ptr<CBlock> GetBlock(CBlockIndex* idx) const;
     
     /****
      * @brief set the chain time to something reasonable
@@ -173,7 +174,7 @@ public:
      * @param tx the transaction
      * @param n the n value of the vout
      */
-    void AddOut(CTransaction tx, uint32_t n);
+    CWalletTx& AddOut(const CTransaction& tx, uint32_t n);
     /*****
      * @brief create a transaction with 1 recipient (signed)
      * @param to who to send funds to
@@ -206,14 +207,16 @@ public:
             bool fIncludeZeroValue=false, bool fIncludeCoinBase=true) const override;
 
     bool IsSpent(const uint256& hash, unsigned int n) const override;
+    bool IsMine(const uint256& hash, uint32_t voutNum) const;
 
     void DisplayContents();
 
 private:
     TestChain *chain;
     CKey key;
-    std::vector<CWalletTx> availableTransactions;
-    std::vector<TransactionReference> spentTransactions;
+    std::unordered_multimap<std::string, CWalletTx> availableTransactions;
+    // the tx hash and the index within the tx
+    std::unordered_multimap<std::string, uint32_t> spentTransactions;
     CScript destScript;
     const std::string name;
 };

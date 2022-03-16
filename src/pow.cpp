@@ -335,7 +335,9 @@ unsigned int GetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHead
     memset(zflags,0,sizeof(zflags));
     if ( pindexLast != 0 )
         height = (int32_t)pindexLast->GetHeight() + 1;
-    if ( ASSETCHAINS_ADAPTIVEPOW > 0 && pindexFirst != 0 && pblock != 0 && height >= (int32_t)(sizeof(ct)/sizeof(*ct)) )
+    // adaptive PoW
+    if ( ASSETCHAINS_ADAPTIVEPOW > 0 && pindexFirst != 0 
+            && pblock != 0 && height >= (int32_t)(sizeof(ct)/sizeof(*ct)) )
     {
         tipdiff = (pblock->nTime - pindexFirst->nTime);
         mult = tipdiff - 7 * ASSETCHAINS_BLOCKTIME;
@@ -361,20 +363,20 @@ unsigned int GetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHead
         }
     }
     pindexFirst = pindexLast;
+    // total up the nBits of the blocks within the recent range
     for (i = 0; pindexFirst && i < params.nPowAveragingWindow; i++)
     {
         bnTmp.SetCompact(pindexFirst->nBits);
+        // adaptive PoW
         if ( ASSETCHAINS_ADAPTIVEPOW > 0 && pblock != 0 )
         {
             blocktime = pindexFirst->nTime;
             diff = (pblock->nTime - blocktime);
-            //fprintf(stderr,"%d ",diff);
             if ( i < 6 )
             {
                 diff -= (8+i)*ASSETCHAINS_BLOCKTIME;
                 if ( diff > mult )
                 {
-                    //fprintf(stderr,"i.%d diff.%d (%u - %u - %dx)\n",i,(int32_t)diff,pblock->nTime,pindexFirst->nTime,(8+i));
                     mult = diff;
                 }
             }
@@ -384,7 +386,6 @@ unsigned int GetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHead
         bnTot += bnTmp;
         pindexFirst = pindexFirst->pprev;
     }
-    //fprintf(stderr,"diffs %d\n",height);
     // Check we have enough blocks
     if (pindexFirst == NULL)
         return nProofOfWorkLimit;
@@ -393,6 +394,7 @@ unsigned int GetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHead
     arith_uint256 easy,origtarget;
     arith_uint256 bnAvg{bnTot / params.nPowAveragingWindow}; // average number of bits in the lookback window
     nbits = CalculateNextWorkRequired(bnAvg, pindexLast->GetMedianTimePast(), pindexFirst->GetMedianTimePast(), params);
+    // adaptive PoW
     if ( ASSETCHAINS_ADAPTIVEPOW > 0 )
     {
         bnTarget = arith_uint256().SetCompact(nbits);
@@ -501,8 +503,8 @@ unsigned int GetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHead
         }
         nbits = bnTarget.GetCompact();
         nbits = (nbits & 0xfffffffc) | zawyflag;
-    }
-    return(nbits);
+    } // adaptive PoW
+    return nbits;
 }
 
 /****
