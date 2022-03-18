@@ -36,14 +36,19 @@ CMutableTransaction spendTx(const CTransaction &txIn, int nOut=0);
 std::vector<uint8_t> getSig(const CMutableTransaction mtx, CScript inputPubKey, int nIn=0);
 
 class TestWallet;
+class CCoinsViewDB;
 
 class TestChain
 {
 public:
     /***
      * ctor to create a chain
+     * @param desiredNetwork mainnet, testnet, regtest
+     * @param data_path where the data is (blank to create a temp dir)
+     * @param inMemory keep indexes in memory instead of files
      */
-    TestChain(CBaseChainParams::Network desiredNetwork = CBaseChainParams::REGTEST);
+    TestChain(CBaseChainParams::Network desiredNetwork = CBaseChainParams::REGTEST, 
+            boost::filesystem::path data_path = "", bool inMemory = true);
     /***
      * dtor to release resources
      */
@@ -59,6 +64,14 @@ public:
      * @returns the view
      */
     CCoinsViewCache *GetCoinsViewCache();
+
+    /***
+     * @brief Get this chain's block tree database
+     * @note this is a low-level object, and only exposed for testing purposes. Higher
+     * layers should probably not talk to this object directly.
+     * @return the block tree db
+     */
+    CBlockTreeDB* GetBlockTreeDB();
 
     /**
      * Generate a block
@@ -109,13 +122,23 @@ public:
      * @returns the wallet
      */
     std::shared_ptr<TestWallet> AddWallet(const std::string& name = "");
-private:
+protected:
     std::vector<std::shared_ptr<TestWallet>> toBeNotified;
     boost::filesystem::path dataDir;
     std::string previousNetwork;
     void CleanGlobals();
     void SetupMining(std::shared_ptr<TestWallet> who);
     std::vector<std::shared_ptr<CBlock>> minedBlocks;
+    bool removeDataOnDestruction = true;
+    bool inMemory = true;
+    CCoinsViewDB* pcoinsdbview = nullptr;
+    /***
+     * @brief called by ctor to get things going
+     * @param network the network to start
+     * @param existing true to initialize with existing data on the drive
+     */
+    void StartChain(CBaseChainParams::Network network, bool existing);
+
 };
 
 class TransactionReference

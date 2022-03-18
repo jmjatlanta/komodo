@@ -32,6 +32,7 @@ std::string notaryPubkey = "0205a8ad0c1dbc515f149af377981aab58b836af008d4d7ab21b
 std::string notarySecret = "UxFWWxsf1d7w7K5TvAWSkeX4H95XQKwdwGv49DXwWUTzPTTjHBbU";
 CKey notaryKey;
 extern CWallet* pwalletMain;
+extern CBlockTreeDB* pblocktree; // in main.cpp
 
 /*
  * We need to have control of clock,
@@ -190,18 +191,35 @@ CTransaction getInputTx(CScript scriptPubKey)
 /****
  * A class to provide a simple chain for tests
  */
-TestChain::TestChain(CBaseChainParams::Network desiredNetwork)
+TestChain::TestChain(CBaseChainParams::Network desiredNetwork, boost::filesystem::path data_path,
+        bool inMemory) : inMemory(inMemory)
 {
+    bool existingDataDir = true;
+    if (data_path.empty())
+    {
+        existingDataDir = false;
+        dataDir = GetTempPath() / strprintf("test_komodo_%li_%i", GetTime(), GetRand(100000));
+        if (ASSETCHAINS_SYMBOL[0])
+            dataDir = dataDir / strprintf("_%s", ASSETCHAINS_SYMBOL);
+        mapArgs["-datadir"] = dataDir.string();
+        boost::filesystem::create_directories(dataDir);
+        if (!inMemory)
+        {
+            auto otherPath = GetDataDir(true) / "blocks" / "index";
+            boost::filesystem::create_directories(otherPath);
+        }
+    }
+    else
+    {
+        dataDir = data_path;
+        mapArgs["-datadir"] = dataDir.string();
+    }
+
     CleanGlobals();
     previousNetwork = Params().NetworkIDString();
-    dataDir = GetTempPath() / strprintf("test_komodo_%li_%i", GetTime(), GetRand(100000));
     ASSETCHAINS_STAKED = 0;
-    if (ASSETCHAINS_SYMBOL[0])
-        dataDir = dataDir / strprintf("_%s", ASSETCHAINS_SYMBOL);
-    boost::filesystem::create_directories(dataDir);
-    mapArgs["-datadir"] = dataDir.string();
 
-    setupChain(desiredNetwork);
+    StartChain(desiredNetwork, existingDataDir);
     CBitcoinSecret vchSecret;
     vchSecret.SetString(notarySecret); // this returns false due to network prefix mismatch but works anyway
     notaryKey = vchSecret.GetKey();
@@ -220,8 +238,31 @@ TestChain::TestChain(CBaseChainParams::Network desiredNetwork)
 
 TestChain::~TestChain()
 {
+    if (removeDataOnDestruction)
+        boost::filesystem::remove_all(dataDir);
+    else
+        FlushStateToDisk();
+    if (pnotarisations != nullptr)
+    {
+        delete pnotarisations;
+        pnotarisations = nullptr;
+    }
+    if (pcoinsTip != nullptr)
+    {
+        delete pcoinsTip;
+        pcoinsTip = nullptr;
+    }
+    if (pcoinsdbview != nullptr)
+    {
+        delete pcoinsdbview;
+        pcoinsdbview = nullptr;
+    }
+    if (pblocktree != nullptr)
+    {
+        delete pblocktree;
+        pblocktree = nullptr;
+    }
     CleanGlobals();
-    boost::filesystem::remove_all(dataDir);
     if (previousNetwork == "main")
         SelectParams(CBaseChainParams::MAIN);
     if (previousNetwork == "regtest")
@@ -229,6 +270,39 @@ TestChain::~TestChain()
     if (previousNetwork == "test")
         SelectParams(CBaseChainParams::TESTNET);
 
+}
+
+void TestChain::StartChain(CBaseChainParams::Network network, bool existing)
+{
+    SelectParams(network);
+
+    // Settings to get block reward
+    NOTARY_PUBKEY = notaryPubkey;
+    STAKED_NOTARY_ID = -1;
+    USE_EXTERNAL_PUBKEY = 0;
+    // dirty trick to release coinbase funds
+    ASSETCHAINS_TIMEUNLOCKFROM = 100;
+    ASSETCHAINS_TIMEUNLOCKTO = 100;
+    mapArgs["-mineraddress"] = "bogus";
+    // Global mock time
+    nMockTime = GetTime();
+    
+    // Unload
+    UnloadBlockIndex();
+
+    // Init blockchain
+    ClearDatadirCache();
+    pblocktree = new CBlockTreeDB(1 << 20, inMemory);
+    pcoinsdbview = new CCoinsViewDB(1 << 23, inMemory);
+    pcoinsTip = new CCoinsViewCache(pcoinsdbview);
+    pnotarisations = new NotarisationDB(1 << 20, inMemory);
+    if (existing)
+    {
+        if (!LoadBlockIndex())
+            throw std::logic_error("Unable to load block index");
+    }
+    else
+        InitBlockIndex();
 }
 
 void TestChain::CleanGlobals()
@@ -254,6 +328,11 @@ CBlockIndex *TestChain::GetIndex(uint32_t height) const
         return chainActive.LastTip();
     return chainActive[height];
 
+}
+
+CBlockTreeDB* TestChain::GetBlockTreeDB()
+{
+    return pblocktree;
 }
 
 void TestChain::IncrementChainTime()

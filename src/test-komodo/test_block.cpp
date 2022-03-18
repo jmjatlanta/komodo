@@ -3,11 +3,12 @@
 #include "komodo_extern_globals.h"
 #include "consensus/validation.h"
 #include "miner.h"
-
+#include "txdb.h"
 #include <gtest/gtest.h>
 
+#include <boost/filesystem.hpp>
 
-TEST(block_tests, header_size_is_expected) {
+TEST(BlockTest, header_size_is_expected) {
     // Header with an empty Equihash solution.
     CBlockHeader header;
     CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
@@ -18,7 +19,7 @@ TEST(block_tests, header_size_is_expected) {
     EXPECT_EQ(ss.size(), stream_size);
 }
 
-TEST(block_tests, TestStopAt)
+TEST(BlockTest, TestStopAt)
 {
     TestChain chain;
     auto notary = chain.AddWallet(chain.getNotaryKey());
@@ -33,7 +34,7 @@ TEST(block_tests, TestStopAt)
     KOMODO_STOPAT = 0; // to not stop other tests
 }
 
-TEST(block_tests, TestConnectWithoutChecks)
+TEST(BlockTest, TestConnectWithoutChecks)
 {
     TestChain chain;
     auto notary = chain.AddWallet(chain.getNotaryKey());
@@ -70,7 +71,7 @@ TEST(block_tests, TestConnectWithoutChecks)
         FAIL() << state.GetRejectReason();
 }
 
-TEST(block_tests, TestSpendInSameBlock)
+TEST(BlockTest, TestSpendInSameBlock)
 {
     TestChain chain;
     auto notary = chain.AddWallet(chain.getNotaryKey());
@@ -125,7 +126,7 @@ TEST(block_tests, TestSpendInSameBlock)
         FAIL() << state.GetRejectReason();
 }
 
-TEST(block_tests, TestDoubleSpendInSameBlock)
+TEST(BlockTest, TestDoubleSpendInSameBlock)
 {
     TestChain chain;
     auto notary = chain.AddWallet(chain.getNotaryKey());
@@ -200,7 +201,7 @@ TEST(block_tests, TestDoubleSpendInSameBlock)
 
 bool CalcPoW(CBlock *pblock);
 
-TEST(block_tests, TestProcessBlock)
+TEST(BlockTest, TestProcessBlock)
 {
     TestChain chain;
     EXPECT_EQ(chain.GetIndex()->GetHeight(), 0);
@@ -254,7 +255,7 @@ TEST(block_tests, TestProcessBlock)
     EXPECT_EQ(mempool.size(), 1);
 }
 
-TEST(block_tests, TestProcessBadBlock)
+TEST(BlockTest, TestProcessBadBlock)
 {
     TestChain chain;
     auto notary = chain.AddWallet(chain.getNotaryKey());
@@ -289,4 +290,70 @@ TEST(block_tests, TestProcessBadBlock)
     EXPECT_EQ(state.GetRejectReason(), "bad-txnmrklroot");
     // Verify transaction is still in mempool
     EXPECT_EQ(mempool.size(), 1);
+}
+
+void komodo_init(int32_t height); // in komodo_bitcoind.cpp
+
+class PersistedTestChain : public TestChain
+{
+public:
+    PersistedTestChain() : TestChain(CBaseChainParams::REGTEST, "", false)
+    {
+        removeDataOnDestruction = false;
+    }
+    PersistedTestChain(boost::filesystem::path data_dir) 
+        : TestChain(CBaseChainParams::REGTEST, data_dir, false)
+    {
+        removeDataOnDestruction = true;
+    }
+    boost::filesystem::path GetDataDir() { return dataDir; }
+};
+
+TEST(TestBlock, CorruptBlockFile)
+{
+    /****
+     * in main.h set the sizes to something small to prevent this from running a VERY
+     * long time. Something like:
+     *  static const unsigned int MAX_BLOCKFILE_SIZE = 0x2000;
+     *  static const unsigned int MAX_TEMPFILE_SIZE =  0x2000;
+     *  static const unsigned int BLOCKFILE_CHUNK_SIZE = 0x2000;
+     *  static const unsigned int UNDOFILE_CHUNK_SIZE = 0x2000;
+     */
+    boost::filesystem::path dataPath;
+    CKey aliceKey;
+    {
+        PersistedTestChain chain;
+        dataPath = chain.GetDataDir();
+        auto notary = chain.AddWallet(chain.getNotaryKey(), "notary");
+        auto alice = chain.AddWallet("alice");
+        aliceKey = alice->GetPrivKey();
+        std::shared_ptr<CBlock> lastBlock = chain.generateBlock(alice); // genesis block
+        auto idx = chain.GetIndex();
+        int blockFile = idx->GetBlockPos().nFile;
+        // fill block00000.dat  
+        while (blockFile == idx->GetBlockPos().nFile)
+        {
+            lastBlock = chain.generateBlock(alice);
+            idx = chain.GetIndex();
+            std::cout << "Mined block " << std::to_string(idx->GetHeight()) << "\n";
+        }
+        // fill block00001.dat
+        blockFile = idx->GetBlockPos().nFile;
+        while (blockFile == idx->GetBlockPos().nFile)
+        {
+            lastBlock = chain.generateBlock(alice);
+            idx = chain.GetIndex();
+            std::cout << "Mined block " << std::to_string(idx->GetHeight()) << "\n";
+        }
+    }
+    // TODO: screw up the 1st file
+    // attempt to read the database
+    {
+        PersistedTestChain chain(dataPath);
+        auto idx = chain.GetIndex();
+        ASSERT_TRUE(idx != nullptr);
+        EXPECT_GT( chain.GetIndex()->GetHeight(), 3 );
+        auto notary = chain.AddWallet(chain.getNotaryKey(), "notary");
+        auto alice = chain.AddWallet( aliceKey, "alice");
+    }
 }
