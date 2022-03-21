@@ -321,6 +321,7 @@ TEST(TestBlock, CorruptBlockFile)
      */
     boost::filesystem::path dataPath;
     CKey aliceKey;
+    int32_t currentHeight = 0;
     {
         PersistedTestChain chain;
         dataPath = chain.GetDataDir();
@@ -335,7 +336,8 @@ TEST(TestBlock, CorruptBlockFile)
         {
             lastBlock = chain.generateBlock(alice);
             idx = chain.GetIndex();
-            std::cout << "Mined block " << std::to_string(idx->GetHeight()) << "\n";
+            currentHeight = idx->GetHeight();
+            std::cout << "Mined block " << std::to_string(currentHeight) << "\n";
         }
         // fill block00001.dat
         blockFile = idx->GetBlockPos().nFile;
@@ -343,17 +345,95 @@ TEST(TestBlock, CorruptBlockFile)
         {
             lastBlock = chain.generateBlock(alice);
             idx = chain.GetIndex();
-            std::cout << "Mined block " << std::to_string(idx->GetHeight()) << "\n";
+            currentHeight = idx->GetHeight();
+            std::cout << "Mined block " << std::to_string(currentHeight) << "\n";
         }
     }
-    // TODO: screw up the 1st file
+    // screw up the 1st file (file 0)
+    {
+        auto inFile = dataPath / "regtest" / "blocks" / "blk00000.dat";
+        boost::filesystem::resize_file( inFile, file_size(inFile) - 100 );
+    }
     // attempt to read the database
     {
         PersistedTestChain chain(dataPath);
         auto idx = chain.GetIndex();
         ASSERT_TRUE(idx != nullptr);
-        EXPECT_GT( chain.GetIndex()->GetHeight(), 3 );
+        EXPECT_EQ( chain.GetIndex()->GetHeight(), currentHeight );
+        /**
+         * corruption in the blkxxxxx.dat causes an exception that is eaten by
+         * txdb.cpp->txdb.cpp->LoadBlockIndexGuts->pcursor->GetKey, try/catch
+         * within the GetKey(). The chain boots, and will probably attempt to 
+         * syncrhornize
+         */
+    }
+}
+
+TEST(TestBlock, CorruptIndexFile)
+{
+    /****
+     * in main.h set the sizes to something small to prevent this from running a VERY
+     * long time. Something like:
+     *  static const unsigned int MAX_BLOCKFILE_SIZE = 0x2000;
+     *  static const unsigned int MAX_TEMPFILE_SIZE =  0x2000;
+     *  static const unsigned int BLOCKFILE_CHUNK_SIZE = 0x2000;
+     *  static const unsigned int UNDOFILE_CHUNK_SIZE = 0x2000;
+     */
+    boost::filesystem::path dataPath;
+    CKey aliceKey;
+    int32_t currentHeight = 0;
+    {
+        PersistedTestChain chain;
+        dataPath = chain.GetDataDir();
         auto notary = chain.AddWallet(chain.getNotaryKey(), "notary");
-        auto alice = chain.AddWallet( aliceKey, "alice");
+        auto alice = chain.AddWallet("alice");
+        aliceKey = alice->GetPrivKey();
+        std::shared_ptr<CBlock> lastBlock = chain.generateBlock(alice); // genesis block
+        auto idx = chain.GetIndex();
+        int blockFile = idx->GetBlockPos().nFile;
+        // fill block00000.dat  
+        while (blockFile == idx->GetBlockPos().nFile)
+        {
+            lastBlock = chain.generateBlock(alice);
+            idx = chain.GetIndex();
+            currentHeight = idx->GetHeight();
+            std::cout << "Mined block " << std::to_string(currentHeight) << "\n";
+        }
+        // fill block00001.dat
+        blockFile = idx->GetBlockPos().nFile;
+        while (blockFile == idx->GetBlockPos().nFile)
+        {
+            lastBlock = chain.generateBlock(alice);
+            idx = chain.GetIndex();
+            currentHeight = idx->GetHeight();
+            std::cout << "Mined block " << std::to_string(currentHeight) << "\n";
+        }
+    }
+    // screw up the ldb file
+    {
+        // find the ldb file
+        boost::filesystem::path ldb;
+        for(int i = 0; i < 10; ++i)
+        {
+            std::string fileName = std::string("00000") + std::to_string(i) + ".log";
+            ldb = dataPath / "regtest" / "blocks" / "index" / fileName;
+            if (boost::filesystem::exists(ldb) )
+                break;
+        }
+        if ( !boost::filesystem::exists(ldb) )
+            FAIL();
+        boost::filesystem::resize_file( ldb, file_size(ldb) - 10 );
+    }
+    // attempt to read the database
+    {
+        PersistedTestChain chain(dataPath);
+        auto idx = chain.GetIndex();
+        ASSERT_TRUE(idx != nullptr);
+        EXPECT_EQ( chain.GetIndex()->GetHeight(), currentHeight );
+        /**
+         * corruption in the index/xxxxxx.log causes an exception that is eaten by
+         * txdb.cpp->txdb.cpp->LoadBlockIndexGuts->pcursor->GetKey, the chain starts
+         * but with 0 blocks.
+         */
     }
 }
