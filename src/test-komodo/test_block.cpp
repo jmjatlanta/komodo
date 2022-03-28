@@ -356,15 +356,12 @@ TEST(TestBlock, CorruptBlockFile)
     }
     // attempt to read the database
     {
-        PersistedTestChain chain(dataPath);
-        auto idx = chain.GetIndex();
-        ASSERT_TRUE(idx != nullptr);
-        EXPECT_EQ( chain.GetIndex()->GetHeight(), currentHeight );
+        EXPECT_THROW(PersistedTestChain chain(dataPath), std::logic_error);
         /**
-         * corruption in the blkxxxxx.dat causes an exception that is eaten by
+         * corruption in the blkxxxxx.dat causes an exception that was eaten by
          * txdb.cpp->txdb.cpp->LoadBlockIndexGuts->pcursor->GetKey, try/catch
-         * within the GetKey(). The chain boots, and will probably attempt to 
-         * syncrhornize
+         * within the GetKey(). The chain booted, and would have probably attempted to 
+         * syncrhornize. Now it throws.
          */
     }
 }
@@ -426,14 +423,11 @@ TEST(TestBlock, CorruptIndexFile)
     }
     // attempt to read the database
     {
-        PersistedTestChain chain(dataPath);
-        auto idx = chain.GetIndex();
-        ASSERT_TRUE(idx != nullptr);
-        EXPECT_EQ( chain.GetIndex()->GetHeight(), currentHeight );
+        EXPECT_THROW(PersistedTestChain chain(dataPath), std::logic_error);
         /**
-         * corruption in the index/xxxxxx.log causes an exception that is eaten by
-         * txdb.cpp->txdb.cpp->LoadBlockIndexGuts->pcursor->GetKey, the chain starts
-         * but with 0 blocks.
+         * corruption in the index/xxxxxx.log causes an exception that was eaten by
+         * txdb.cpp->txdb.cpp->LoadBlockIndexGuts->pcursor->GetKey, the chain started
+         * but with 0 blocks. Now it throws.
          */
     }
 }

@@ -694,54 +694,62 @@ bool CBlockTreeDB::LoadBlockIndexGuts()
     pcursor->Seek(make_pair(DB_BLOCK_INDEX, uint256()));
 
     // Load mapBlockIndex
-    while (pcursor->Valid()) {
-        boost::this_thread::interruption_point();
-        std::pair<char, uint256> key;
-        if (pcursor->GetKey(key) && key.first == DB_BLOCK_INDEX) {
-            CDiskBlockIndex diskindex;
-            if (pcursor->GetValue(diskindex)) {
-                // Construct block index object
-                CBlockIndex* pindexNew = InsertBlockIndex(diskindex.GetBlockHash());
-                pindexNew->pprev          = InsertBlockIndex(diskindex.hashPrev);
-                pindexNew->SetHeight(diskindex.GetHeight());
-                pindexNew->nFile          = diskindex.nFile;
-                pindexNew->nDataPos       = diskindex.nDataPos;
-                pindexNew->nUndoPos       = diskindex.nUndoPos;
-                pindexNew->hashSproutAnchor     = diskindex.hashSproutAnchor;
-                pindexNew->nVersion       = diskindex.nVersion;
-                pindexNew->hashMerkleRoot = diskindex.hashMerkleRoot;
-                pindexNew->hashFinalSaplingRoot   = diskindex.hashFinalSaplingRoot;
-                pindexNew->nTime          = diskindex.nTime;
-                pindexNew->nBits          = diskindex.nBits;
-                pindexNew->nNonce         = diskindex.nNonce;
-                pindexNew->nSolution      = diskindex.nSolution;
-                pindexNew->nStatus        = diskindex.nStatus;
-                pindexNew->nCachedBranchId = diskindex.nCachedBranchId;
-                pindexNew->nTx            = diskindex.nTx;
-                pindexNew->nSproutValue   = diskindex.nSproutValue;
-                pindexNew->nSaplingValue  = diskindex.nSaplingValue;
-                pindexNew->segid          = diskindex.segid;
-                pindexNew->nNotaryPay     = diskindex.nNotaryPay;
-//fprintf(stderr,"loadguts ht.%d\n",pindexNew->GetHeight());
-                // Consistency checks
-                auto header = pindexNew->GetBlockHeader();
-                if (header.GetHash() != pindexNew->GetBlockHash())
-                    return error("LoadBlockIndex(): block header inconsistency detected: on-disk = %s, in-memory = %s",
-                                 diskindex.ToString(),  pindexNew->ToString());
-                if ( 0 ) // POW will be checked before any block is connected
-                {
-                    uint8_t pubkey33[33];
-                    komodo_index2pubkey33(pubkey33,pindexNew,pindexNew->GetHeight());
-                    if (!CheckProofOfWork(header,pubkey33,pindexNew->GetHeight(),Params().GetConsensus()))
-                        return error("LoadBlockIndex(): CheckProofOfWork failed: %s", pindexNew->ToString());
+    try
+    {
+        while (pcursor->Valid()) 
+        {
+            boost::this_thread::interruption_point();
+            std::pair<char, uint256> key;
+            if (pcursor->GetKey(key) && key.first == DB_BLOCK_INDEX) {
+                CDiskBlockIndex diskindex;
+                if (pcursor->GetValue(diskindex)) {
+                    // Construct block index object
+                    CBlockIndex* pindexNew = InsertBlockIndex(diskindex.GetBlockHash());
+                    pindexNew->pprev          = InsertBlockIndex(diskindex.hashPrev);
+                    pindexNew->SetHeight(diskindex.GetHeight());
+                    pindexNew->nFile          = diskindex.nFile;
+                    pindexNew->nDataPos       = diskindex.nDataPos;
+                    pindexNew->nUndoPos       = diskindex.nUndoPos;
+                    pindexNew->hashSproutAnchor     = diskindex.hashSproutAnchor;
+                    pindexNew->nVersion       = diskindex.nVersion;
+                    pindexNew->hashMerkleRoot = diskindex.hashMerkleRoot;
+                    pindexNew->hashFinalSaplingRoot   = diskindex.hashFinalSaplingRoot;
+                    pindexNew->nTime          = diskindex.nTime;
+                    pindexNew->nBits          = diskindex.nBits;
+                    pindexNew->nNonce         = diskindex.nNonce;
+                    pindexNew->nSolution      = diskindex.nSolution;
+                    pindexNew->nStatus        = diskindex.nStatus;
+                    pindexNew->nCachedBranchId = diskindex.nCachedBranchId;
+                    pindexNew->nTx            = diskindex.nTx;
+                    pindexNew->nSproutValue   = diskindex.nSproutValue;
+                    pindexNew->nSaplingValue  = diskindex.nSaplingValue;
+                    pindexNew->segid          = diskindex.segid;
+                    pindexNew->nNotaryPay     = diskindex.nNotaryPay;
+    //fprintf(stderr,"loadguts ht.%d\n",pindexNew->GetHeight());
+                    // Consistency checks
+                    auto header = pindexNew->GetBlockHeader();
+                    if (header.GetHash() != pindexNew->GetBlockHash())
+                        return error("LoadBlockIndex(): block header inconsistency detected: on-disk = %s, in-memory = %s",
+                                    diskindex.ToString(),  pindexNew->ToString());
+                    if ( 0 ) // POW will be checked before any block is connected
+                    {
+                        uint8_t pubkey33[33];
+                        komodo_index2pubkey33(pubkey33,pindexNew,pindexNew->GetHeight());
+                        if (!CheckProofOfWork(header,pubkey33,pindexNew->GetHeight(),Params().GetConsensus()))
+                            return error("LoadBlockIndex(): CheckProofOfWork failed: %s", pindexNew->ToString());
+                    }
+                    pcursor->Next();
+                } else {
+                    return error("LoadBlockIndex() : failed to read value");
                 }
-                pcursor->Next();
             } else {
-                return error("LoadBlockIndex() : failed to read value");
+                break;
             }
-        } else {
-            break;
         }
+    }
+    catch(const std::ios_base::failure& ioe)
+    {
+        return error("LoadBlockIndexGuts() possible file corruption: %s", ioe.what());
     }
 
     return true;

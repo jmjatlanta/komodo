@@ -194,6 +194,7 @@ CTransaction getInputTx(CScript scriptPubKey)
 TestChain::TestChain(CBaseChainParams::Network desiredNetwork, boost::filesystem::path data_path,
         bool inMemory) : inMemory(inMemory)
 {
+    ClearDatadirCache();
     bool existingDataDir = true;
     if (data_path.empty())
     {
@@ -202,11 +203,13 @@ TestChain::TestChain(CBaseChainParams::Network desiredNetwork, boost::filesystem
         if (ASSETCHAINS_SYMBOL[0])
             dataDir = dataDir / strprintf("_%s", ASSETCHAINS_SYMBOL);
         mapArgs["-datadir"] = dataDir.string();
-        boost::filesystem::create_directories(dataDir);
+        if (!boost::filesystem::create_directories(dataDir))
+            throw std::ios_base::failure("Unable to create block directory " + dataDir.string());
         if (!inMemory)
         {
             auto otherPath = GetDataDir(true) / "blocks" / "index";
-            boost::filesystem::create_directories(otherPath);
+            if (!boost::filesystem::create_directories(otherPath))
+                throw std::ios_base::failure("Unable to create index directory " + otherPath.string());
         }
     }
     else

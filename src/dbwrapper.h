@@ -117,7 +117,12 @@ public:
         try {
             CDataStream ssKey(slKey.data(), slKey.data() + slKey.size(), SER_DISK, CLIENT_VERSION);
             ssKey >> key;
-        } catch(std::exception &e) {
+        } 
+        catch(const std::ios_base::failure &ioe)
+        {
+            throw ioe;
+        }
+        catch(std::exception &e) {
             return false;
         }
         return true;
