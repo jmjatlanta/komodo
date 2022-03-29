@@ -725,19 +725,11 @@ bool CBlockTreeDB::LoadBlockIndexGuts()
                     pindexNew->nSaplingValue  = diskindex.nSaplingValue;
                     pindexNew->segid          = diskindex.segid;
                     pindexNew->nNotaryPay     = diskindex.nNotaryPay;
-    //fprintf(stderr,"loadguts ht.%d\n",pindexNew->GetHeight());
                     // Consistency checks
                     auto header = pindexNew->GetBlockHeader();
                     if (header.GetHash() != pindexNew->GetBlockHash())
                         return error("LoadBlockIndex(): block header inconsistency detected: on-disk = %s, in-memory = %s",
                                     diskindex.ToString(),  pindexNew->ToString());
-                    if ( 0 ) // POW will be checked before any block is connected
-                    {
-                        uint8_t pubkey33[33];
-                        komodo_index2pubkey33(pubkey33,pindexNew,pindexNew->GetHeight());
-                        if (!CheckProofOfWork(header,pubkey33,pindexNew->GetHeight(),Params().GetConsensus()))
-                            return error("LoadBlockIndex(): CheckProofOfWork failed: %s", pindexNew->ToString());
-                    }
                     pcursor->Next();
                 } else {
                     return error("LoadBlockIndex() : failed to read value");

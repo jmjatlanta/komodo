@@ -114,14 +114,11 @@ public:
 
     template<typename K> bool GetKey(K& key) {
         leveldb::Slice slKey = piter->key();
+
         try {
             CDataStream ssKey(slKey.data(), slKey.data() + slKey.size(), SER_DISK, CLIENT_VERSION);
             ssKey >> key;
         } 
-        catch(const std::ios_base::failure &ioe)
-        {
-            throw ioe;
-        }
         catch(std::exception &e) {
             return false;
         }

@@ -48,7 +48,7 @@ public:
      * @param inMemory keep indexes in memory instead of files
      */
     TestChain(CBaseChainParams::Network desiredNetwork = CBaseChainParams::REGTEST, 
-            boost::filesystem::path data_path = "", bool inMemory = true);
+            boost::filesystem::path data_path = "", bool inMemory = true, bool reindex = false);
     /***
      * dtor to release resources
      */

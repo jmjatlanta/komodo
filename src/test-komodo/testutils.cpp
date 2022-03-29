@@ -27,6 +27,7 @@ void undo_init_notaries(); // test helper
 bool CalcPoW(CBlock *pblock); // generate PoW on a block
 void BitcoinMiner(CWallet *pwallet); // in miner.cpp
 void komodo_init(int32_t height); // in komodo_bitcoind.cpp
+void ThreadImport(std::vector<boost::filesystem::path> vImport); // in main.cpp
 
 std::string notaryPubkey = "0205a8ad0c1dbc515f149af377981aab58b836af008d4d7ab21bd76faf80550b47";
 std::string notarySecret = "UxFWWxsf1d7w7K5TvAWSkeX4H95XQKwdwGv49DXwWUTzPTTjHBbU";
@@ -192,7 +193,7 @@ CTransaction getInputTx(CScript scriptPubKey)
  * A class to provide a simple chain for tests
  */
 TestChain::TestChain(CBaseChainParams::Network desiredNetwork, boost::filesystem::path data_path,
-        bool inMemory) : inMemory(inMemory)
+        bool inMemory, bool reindex) : inMemory(inMemory)
 {
     ClearDatadirCache();
     bool existingDataDir = true;
@@ -222,7 +223,36 @@ TestChain::TestChain(CBaseChainParams::Network desiredNetwork, boost::filesystem
     previousNetwork = Params().NetworkIDString();
     ASSETCHAINS_STAKED = 0;
 
-    StartChain(desiredNetwork, existingDataDir);
+    fReindex = reindex;
+
+    try {
+        StartChain(desiredNetwork, existingDataDir);
+    }
+    catch(const std::logic_error& le)
+    {
+        // we didn't construct correctly. Clean up the mess.
+        if (pnotarisations != nullptr)
+        {
+            delete pnotarisations;
+            pnotarisations = nullptr;
+        }
+        if (pcoinsTip != nullptr)
+        {
+            delete pcoinsTip;
+            pcoinsTip = nullptr;
+        }
+        if (pcoinsdbview != nullptr)
+        {
+            delete pcoinsdbview;
+            pcoinsdbview = nullptr;
+        }
+        if (pblocktree != nullptr)
+        {
+            delete pblocktree;
+            pblocktree = nullptr;
+        }
+        throw le;
+    }
     CBitcoinSecret vchSecret;
     vchSecret.SetString(notarySecret); // this returns false due to network prefix mismatch but works anyway
     notaryKey = vchSecret.GetKey();
@@ -295,10 +325,16 @@ void TestChain::StartChain(CBaseChainParams::Network network, bool existing)
 
     // Init blockchain
     ClearDatadirCache();
-    pblocktree = new CBlockTreeDB(1 << 20, inMemory);
-    pcoinsdbview = new CCoinsViewDB(1 << 23, inMemory);
+    pblocktree = new CBlockTreeDB(1 << 20, inMemory, fReindex);
+    pcoinsdbview = new CCoinsViewDB(1 << 23, inMemory, fReindex);
     pcoinsTip = new CCoinsViewCache(pcoinsdbview);
-    pnotarisations = new NotarisationDB(1 << 20, inMemory);
+    pnotarisations = new NotarisationDB(1 << 20, inMemory, fReindex);
+    if (fReindex)
+    {
+        pblocktree->WriteReindexing(true);
+        std::vector<boost::filesystem::path> vec;
+        ThreadImport(vec);
+    }
     if (existing)
     {
         if (!LoadBlockIndex())

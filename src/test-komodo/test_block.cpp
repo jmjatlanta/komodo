@@ -301,15 +301,16 @@ public:
     {
         removeDataOnDestruction = false;
     }
-    PersistedTestChain(boost::filesystem::path data_dir) 
-        : TestChain(CBaseChainParams::REGTEST, data_dir, false)
+    PersistedTestChain(boost::filesystem::path data_dir, bool reindex = false) 
+        : TestChain(CBaseChainParams::REGTEST, data_dir, false, reindex)
     {
-        removeDataOnDestruction = true;
+        removeDataOnDestruction = false;
     }
     boost::filesystem::path GetDataDir() { return dataDir; }
+    void RemoveOnDestruction(bool in) { removeDataOnDestruction = in; }
 };
 
-TEST(TestBlock, CorruptBlockFile)
+TEST(BlockTest, CorruptBlockFile)
 {
     /****
      * in main.h set the sizes to something small to prevent this from running a VERY
@@ -356,17 +357,44 @@ TEST(TestBlock, CorruptBlockFile)
     }
     // attempt to read the database
     {
-        EXPECT_THROW(PersistedTestChain chain(dataPath), std::logic_error);
+        PersistedTestChain chain(dataPath);
         /**
          * corruption in the blkxxxxx.dat causes an exception that was eaten by
          * txdb.cpp->txdb.cpp->LoadBlockIndexGuts->pcursor->GetKey, try/catch
-         * within the GetKey(). The chain booted, and would have probably attempted to 
-         * syncrhornize. Now it throws.
+         * within the GetKey(). The chain boots.
          */
+        // we are at the correct height, as the index is okay.
+        auto idx = chain.GetIndex();
+        EXPECT_TRUE( idx != nullptr);
+        EXPECT_EQ(idx->GetHeight(), currentHeight);
+        // Attempting to retrieve any block fails.
+        for(int i = 1; i <= currentHeight; ++i)
+        {
+            idx = chain.GetIndex(i);
+            EXPECT_TRUE(idx != nullptr);
+            auto blk = chain.GetBlock(idx);
+            EXPECT_TRUE(blk != nullptr);
+        }
     }
 }
 
-TEST(TestBlock, CorruptIndexFile)
+boost::filesystem::path find_file(const boost::filesystem::path& dir, const std::string& extension)
+{
+    boost::filesystem::path retval;
+    for( auto f : boost::filesystem::directory_iterator(dir) )
+    {
+        if (f.path().extension() == extension)
+            retval = f.path();
+    }
+    return retval;
+}
+
+boost::filesystem::path index_path(const boost::filesystem::path& dataPath)
+{
+    return dataPath / "regtest" / "blocks" / "index";
+}
+
+TEST(BlockTest, CorruptIndexFile)
 {
     /****
      * in main.h set the sizes to something small to prevent this from running a VERY
@@ -396,30 +424,13 @@ TEST(TestBlock, CorruptIndexFile)
             currentHeight = idx->GetHeight();
             std::cout << "Mined block " << std::to_string(currentHeight) << "\n";
         }
-        // fill block00001.dat
-        blockFile = idx->GetBlockPos().nFile;
-        while (blockFile == idx->GetBlockPos().nFile)
-        {
-            lastBlock = chain.generateBlock(alice);
-            idx = chain.GetIndex();
-            currentHeight = idx->GetHeight();
-            std::cout << "Mined block " << std::to_string(currentHeight) << "\n";
-        }
     }
     // screw up the ldb file
     {
-        // find the ldb file
-        boost::filesystem::path ldb;
-        for(int i = 0; i < 10; ++i)
-        {
-            std::string fileName = std::string("00000") + std::to_string(i) + ".log";
-            ldb = dataPath / "regtest" / "blocks" / "index" / fileName;
-            if (boost::filesystem::exists(ldb) )
-                break;
-        }
-        if ( !boost::filesystem::exists(ldb) )
-            FAIL();
-        boost::filesystem::resize_file( ldb, file_size(ldb) - 10 );
+        boost::filesystem::path ldb = find_file(index_path(dataPath), ".log");
+        ASSERT_TRUE(boost::filesystem::exists(ldb));
+        // chop 3 bytes off the end of the file
+        boost::filesystem::resize_file( ldb, file_size(ldb) - 3 );
     }
     // attempt to read the database
     {
@@ -427,7 +438,96 @@ TEST(TestBlock, CorruptIndexFile)
         /**
          * corruption in the index/xxxxxx.log causes an exception that was eaten by
          * txdb.cpp->txdb.cpp->LoadBlockIndexGuts->pcursor->GetKey, the chain started
-         * but with 0 blocks. Now it throws.
+         * but with 0 blocks. Now it throws. Try to recover.
          */
+        PersistedTestChain chain(dataPath, true);
+        chain.RemoveOnDestruction(true); // last one
+        // we should have the right number of blocks
+        EXPECT_TRUE( chain.GetIndex() != nullptr );
+        EXPECT_EQ(chain.GetIndex()->GetHeight(), currentHeight);
+    }
+}
+
+TEST(BlockTest, MissingIndexEntry)
+{
+    /****
+     * in main.h set the sizes to something small to prevent this from running a VERY
+     * long time. Something like:
+     *  static const unsigned int MAX_BLOCKFILE_SIZE = 0x2000;
+     *  static const unsigned int MAX_TEMPFILE_SIZE =  0x2000;
+     *  static const unsigned int BLOCKFILE_CHUNK_SIZE = 0x2000;
+     *  static const unsigned int UNDOFILE_CHUNK_SIZE = 0x2000;
+     */
+    boost::filesystem::path dataPath;
+    int32_t currentHeight = 0;
+    boost::filesystem::path copiedLogFile;
+    uint256 firstBlockHash;
+    {
+        PersistedTestChain chain;
+        dataPath = chain.GetDataDir();
+        auto notary = chain.AddWallet(chain.getNotaryKey(), "notary");
+        auto alice = chain.AddWallet("alice");
+        auto lastBlock = chain.generateBlock(alice); // genesis block
+        currentHeight = chain.GetIndex()->GetHeight();
+        firstBlockHash = lastBlock->GetHash();
+    }
+    // save off a copy of the .log file
+    {
+        // find the ldb file
+        boost::filesystem::path ldb = find_file(index_path(dataPath), ".log");
+        ASSERT_TRUE(boost::filesystem::exists(ldb));
+        copiedLogFile = dataPath / "regtest" / "blocks" / ldb.filename();
+        boost::filesystem::copy(ldb, copiedLogFile);
+    }
+    // store info about the last block to be created
+    uint256 lastBlockHash;
+    uint256 lastTransactionHash;
+    // create the last block
+    {
+        PersistedTestChain chain(dataPath);
+        auto notary = chain.AddWallet(chain.getNotaryKey(), "notary");
+        auto alice = chain.AddWallet("alice");
+        auto lastBlock = chain.generateBlock(alice);
+        lastBlockHash = lastBlock->GetHash();
+        lastTransactionHash = lastBlock->vtx[lastBlock->vtx.size()-1].GetHash();
+        EXPECT_EQ( chain.GetIndex()->GetHeight(), currentHeight + 1);
+        currentHeight = chain.GetIndex()->GetHeight();
+    }
+    // replace the .log file with the one we copied
+    {
+        // find the ldb file
+        boost::filesystem::path ldb = find_file(index_path(dataPath), ".log");
+        ASSERT_TRUE(boost::filesystem::exists(ldb) );
+        boost::filesystem::copy_file(copiedLogFile, ldb, boost::filesystem::copy_option::overwrite_if_exists);
+    }
+    // attempt to read the database
+    {
+        /**
+         * The index has a missing entry, but the chain starts fine.
+         * The chain has the correct number of blocks. But looking
+         * it up by chain height leads to nullptr
+         */
+        PersistedTestChain chain(dataPath, true);
+        // we should have the right number of blocks
+        EXPECT_TRUE( chain.GetIndex() != nullptr );
+        EXPECT_EQ(chain.GetIndex()->GetHeight(), currentHeight);
+        // we should be able to look up the block
+        auto lastBlock = chain.GetBlock( chain.GetIndex(currentHeight) );
+        EXPECT_EQ( lastBlock, nullptr ); // <-- a nullptr due to missing index entry
+        // what happens if I attempt to mine a block and add it to the chain?
+        auto notary = chain.AddWallet(chain.getNotaryKey(), "notary");
+        auto alice = chain.AddWallet("alice");
+        lastBlock = chain.generateBlock(alice);
+        EXPECT_EQ( chain.GetIndex()->GetHeight(), currentHeight + 1);
+        currentHeight = chain.GetIndex()->GetHeight();
+        // attempt some lookups of the new block
+        auto idx = chain.GetIndex();
+        auto newestBlock = chain.GetBlock( idx );
+        EXPECT_NE( newestBlock, nullptr );
+        // The new block references the last (we have not forked).
+        EXPECT_EQ( newestBlock->GetBlockHeader().hashPrevBlock, lastBlockHash );
+        // We are still unable to look up the block with the missing index entry.
+        lastBlock = chain.GetBlock( chain.GetIndex( currentHeight - 1 ) );
+        EXPECT_EQ( lastBlock, nullptr );
     }
 }
