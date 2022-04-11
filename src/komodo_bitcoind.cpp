@@ -625,7 +625,8 @@ uint8_t DecodeStakingOpRet(CScript scriptPubKey, uint256 &merkleroot)
 
 int32_t komodo_newStakerActive(int32_t height, uint32_t timestamp)
 {
-    if ( timestamp > nStakedDecemberHardforkTimestamp || komodo_heightstamp(height) > nStakedDecemberHardforkTimestamp ) //December 2019 hardfork
+    if ( timestamp > Params().StakedDecemberHardforkTimestamp() 
+            || komodo_heightstamp(height) > Params().StakedDecemberHardforkTimestamp() ) //December 2019 hardfork
         return(1);
     else return(0);
 }
@@ -643,7 +644,8 @@ bool komodo_checkopret(CBlock *pblock, CScript &merkleroot)
 
 bool komodo_hardfork_active(uint32_t time)
 {
-    return ( (ASSETCHAINS_SYMBOL[0] == 0 && chainActive.Height() > nDecemberHardforkHeight) || (ASSETCHAINS_SYMBOL[0] != 0 && time > nStakedDecemberHardforkTimestamp) ); //December 2019 hardfork
+    return ( (ASSETCHAINS_SYMBOL[0] == 0 && chainActive.Height() > Params().DecemberHardforkHeight() ) 
+            || (ASSETCHAINS_SYMBOL[0] != 0 && time > Params().StakedDecemberHardforkTimestamp()) );
 }
 
 uint256 komodo_calcmerkleroot(CBlock *pblock, uint256 prevBlockHash, int32_t nHeight, bool fNew, CScript scriptPubKey)

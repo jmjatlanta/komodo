@@ -31,6 +31,8 @@
 
 #include "chainparamsseeds.h"
 
+#include "komodo_hardfork.h"
+
 static CBlock CreateGenesisBlock(const char* pszTimestamp, const CScript& genesisOutputScript, uint32_t nTime, const uint256& nNonce, const std::vector<unsigned char>& nSolution, uint32_t nBits, int32_t nVersion, const CAmount& genesisReward)
 {
     // To create a genesis block for a new chain which is Overwintered:
@@ -96,7 +98,7 @@ uint64_t ASSETCHAINS_NK[2];
 
 const arith_uint256 maxUint = UintToArith256(uint256S("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"));
 
-class CMainParams : public CChainParams {
+class CMainParams : public ChainParamsWithHardfork<MainnetHardfork> {
 public:
     CMainParams()
     {
@@ -249,9 +251,10 @@ void CChainParams::SetCheckpointData(CChainParams::CCheckpointData checkpointDat
 /**
  * Testnet (v3)
  */
-class CTestNetParams : public CChainParams {
+class CTestNetParams : public ChainParamsWithHardfork<TestnetHardfork> {
 public:
-    CTestNetParams() {
+    CTestNetParams() 
+    {
         strNetworkID = "test";
         strCurrencyUnits = "TAZ";
         bip44CoinType = 1;
@@ -354,7 +357,8 @@ static CTestNetParams testNetParams;
 /**
  * Regression test
  */
-class CRegTestParams : public CChainParams {
+class CRegTestParams : public ChainParamsWithHardfork<RegtestHardfork>
+{
 public:
     CRegTestParams() {
         strNetworkID = "regtest";
@@ -465,14 +469,14 @@ public:
 };
 static CRegTestParams regTestParams;
 
-static CChainParams *pCurrentParams = 0;
+static ChainParams *pCurrentParams = 0;
 
-const CChainParams &Params() {
+const ChainParams &Params() {
     assert(pCurrentParams);
     return *pCurrentParams;
 }
 
-CChainParams &Params(CBaseChainParams::Network network) {
+ChainParams &Params(CBaseChainParams::Network network) {
     switch (network) {
         case CBaseChainParams::MAIN:
             return mainParams;

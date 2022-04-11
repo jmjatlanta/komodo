@@ -860,7 +860,7 @@ CBlockTemplate* CreateNewBlock(CPubKey _pk,const CScript& _scriptPubKeyIn, int32
                 pblock->nTime += (r % (33 - gpucount)*(33 - gpucount));
             }
             pblock->vtx[0] = txNew;
-            if ( Mining_height > nDecemberHardforkHeight ) //December 2019 hardfork
+            if ( Mining_height > Params().DecemberHardforkHeight() )
             {
                 opret = komodo_makeopret(pblock, true);
                 ptr = (void**)calloc(0,sizeof(void *)*2);
@@ -1824,7 +1824,8 @@ void static BitcoinMiner()
                 }
             }
             // We cant increment nonce for proof transactions, as it modifes the coinbase, meaning CreateBlock must be called again to get a new valid proof to pass validation. 
-            if ( (ASSETCHAINS_SYMBOL[0] == 0 && notaryid >= 0 && Mining_height > nDecemberHardforkHeight ) || (ASSETCHAINS_STAKED != 0 && komodo_newStakerActive(Mining_height, pblock->nTime) != 0) ) //December 2019 hardfork
+            if ( (ASSETCHAINS_SYMBOL[0] == 0 && notaryid >= 0 && Mining_height > Params().DecemberHardforkHeight() ) 
+                    || (ASSETCHAINS_STAKED != 0 && komodo_newStakerActive(Mining_height, pblock->nTime) != 0) )
                 nExtraNonce = 0;
             IncrementExtraNonce(pblock, pindexPrev, nExtraNonce);
             //fprintf(stderr,"Running KomodoMiner.%s with %u transactions in block\n",solver.c_str(),(int32_t)pblock->vtx.size());

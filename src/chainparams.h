@@ -42,7 +42,6 @@ struct SeedSpec6 {
 
 typedef std::map<int, uint256> MapCheckpoints;
 
-
 /**
  * CChainParams defines various tweakable parameters of a given instance of the
  * Bitcoin system. There are three: the main network on which people trade goods
@@ -158,14 +157,25 @@ protected:
     std::vector<std::string> vFoundersRewardAddress;
 };
 
+class ChainParams : public CChainParams
+{
+public:
+    constexpr int32_t DecemberHardforkHeight() const { assert(false); }
+    constexpr uint32_t StakedDecemberHardforkTimestamp() const { assert(false); }
+    constexpr uint32_t S4Timestamp() const { assert(false); }
+    constexpr int32_t S4HardforkHeight() const { assert(false); }
+    constexpr uint32_t S5Timestamp() const { assert(false); }
+    constexpr int32_t S5HardforkHeight() const { assert(false); }
+};
+
 /**
  * Return the currently selected parameters. This won't change after app
  * startup, except for unit tests.
  */
-const CChainParams &Params();
+const ChainParams &Params();
 
 /** Return parameters for the given network. */
-CChainParams &Params(CBaseChainParams::Network network);
+ChainParams &Params(CBaseChainParams::Network network);
 
 /** Sets the params returned by Params() to those for the given network. */
 void SelectParams(CBaseChainParams::Network network);
