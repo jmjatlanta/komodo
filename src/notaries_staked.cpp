@@ -3,10 +3,13 @@
 #include "crosschain.h"
 #include "cc/CCinclude.h"
 #include "komodo_defs.h"
+#include "komodo_hardfork.h"
 #include "hex.h"
 #include <cstring>
 
 extern pthread_mutex_t staked_mutex;
+
+char NOTARYADDRS[64][64];
 
 int8_t is_STAKED(const char *chain_name) 
 {

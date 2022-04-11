@@ -48,4 +48,3 @@ public:
     static const uint32_t nS5Timestamp = 1623682800;  //dPoW Season 5 Monday, June 14th, 2021 (03:00:00 PM UTC)
     static const int32_t nS5HardforkHeight = 9;  //dPoW Season 5 Monday, June 14th, 2021
 };
-
