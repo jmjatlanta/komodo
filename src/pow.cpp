@@ -595,9 +595,6 @@ bool CheckProofOfWork(const CBlockHeader &blkHeader, uint8_t *pubkey33, int32_t 
     uint256 hash;
     bool fNegative,fOverflow; uint8_t origpubkey33[33]; int32_t i,nonzpkeys=0,nonz=0,special=0,special2=0,notaryid=-1,flag = 0, mids[66]; uint32_t tiptime,blocktimes[66];
     arith_uint256 bnTarget; uint8_t pubkeys[66][33];
-    //for (i=31; i>=0; i--)
-    //    fprintf(stderr,"%02x",((uint8_t *)&hash)[i]);
-    //fprintf(stderr," checkpow\n");
     memcpy(origpubkey33,pubkey33,33);
     memset(blocktimes,0,sizeof(blocktimes));
     tiptime = komodo_chainactive_timestamp();
@@ -605,9 +602,8 @@ bool CheckProofOfWork(const CBlockHeader &blkHeader, uint8_t *pubkey33, int32_t 
     if ( height == 0 )
     {
         height = komodo_currentheight() + 1;
-        //fprintf(stderr,"set height to %d\n",height);
     }
-    if ( height > 34000 && ASSETCHAINS_SYMBOL[0] == 0 ) // 0 -> non-special notary
+    if ( height > Params().NotarySpecialStartHeight() && ASSETCHAINS_SYMBOL[0] == 0 ) // 0 -> non-special notary
     {
         special = komodo_chosennotary(&notaryid,height,pubkey33,tiptime);
         for (i=0; i<33; i++)
@@ -617,24 +613,27 @@ bool CheckProofOfWork(const CBlockHeader &blkHeader, uint8_t *pubkey33, int32_t 
         }
         if ( nonz == 0 )
         {
-            //fprintf(stderr,"ht.%d null pubkey checkproof return\n",height);
             return(true); // will come back via different path with pubkey set
         }
         flag = komodo_eligiblenotary(pubkeys,mids,blocktimes,&nonzpkeys,height);
         special2 = komodo_is_special(pubkeys,mids,blocktimes,height,pubkey33,blkHeader.nTime);
         if ( notaryid >= 0 )
         {
-            if ( height > 10000 && height < 80000 && (special != 0 || special2 > 0) )
+            if ( height > Params().NotarySAndS2StartHeight() 
+                    && height < Params().NotaryS2StartHeight() && (special != 0 || special2 > 0) )
                 flag = 1;
-            else if ( height >= 80000 && height < 108000 && special2 > 0 )
+            else if ( height >= Params().NotaryS2StartHeight() 
+                    && height < Params().NotaryS2IncludeElectionGapHeight() && special2 > 0 )
                 flag = 1;
-            else if ( height >= 108000 && special2 > 0 )
-                flag = (height > 1000000 || (height % KOMODO_ELECTION_GAP) > 64 || (height % KOMODO_ELECTION_GAP) == 0);
-            else if ( height == 790833 )
+            else if ( height >= Params().NotaryS2IncludeElectionGapHeight() && special2 > 0 )
+                flag = (height > Params().NotaryElectionGapOverrideHeight() 
+                        || (height % KOMODO_ELECTION_GAP) > 64 
+                        || (height % KOMODO_ELECTION_GAP) == 0);
+            else if ( height == Params().NotarySpecialFlagHeight() )
                 flag = 1;
             else if ( special2 < 0 )
             {
-                if ( height > 792000 )
+                if ( height > Params().NotaryLimitRepeatHeight() )
                     flag = 0;
                 else fprintf(stderr,"ht.%d notaryid.%d special.%d flag.%d special2.%d\n",height,notaryid,special,flag,special2);
             }
@@ -652,17 +651,14 @@ bool CheckProofOfWork(const CBlockHeader &blkHeader, uint8_t *pubkey33, int32_t 
         arith_uint256 bnMaxPoSdiff;
         bnTarget.SetCompact(KOMODO_MINDIFF_NBITS,&fNegative,&fOverflow);
     }
-    //else if ( ASSETCHAINS_ADAPTIVEPOW > 0 && ASSETCHAINS_STAKED == 0 )
-    //    bnTarget = komodo_adaptivepow_target(height,bnTarget,blkHeader.nTime);
     // Check proof of work matches claimed amount
     if ( UintToArith256(hash = blkHeader.GetHash()) > bnTarget )
     {
         if ( KOMODO_LOADINGBLOCKS != 0 )
             return true;
 
-        if ( ASSETCHAINS_SYMBOL[0] != 0 || height > 792000 )
+        if ( ASSETCHAINS_SYMBOL[0] != 0 || height > Params().NotaryLimitRepeatHeight() )
         {
-            //if ( 0 && height > 792000 )
             if ( Params().NetworkIDString() != "regtest" )
             {
                 for (i=31; i>=0; i--)
@@ -681,12 +677,6 @@ bool CheckProofOfWork(const CBlockHeader &blkHeader, uint8_t *pubkey33, int32_t 
             return false;
         }
     }
-    /*for (i=31; i>=0; i--)
-     fprintf(stderr,"%02x",((uint8_t *)&hash)[i]);
-     fprintf(stderr," hash vs ");
-     for (i=31; i>=0; i--)
-     fprintf(stderr,"%02x",((uint8_t *)&bnTarget)[i]);
-     fprintf(stderr," height.%d notaryid.%d PoW valid\n",height,notaryid);*/
     return true;
 }
 

@@ -924,7 +924,7 @@ int32_t komodo_is_special(uint8_t pubkeys[66][33],int32_t mids[66],uint32_t bloc
 {
     int32_t i,j,notaryid=0,minerid,limit,nid; uint8_t destpubkey33[33];
     komodo_chosennotary(&notaryid,height,pubkey33,blocktimes[0]);
-    if ( height >= 82000 )
+    if ( height >= Params().NotaryLowerDifficultyStartHeight() )
     {
         if ( notaryid >= 0 )
         {
@@ -932,7 +932,7 @@ int32_t komodo_is_special(uint8_t pubkeys[66][33],int32_t mids[66],uint32_t bloc
             {
                 if ( mids[i] == notaryid )
                 {
-                    if ( height > 792000 )
+                    if ( height > Params().NotaryLimitRepeatHeight() )
                     {
                         for (j=0; j<66; j++)
                             fprintf(stderr,"%d ",mids[j]);
@@ -943,7 +943,7 @@ int32_t komodo_is_special(uint8_t pubkeys[66][33],int32_t mids[66],uint32_t bloc
             }
             if ( blocktime != 0 && blocktimes[1] != 0 && blocktime < blocktimes[1]+57 )
             {
-                if ( height > 807000 )
+                if ( height > Params().NotarySpecialTimeTooShortHeight() )
                     return(-2);
             }
             return(1);
@@ -951,11 +951,11 @@ int32_t komodo_is_special(uint8_t pubkeys[66][33],int32_t mids[66],uint32_t bloc
     }
     else
     {
-        if ( height >= 34000 && notaryid >= 0 )
+        if ( height >= Params().NotarySpecialStartHeight() && notaryid >= 0 )
         {
-            if ( height < 79693 )
+            if ( height < Params().NotaryMovedTo66() )
                 limit = 64;
-            else if ( height < 82000 )
+            else if ( height < Params().NotaryLowerDifficultyStartHeight() )
                 limit = 8;
             else limit = 66;
             for (i=1; i<limit; i++)
@@ -963,14 +963,10 @@ int32_t komodo_is_special(uint8_t pubkeys[66][33],int32_t mids[66],uint32_t bloc
                 komodo_chosennotary(&nid,height-i,pubkey33,blocktimes[i]);
                 if ( nid == notaryid )
                 {
-                    //for (j=0; j<66; j++)
-                    //    fprintf(stderr,"%d ",mids[j]);
-                    //fprintf(stderr,"ht.%d repeat mids[%d] nid.%d notaryid.%d\n",height-i,i,nid,notaryid);
-                    if ( height > 225000 )
+                    if ( height > Params().NotaryOncePerCycle() )
                         return(-1);
                 }
             }
-            //fprintf(stderr,"special notaryid.%d ht.%d limit.%d\n",notaryid,height,limit);
             return(1);
         }
     }
@@ -1229,7 +1225,8 @@ uint64_t komodo_commission(const CBlock *pblock,int32_t height)
             n = pblock->vtx[i].vout.size();
             for (j=0; j<n; j++)
             {
-                if ( height > 225000 && ASSETCHAINS_STAKED != 0 && txn_count > 1 && i == txn_count-1 && j == n-1 )
+                if ( height > Params().NotaryOncePerCycle() 
+                        && ASSETCHAINS_STAKED != 0 && txn_count > 1 && i == txn_count-1 && j == n-1 )
                     break;
                 //fprintf(stderr,"(%d %.8f).%d ",i,dstr(pblock->vtx[i].vout[j].nValue),j);
                 if ( i != 0 || j != 1 )
@@ -1976,7 +1973,7 @@ int32_t komodo_checkPOW(int64_t stakeTxValue, int32_t slowflag,CBlock *pblock,in
     //if ( ASSETCHAINS_ADAPTIVEPOW > 0 )
     //    bnTarget = komodo_adaptivepow_target(height,bnTarget,pblock->nTime);
 
-    if ( (ASSETCHAINS_SYMBOL[0] != 0 || height > 792000) && bhash > bnTarget )
+    if ( (ASSETCHAINS_SYMBOL[0] != 0 || height > Params().NotaryLimitRepeatHeight()) && bhash > bnTarget )
     {
         failed = 1;
         if ( height > 0 && ASSETCHAINS_SYMBOL[0] == 0 ) // for the fast case
