@@ -46,6 +46,14 @@ int32_t komodo_ratify_threshold(int32_t height,uint64_t signedmask);
 
 void komodo_notarysinit(int32_t origheight,uint8_t pubkeys[64][33],int32_t num);
 
+/***
+ * @brief Determine if a key should notarize at this height/timestamp
+ * @param[out] notaryidp the index id of the notary
+ * @param[in] height height to examine (if height used for notary elections)
+ * @param[in] pubkey33 the key to look for
+ * @param[in] timestamp the timestamp to examine (if timestamp used for notary elections)
+ * @returns -1 if not a notary, 0 if chosen notary, 1 if special notary
+ */
 int32_t komodo_chosennotary(int32_t *notaryidp,int32_t height,uint8_t *pubkey33,uint32_t timestamp);
 
 /******

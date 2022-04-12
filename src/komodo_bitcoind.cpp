@@ -938,63 +938,6 @@ int32_t komodo_minerids(uint8_t *minerids,int32_t height,int32_t width)
     return(nonz);
 }
 
-int32_t komodo_is_special(uint8_t pubkeys[66][33],int32_t mids[66],uint32_t blocktimes[66],int32_t height,uint8_t pubkey33[33],uint32_t blocktime)
-{
-    int32_t i,j,notaryid=0,minerid,limit,nid; uint8_t destpubkey33[33];
-    komodo_chosennotary(&notaryid,height,pubkey33,blocktimes[0]);
-    if ( height >= 82000 )
-    {
-        if ( notaryid >= 0 )
-        {
-            for (i=1; i<66; i++)
-            {
-                if ( mids[i] == notaryid )
-                {
-                    if ( height > 792000 )
-                    {
-                        for (j=0; j<66; j++)
-                            fprintf(stderr,"%d ",mids[j]);
-                        fprintf(stderr,"ht.%d repeat notaryid.%d in mids[%d]\n",height,notaryid,i);
-                        return(-1);
-                    } else break;
-                }
-            }
-            if ( blocktime != 0 && blocktimes[1] != 0 && blocktime < blocktimes[1]+57 )
-            {
-                if ( height > 807000 )
-                    return(-2);
-            }
-            return(1);
-        } else return(0);
-    }
-    else
-    {
-        if ( height >= 34000 && notaryid >= 0 )
-        {
-            if ( height < 79693 )
-                limit = 64;
-            else if ( height < 82000 )
-                limit = 8;
-            else limit = 66;
-            for (i=1; i<limit; i++)
-            {
-                komodo_chosennotary(&nid,height-i,pubkey33,blocktimes[i]);
-                if ( nid == notaryid )
-                {
-                    //for (j=0; j<66; j++)
-                    //    fprintf(stderr,"%d ",mids[j]);
-                    //fprintf(stderr,"ht.%d repeat mids[%d] nid.%d notaryid.%d\n",height-i,i,nid,notaryid);
-                    if ( height > 225000 )
-                        return(-1);
-                }
-            }
-            //fprintf(stderr,"special notaryid.%d ht.%d limit.%d\n",notaryid,height,limit);
-            return(1);
-        }
-    }
-    return(0);
-}
-
 int32_t komodo_MoM(int32_t *notarized_heightp,uint256 *MoMp,uint256 *kmdtxidp,int32_t nHeight,uint256 *MoMoMp,int32_t *MoMoMoffsetp,int32_t *MoMoMdepthp,int32_t *kmdstartip,int32_t *kmdendip)
 {
     int32_t depth,notarized_ht; uint256 MoM,kmdtxid;
