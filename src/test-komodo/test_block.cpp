@@ -23,9 +23,9 @@ TEST(block_tests, TestStopAt)
     TestChain chain;
     auto notary = chain.AddWallet(chain.getNotaryKey());
     std::shared_ptr<CBlock> lastBlock = chain.generateBlock(); // genesis block
-    ASSERT_GT( chain.GetIndex()->GetHeight(), 0 );
+    ASSERT_GT( chain.GetIndex()->nHeight, 0 );
     lastBlock = chain.generateBlock(); // now we should be above 1
-    ASSERT_GT( chain.GetIndex()->GetHeight(), 1);
+    ASSERT_GT( chain.GetIndex()->nHeight, 1);
     CBlock block;
     CValidationState state;
     KOMODO_STOPAT = 1;
@@ -38,13 +38,11 @@ TEST(block_tests, TestConnectWithoutChecks)
     TestChain chain;
     auto notary = chain.AddWallet(chain.getNotaryKey());
     auto alice = chain.AddWallet();
-    std::shared_ptr<CBlock> lastBlock = chain.generateBlock(alice); // genesis block
-    ASSERT_GT( chain.GetIndex()->GetHeight(), 0 );
-    // let funds mature
-    lastBlock = chain.generateBlock(alice);
+    std::shared_ptr<CBlock> lastBlock = chain.generateBlock(); // genesis block
+    ASSERT_GT( chain.GetIndex()->nHeight, 0 );
     // Add some transaction to a block
-    int32_t newHeight = chain.GetIndex()->GetHeight() + 1;
-    CTransaction fundAlice = alice->CreateSpendTransaction(notary, 100000);
+    int32_t newHeight = chain.GetIndex()->nHeight + 1;
+    CTransaction fundAlice = notary->CreateSpendTransaction(alice, 100000);
     // construct the block
     CBlock block;
     // first a coinbase tx
@@ -76,30 +74,28 @@ TEST(block_tests, TestSpendInSameBlock)
     auto notary = chain.AddWallet(chain.getNotaryKey());
     auto alice = chain.AddWallet();
     auto bob = chain.AddWallet();
-    std::shared_ptr<CBlock> lastBlock = chain.generateBlock(alice); // genesis block
-    ASSERT_GT( chain.GetIndex()->GetHeight(), 0 );
-    // let coinbase mature
-    lastBlock = chain.generateBlock(alice); // genesis block
+    std::shared_ptr<CBlock> lastBlock = chain.generateBlock(); // genesis block
+    ASSERT_GT( chain.GetIndex()->nHeight, 0 );
     // Start to build a block
-    int32_t newHeight = chain.GetIndex()->GetHeight() + 1;
-    CTransaction fundAlice = alice->CreateSpendTransaction(notary, 100000);
-    // now have Notary move some funds to Bob in the same block
-    CMutableTransaction notaryToBobMutable;
-    CTxIn notaryIn;
-    notaryIn.prevout.hash = fundAlice.GetHash();
-    notaryIn.prevout.n = 0;
-    notaryToBobMutable.vin.push_back(notaryIn);
+    int32_t newHeight = chain.GetIndex()->nHeight + 1;
+    CTransaction fundAlice = notary->CreateSpendTransaction(alice, 100000);
+    // now have Alice move some funds to Bob in the same block
+    CMutableTransaction aliceToBobMutable;
+    CTxIn aliceIn;
+    aliceIn.prevout.hash = fundAlice.GetHash();
+    aliceIn.prevout.n = 0;
+    aliceToBobMutable.vin.push_back(aliceIn);
     CTxOut bobOut;
     bobOut.scriptPubKey = GetScriptForDestination(bob->GetPubKey());
     bobOut.nValue = 10000;
-    notaryToBobMutable.vout.push_back(bobOut);
+    aliceToBobMutable.vout.push_back(bobOut);
     CTxOut notaryRemainder;
     notaryRemainder.scriptPubKey = GetScriptForDestination(notary->GetPubKey());
     notaryRemainder.nValue = fundAlice.vout[0].nValue - 10000;
-    notaryToBobMutable.vout.push_back(notaryRemainder);
-    uint256 hash = SignatureHash(fundAlice.vout[0].scriptPubKey, notaryToBobMutable, 0, SIGHASH_ALL, 0, 0);
-    notaryToBobMutable.vin[0].scriptSig << alice->Sign(hash, SIGHASH_ALL);
-    CTransaction notaryToBobTx(notaryToBobMutable);
+    aliceToBobMutable.vout.push_back(notaryRemainder);
+    uint256 hash = SignatureHash(fundAlice.vout[0].scriptPubKey, aliceToBobMutable, 0, SIGHASH_ALL, 0, 0);
+    aliceToBobMutable.vin[0].scriptSig << alice->Sign(hash, SIGHASH_ALL);
+    CTransaction notaryToBobTx(aliceToBobMutable);
     // construct the block
     CBlock block;
     // first a coinbase tx
@@ -132,17 +128,15 @@ TEST(block_tests, TestDoubleSpendInSameBlock)
     auto alice = chain.AddWallet();
     auto bob = chain.AddWallet();
     auto charlie = chain.AddWallet();
-    std::shared_ptr<CBlock> lastBlock = chain.generateBlock(alice); // genesis block
-    ASSERT_GT( chain.GetIndex()->GetHeight(), 0 );
-    // let coinbase mature
-    lastBlock = chain.generateBlock(alice); // genesis block
+    std::shared_ptr<CBlock> lastBlock = chain.generateBlock(); // genesis block
+    ASSERT_GT( chain.GetIndex()->nHeight, 0 );
     // Start to build a block
-    int32_t newHeight = chain.GetIndex()->GetHeight() + 1;
-    CTransaction fundNotary = alice->CreateSpendTransaction(notary, 100000);
+    int32_t newHeight = chain.GetIndex()->nHeight + 1;
+    CTransaction fundAlice = notary->CreateSpendTransaction(alice, 100000);
     // now have Alice move some funds to Bob in the same block
     CMutableTransaction aliceToBobMutable;
     CTxIn aliceIn;
-    aliceIn.prevout.hash = fundNotary.GetHash();
+    aliceIn.prevout.hash = fundAlice.GetHash();
     aliceIn.prevout.n = 0;
     aliceToBobMutable.vin.push_back(aliceIn);
     CTxOut bobOut;
@@ -151,15 +145,15 @@ TEST(block_tests, TestDoubleSpendInSameBlock)
     aliceToBobMutable.vout.push_back(bobOut);
     CTxOut aliceRemainder;
     aliceRemainder.scriptPubKey = GetScriptForDestination(alice->GetPubKey());
-    aliceRemainder.nValue = fundNotary.vout[0].nValue - 10000;
+    aliceRemainder.nValue = fundAlice.vout[0].nValue - 10000;
     aliceToBobMutable.vout.push_back(aliceRemainder);
-    uint256 hash = SignatureHash(fundNotary.vout[0].scriptPubKey, aliceToBobMutable, 0, SIGHASH_ALL, 0, 0);
+    uint256 hash = SignatureHash(fundAlice.vout[0].scriptPubKey, aliceToBobMutable, 0, SIGHASH_ALL, 0, 0);
     aliceToBobMutable.vin[0].scriptSig << alice->Sign(hash, SIGHASH_ALL);
     CTransaction aliceToBobTx(aliceToBobMutable);
     // alice attempts to double spend the vout and send something to charlie
     CMutableTransaction aliceToCharlieMutable;
     CTxIn aliceIn2;
-    aliceIn2.prevout.hash = fundNotary.GetHash();
+    aliceIn2.prevout.hash = fundAlice.GetHash();
     aliceIn2.prevout.n = 0;
     aliceToCharlieMutable.vin.push_back(aliceIn2);
     CTxOut charlieOut;
@@ -168,9 +162,9 @@ TEST(block_tests, TestDoubleSpendInSameBlock)
     aliceToCharlieMutable.vout.push_back(charlieOut);
     CTxOut aliceRemainder2;
     aliceRemainder2.scriptPubKey = GetScriptForDestination(alice->GetPubKey());
-    aliceRemainder2.nValue = fundNotary.vout[0].nValue - 10000;
+    aliceRemainder2.nValue = fundAlice.vout[0].nValue - 10000;
     aliceToCharlieMutable.vout.push_back(aliceRemainder2);
-    hash = SignatureHash(fundNotary.vout[0].scriptPubKey, aliceToCharlieMutable, 0, SIGHASH_ALL, 0, 0);
+    hash = SignatureHash(fundAlice.vout[0].scriptPubKey, aliceToCharlieMutable, 0, SIGHASH_ALL, 0, 0);
     aliceToCharlieMutable.vin[0].scriptSig << alice->Sign(hash, SIGHASH_ALL);
     CTransaction aliceToCharlieTx(aliceToCharlieMutable);
     // construct the block
@@ -186,7 +180,7 @@ TEST(block_tests, TestDoubleSpendInSameBlock)
     txNew.nExpiryHeight = 0;
     block.vtx.push_back(CTransaction(txNew));
     // then the actual txs
-    block.vtx.push_back(fundNotary);
+    block.vtx.push_back(fundAlice);
     block.vtx.push_back(aliceToBobTx);
     block.vtx.push_back(aliceToCharlieTx);
     CValidationState state;
@@ -203,27 +197,25 @@ bool CalcPoW(CBlock *pblock);
 TEST(block_tests, TestProcessBlock)
 {
     TestChain chain;
-    EXPECT_EQ(chain.GetIndex()->GetHeight(), 0);
+    EXPECT_EQ(chain.GetIndex()->nHeight, 0);
     auto notary = chain.AddWallet(chain.getNotaryKey());
     auto alice = chain.AddWallet();
     auto bob = chain.AddWallet();
     auto charlie = chain.AddWallet();
-    std::shared_ptr<CBlock> lastBlock = chain.generateBlock(alice); // gives alice everything
-    // let coinbase mature
-    lastBlock = chain.generateBlock(alice);
-    EXPECT_EQ(chain.GetIndex()->GetHeight(), 2);
+    auto lastBlock = chain.generateBlock(); // gives notary everything
+    EXPECT_EQ(chain.GetIndex()->nHeight, 1);
     chain.IncrementChainTime();
     // add a transaction to the mempool
     CTransaction fundAlice = alice->CreateSpendTransaction(bob, 100000);
     EXPECT_TRUE( chain.acceptTx(fundAlice).IsValid() );
     // construct the block
     CBlock block;
-    int32_t newHeight = chain.GetIndex()->GetHeight() + 1;
+    int32_t newHeight = chain.GetIndex()->nHeight + 1;
     CValidationState state;
     // no transactions
     EXPECT_FALSE( ProcessNewBlock(false, newHeight, state, nullptr, &block, false, nullptr) );
     EXPECT_EQ(state.GetRejectReason(), "bad-blk-length");
-    EXPECT_EQ(chain.GetIndex()->GetHeight(), 2);
+    EXPECT_EQ(chain.GetIndex()->nHeight, 1);
     // add first a coinbase tx
     auto consensusParams = Params().GetConsensus();
     CMutableTransaction txNew = CreateNewContextualCMutableTransaction(consensusParams, newHeight);
@@ -269,7 +261,7 @@ TEST(block_tests, TestProcessBadBlock)
     EXPECT_TRUE( chain.acceptTx(fundAlice).IsValid() );
     // construct the block
     CBlock block;
-    int32_t newHeight = chain.GetIndex()->GetHeight() + 1;
+    int32_t newHeight = chain.GetIndex()->nHeight + 1;
     CValidationState state;
     // no transactions
     EXPECT_FALSE( ProcessNewBlock(false, newHeight, state, nullptr, &block, false, nullptr) );

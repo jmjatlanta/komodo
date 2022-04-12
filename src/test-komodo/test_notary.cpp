@@ -187,18 +187,18 @@ TEST(TestNotary, HardforkActiveDecember2019)
         ASSETCHAINS_SYMBOL[0] = 0;
 
         TestChain testChain;
-        auto height = testChain.GetIndex()->GetHeight();
+        auto height = testChain.GetIndex()->nHeight;
         while (height < nDecemberHardforkHeight)
         {
             testChain.generateBlock();
-            height = testChain.GetIndex()->GetHeight();
+            height = testChain.GetIndex()->nHeight;
             EXPECT_FALSE( komodo_hardfork_active(0) );
         }
         while (height < nDecemberHardforkHeight + 10)
         {
             testChain.generateBlock();
             EXPECT_TRUE( komodo_hardfork_active(0) );
-            height = testChain.GetIndex()->GetHeight();
+            height = testChain.GetIndex()->nHeight;
         }
     }
     {
@@ -252,7 +252,7 @@ TEST(TestNotary, HardforkActiveDecember2019)
         TestChain testChain;
         auto notary = testChain.AddWallet(testChain.getNotaryKey(), "notary");
         auto alice = testChain.AddWallet("alice");
-        auto height = testChain.GetIndex()->GetHeight();
+        auto height = testChain.GetIndex()->nHeight;
         uint32_t timestamp = 0;
         // both are too low
         EXPECT_FALSE( komodo_newStakerActive(height, timestamp) );
@@ -268,7 +268,7 @@ TEST(TestNotary, HardforkActiveDecember2019)
         // because we are well beyond the hardfork time, making just 
         // 1 block should cause the hardfork
         testChain.generateBlock(alice);
-        height = testChain.GetIndex()->GetHeight();
+        height = testChain.GetIndex()->nHeight;
         EXPECT_TRUE( komodo_newStakerActive(height, timestamp) );
     }
     {
@@ -305,7 +305,7 @@ TEST(TestNotary, HardforkActiveDecember2019)
 void displayBlock(const TestChain& testChain, std::shared_ptr<CBlock> block, bool withTransactions = false)
 {
     static uint32_t lastBlockTime;
-    auto height = testChain.GetIndex()->GetHeight();
+    auto height = testChain.GetIndex()->nHeight;
     uint32_t currentBlockTime = time(nullptr);
     if (height == 1)
         lastBlockTime = currentBlockTime;

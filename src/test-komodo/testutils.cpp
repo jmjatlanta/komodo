@@ -39,6 +39,11 @@ extern CWallet* pwalletMain;
  */
 int64_t nMockTime;
 
+extern int32_t USE_EXTERNAL_PUBKEY;
+extern std::string NOTARY_PUBKEY;
+
+void adjust_hwmheight(int32_t in); // in komodo.cpp
+
 void setupChain(CBaseChainParams::Network network)
 {
     SelectParams(network);
@@ -293,7 +298,7 @@ std::shared_ptr<CBlock> TestChain::generateBlock(std::shared_ptr<TestWallet> who
     }
     else
     {
-        int32_t height = this->GetIndex()->GetHeight();
+        int32_t height = this->GetIndex()->nHeight;
         // use the real miner (returns after 1 block for RegTest)
         try
         {
@@ -303,7 +308,7 @@ std::shared_ptr<CBlock> TestChain::generateBlock(std::shared_ptr<TestWallet> who
         {
             // this exception is normal, it is used to get out of the mining loop
             // when on the regtest chain
-            if (height != this->GetIndex()->GetHeight())
+            if (height != this->GetIndex()->nHeight)
             {
                 block = getBlock(GetIndex()->GetBlockHash());
             }
@@ -348,7 +353,7 @@ std::shared_ptr<CBlock> TestChain::generateBlock(const CBlock& in)
     *(retVal) = in;
     CalcPoW(retVal.get());
     CValidationState state;
-    if (!ProcessNewBlock(1,chainActive.LastTip()->GetHeight()+1,state, NULL, retVal.get(), true, NULL))
+    if (!ProcessNewBlock(1,chainActive.LastTip()->nHeight+1,state, NULL, retVal.get(), true, NULL))
         throw JSONRPCError(RPC_INTERNAL_ERROR, "ProcessNewBlock, block not accepted");
     minedBlocks.push_back(retVal);
     return retVal;

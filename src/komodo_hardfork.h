@@ -18,6 +18,5 @@ extern const int32_t KMD_SEASON_HEIGHTS[NUM_KMD_SEASONS];
 
 // Era array of pubkeys. Add extra seasons to bottom as requried, after adding appropriate info above. 
 extern const char *notaries_elected[NUM_KMD_SEASONS][NUM_KMD_NOTARIES][2];
-
 extern char NOTARYADDRS[64][64];
 extern char NOTARY_ADDRESSES[NUM_KMD_SEASONS][64][64];
