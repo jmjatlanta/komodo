@@ -333,7 +333,7 @@ void displayBlock(const TestChain& testChain, std::shared_ptr<CBlock> block, boo
         }
 }
 
-TEST(TestNotary, DISABLED_NotaryMining)
+TEST(TestNotary, NotaryMining)
 {
     // setup LogPrint logging
     fDebug = true;

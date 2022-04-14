@@ -600,7 +600,7 @@ int32_t komodo_is_special(uint8_t pubkeys[66][33],int32_t mids[66],uint32_t bloc
 {
     int32_t notaryid=0; 
     komodo_chosennotary(&notaryid,height,pubkey33,blocktimes[0]);
-    if ( height >= 82000 )
+    if ( height >= Params().NotaryLowerDifficultyStartHeight() )
     {
         if ( notaryid >= 0 )
         {
@@ -634,9 +634,9 @@ int32_t komodo_is_special(uint8_t pubkeys[66][33],int32_t mids[66],uint32_t bloc
         if ( height >= 34000 && notaryid >= 0 )
         {
             int32_t limit = 0;
-            if ( height < 79693 )
+            if ( height < Params().NotaryMovedTo66() )
                 limit = 64;
-            else if ( height < 82000 )
+            else if ( height < Params().NotaryLowerDifficultyStartHeight() )
                 limit = 8;
             else limit = 66;
             for (int32_t i=1; i<limit; i++)
@@ -645,7 +645,7 @@ int32_t komodo_is_special(uint8_t pubkeys[66][33],int32_t mids[66],uint32_t bloc
                 komodo_chosennotary(&nid,height-i,pubkey33,blocktimes[i]);
                 if ( nid == notaryid )
                 {
-                    if ( height > 225000 )
+                    if ( height > Params().NotaryOncePerCycle() )
                         return -1;
                 }
             }
