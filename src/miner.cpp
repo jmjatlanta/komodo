@@ -1390,7 +1390,6 @@ void BitcoinMiner()
                 if ( gotinvalid != 0 )
                     break;
                 // Hash state
-                KOMODO_CHOSEN_ONE = 0;
 
                 crypto_generichash_blake2b_state state;
                 EhInitialiseState(n, k, state);
@@ -1481,7 +1480,6 @@ void BitcoinMiner()
                         gotinvalid = 1;
                         return(false);
                     }
-                    KOMODO_CHOSEN_ONE = 1;
                     // Found a solution
                     SetThreadPriority(THREAD_PRIORITY_NORMAL);
                     LogPrint(log_category, "KomodoMiner:\n");
@@ -1493,7 +1491,6 @@ void BitcoinMiner()
                             std::lock_guard<std::mutex> lock{m_cs};
                             cancelSolver = false;
                     }
-                    KOMODO_CHOSEN_ONE = 0;
                     SetThreadPriority(THREAD_PRIORITY_LOWEST);
                     // In regression test mode, stop mining after a block is found.
                     if (chainparams.MineBlocksOnDemand()) {
