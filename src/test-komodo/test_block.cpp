@@ -38,11 +38,11 @@ TEST(block_tests, TestConnectWithoutChecks)
     TestChain chain;
     auto notary = chain.AddWallet(chain.getNotaryKey());
     auto alice = chain.AddWallet();
-    std::shared_ptr<CBlock> lastBlock = chain.generateBlock(); // genesis block
+    std::shared_ptr<CBlock> lastBlock = chain.generateBlock(alice); // genesis block
     ASSERT_GT( chain.GetIndex()->nHeight, 0 );
     // Add some transaction to a block
     int32_t newHeight = chain.GetIndex()->nHeight + 1;
-    CTransaction fundAlice = notary->CreateSpendTransaction(alice, 100000);
+    CTransaction fundAlice = alice->CreateSpendTransaction(notary, 100000);
     // construct the block
     CBlock block;
     // first a coinbase tx
@@ -74,28 +74,28 @@ TEST(block_tests, TestSpendInSameBlock)
     auto notary = chain.AddWallet(chain.getNotaryKey());
     auto alice = chain.AddWallet();
     auto bob = chain.AddWallet();
-    std::shared_ptr<CBlock> lastBlock = chain.generateBlock(); // genesis block
+    std::shared_ptr<CBlock> lastBlock = chain.generateBlock(alice); // genesis block
     ASSERT_GT( chain.GetIndex()->nHeight, 0 );
     // Start to build a block
     int32_t newHeight = chain.GetIndex()->nHeight + 1;
-    CTransaction fundAlice = notary->CreateSpendTransaction(alice, 100000);
-    // now have Alice move some funds to Bob in the same block
-    CMutableTransaction aliceToBobMutable;
-    CTxIn aliceIn;
-    aliceIn.prevout.hash = fundAlice.GetHash();
-    aliceIn.prevout.n = 0;
-    aliceToBobMutable.vin.push_back(aliceIn);
+    CTransaction fundNotary = alice->CreateSpendTransaction(notary, 100000);
+    // now have Notary move some funds to Bob in the same block
+    CMutableTransaction notaryToBobMutable;
+    CTxIn notaryIn;
+    notaryIn.prevout.hash = fundNotary.GetHash();
+    notaryIn.prevout.n = 1;
+    notaryToBobMutable.vin.push_back(notaryIn);
     CTxOut bobOut;
     bobOut.scriptPubKey = GetScriptForDestination(bob->GetPubKey());
     bobOut.nValue = 10000;
-    aliceToBobMutable.vout.push_back(bobOut);
+    notaryToBobMutable.vout.push_back(bobOut);
     CTxOut notaryRemainder;
     notaryRemainder.scriptPubKey = GetScriptForDestination(notary->GetPubKey());
-    notaryRemainder.nValue = fundAlice.vout[0].nValue - 10000;
-    aliceToBobMutable.vout.push_back(notaryRemainder);
-    uint256 hash = SignatureHash(fundAlice.vout[0].scriptPubKey, aliceToBobMutable, 0, SIGHASH_ALL, 0, 0);
-    aliceToBobMutable.vin[0].scriptSig << alice->Sign(hash, SIGHASH_ALL);
-    CTransaction notaryToBobTx(aliceToBobMutable);
+    notaryRemainder.nValue = fundNotary.vout[1].nValue - 10000;
+    notaryToBobMutable.vout.push_back(notaryRemainder);
+    uint256 hash = SignatureHash(fundNotary.vout[1].scriptPubKey, notaryToBobMutable, 0, SIGHASH_ALL, 0, 0);
+    notaryToBobMutable.vin[0].scriptSig << notary->Sign(hash, SIGHASH_ALL);
+    CTransaction notaryToBobTx(notaryToBobMutable);
     // construct the block
     CBlock block;
     // first a coinbase tx
@@ -109,7 +109,7 @@ TEST(block_tests, TestSpendInSameBlock)
     txNew.nExpiryHeight = 0;
     block.vtx.push_back(CTransaction(txNew));
     // then the actual txs
-    block.vtx.push_back(fundAlice);
+    block.vtx.push_back(fundNotary);
     block.vtx.push_back(notaryToBobTx);
     CValidationState state;
     // create a new CBlockIndex to forward to ConnectBlock
@@ -128,45 +128,45 @@ TEST(block_tests, TestDoubleSpendInSameBlock)
     auto alice = chain.AddWallet();
     auto bob = chain.AddWallet();
     auto charlie = chain.AddWallet();
-    std::shared_ptr<CBlock> lastBlock = chain.generateBlock(); // genesis block
+    std::shared_ptr<CBlock> lastBlock = chain.generateBlock(alice); // genesis block
     ASSERT_GT( chain.GetIndex()->nHeight, 0 );
     // Start to build a block
     int32_t newHeight = chain.GetIndex()->nHeight + 1;
-    CTransaction fundAlice = notary->CreateSpendTransaction(alice, 100000);
-    // now have Alice move some funds to Bob in the same block
-    CMutableTransaction aliceToBobMutable;
-    CTxIn aliceIn;
-    aliceIn.prevout.hash = fundAlice.GetHash();
-    aliceIn.prevout.n = 0;
-    aliceToBobMutable.vin.push_back(aliceIn);
+    CTransaction fundNotary = alice->CreateSpendTransaction(notary, 100000);
+    // now have Notary move some funds to Bob in the same block
+    CMutableTransaction notaryToBobMutable;
+    CTxIn notaryIn;
+    notaryIn.prevout.hash = fundNotary.GetHash();
+    notaryIn.prevout.n = 1;
+    notaryToBobMutable.vin.push_back(notaryIn);
     CTxOut bobOut;
     bobOut.scriptPubKey = GetScriptForDestination(bob->GetPubKey());
     bobOut.nValue = 10000;
-    aliceToBobMutable.vout.push_back(bobOut);
-    CTxOut aliceRemainder;
-    aliceRemainder.scriptPubKey = GetScriptForDestination(alice->GetPubKey());
-    aliceRemainder.nValue = fundAlice.vout[0].nValue - 10000;
-    aliceToBobMutable.vout.push_back(aliceRemainder);
-    uint256 hash = SignatureHash(fundAlice.vout[0].scriptPubKey, aliceToBobMutable, 0, SIGHASH_ALL, 0, 0);
-    aliceToBobMutable.vin[0].scriptSig << alice->Sign(hash, SIGHASH_ALL);
-    CTransaction aliceToBobTx(aliceToBobMutable);
-    // alice attempts to double spend the vout and send something to charlie
-    CMutableTransaction aliceToCharlieMutable;
-    CTxIn aliceIn2;
-    aliceIn2.prevout.hash = fundAlice.GetHash();
-    aliceIn2.prevout.n = 0;
-    aliceToCharlieMutable.vin.push_back(aliceIn2);
+    notaryToBobMutable.vout.push_back(bobOut);
+    CTxOut notaryRemainder;
+    notaryRemainder.scriptPubKey = GetScriptForDestination(notary->GetPubKey());
+    notaryRemainder.nValue = fundNotary.vout[1].nValue - 10000;
+    notaryToBobMutable.vout.push_back(notaryRemainder);
+    uint256 hash = SignatureHash(fundNotary.vout[1].scriptPubKey, notaryToBobMutable, 0, SIGHASH_ALL, 0, 0);
+    notaryToBobMutable.vin[0].scriptSig << notary->Sign(hash, SIGHASH_ALL);
+    CTransaction notaryToBobTx(notaryToBobMutable);
+    // notary attempts to double spend the vout and send something to charlie
+    CMutableTransaction notaryToCharlieMutable;
+    CTxIn notaryIn2;
+    notaryIn2.prevout.hash = fundNotary.GetHash();
+    notaryIn2.prevout.n = 1;
+    notaryToCharlieMutable.vin.push_back(notaryIn2);
     CTxOut charlieOut;
     charlieOut.scriptPubKey = GetScriptForDestination(charlie->GetPubKey());
     charlieOut.nValue = 10000;
-    aliceToCharlieMutable.vout.push_back(charlieOut);
-    CTxOut aliceRemainder2;
-    aliceRemainder2.scriptPubKey = GetScriptForDestination(alice->GetPubKey());
-    aliceRemainder2.nValue = fundAlice.vout[0].nValue - 10000;
-    aliceToCharlieMutable.vout.push_back(aliceRemainder2);
-    hash = SignatureHash(fundAlice.vout[0].scriptPubKey, aliceToCharlieMutable, 0, SIGHASH_ALL, 0, 0);
-    aliceToCharlieMutable.vin[0].scriptSig << alice->Sign(hash, SIGHASH_ALL);
-    CTransaction aliceToCharlieTx(aliceToCharlieMutable);
+    notaryToCharlieMutable.vout.push_back(charlieOut);
+    CTxOut notaryRemainder2;
+    notaryRemainder2.scriptPubKey = GetScriptForDestination(notary->GetPubKey());
+    notaryRemainder2.nValue = fundNotary.vout[1].nValue - 10000;
+    notaryToCharlieMutable.vout.push_back(notaryRemainder2);
+    hash = SignatureHash(fundNotary.vout[1].scriptPubKey, notaryToCharlieMutable, 0, SIGHASH_ALL, 0, 0);
+    notaryToCharlieMutable.vin[0].scriptSig << notary->Sign(hash, SIGHASH_ALL);
+    CTransaction notaryToCharlieTx(notaryToCharlieMutable);
     // construct the block
     CBlock block;
     // first a coinbase tx
@@ -180,9 +180,9 @@ TEST(block_tests, TestDoubleSpendInSameBlock)
     txNew.nExpiryHeight = 0;
     block.vtx.push_back(CTransaction(txNew));
     // then the actual txs
-    block.vtx.push_back(fundAlice);
-    block.vtx.push_back(aliceToBobTx);
-    block.vtx.push_back(aliceToCharlieTx);
+    block.vtx.push_back(fundNotary);
+    block.vtx.push_back(notaryToBobTx);
+    block.vtx.push_back(notaryToCharlieTx);
     CValidationState state;
     // create a new CBlockIndex to forward to ConnectBlock
     auto index = chain.GetIndex();
@@ -202,12 +202,12 @@ TEST(block_tests, TestProcessBlock)
     auto alice = chain.AddWallet();
     auto bob = chain.AddWallet();
     auto charlie = chain.AddWallet();
-    auto lastBlock = chain.generateBlock(); // gives notary everything
+    auto lastBlock = chain.generateBlock(alice); // gives alice everything
     EXPECT_EQ(chain.GetIndex()->nHeight, 1);
     chain.IncrementChainTime();
     // add a transaction to the mempool
-    CTransaction fundAlice = alice->CreateSpendTransaction(bob, 100000);
-    EXPECT_TRUE( chain.acceptTx(fundAlice).IsValid() );
+    CTransaction fundBob = alice->CreateSpendTransaction(bob, 100000);
+    EXPECT_TRUE( chain.acceptTx(fundBob).IsValid() );
     // construct the block
     CBlock block;
     int32_t newHeight = chain.GetIndex()->nHeight + 1;

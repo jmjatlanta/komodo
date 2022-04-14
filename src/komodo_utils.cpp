@@ -2026,5 +2026,5 @@ void komodo_prefetch(FILE *fp)
 // this function is to activate the ExtractDestination fix 
 bool komodo_is_vSolutionsFixActive()
 {
-    return GetLatestTimestamp(komodo_currentheight()) > nS5Timestamp;
+    return GetLatestTimestamp(komodo_currentheight()) > Params().S5Timestamp();
 }

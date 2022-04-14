@@ -19,6 +19,7 @@ void undo_init_STAKED()
     doneinit_STAKED = false;
 }
 
+char NOTARYADDRS[64][64];
 
 int8_t is_STAKED(const char *chain_name) 
 {

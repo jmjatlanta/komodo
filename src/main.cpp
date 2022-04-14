@@ -3696,7 +3696,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
     LogPrint("bench", "      - Connect %u transactions: %.2fms (%.3fms/tx, %.3fms/txin) [%.2fs]\n", (unsigned)block.vtx.size(), 0.001 * (nTime1 - nTimeStart), 0.001 * (nTime1 - nTimeStart) / block.vtx.size(), nInputs <= 1 ? 0 : 0.001 * (nTime1 - nTimeStart) / (nInputs-1), nTimeConnect * 0.000001);
 
     blockReward += nFees + sum;
-    if ( ASSETCHAINS_SYMBOL[0] == 0 && pindex->nHeight >= KOMODO_NOTARIES_HEIGHT2)
+    if ( ASSETCHAINS_SYMBOL[0] == 0 && pindex->nHeight >= Params().S2HardforkHeight() )
         blockReward -= sum;
 
     if ( ASSETCHAINS_COMMISSION != 0 || ASSETCHAINS_FOUNDERS_REWARD != 0 ) //ASSETCHAINS_OVERRIDE_PUBKEY33[0] != 0 &&
@@ -3717,7 +3717,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
     }
     if ( block.vtx[0].GetValueOut() > blockReward+KOMODO_EXTRASATOSHI )
     {
-        if ( ASSETCHAINS_SYMBOL[0] != 0 || pindex->nHeight >= KOMODO_NOTARIES_HEIGHT1 || block.vtx[0].vout[0].nValue > blockReward )
+        if ( ASSETCHAINS_SYMBOL[0] != 0 || pindex->nHeight >= Params().S1HardforkHeight() || block.vtx[0].vout[0].nValue > blockReward )
         {
             return state.DoS(100,
                              error("ConnectBlock(): coinbase pays too much (actual=%d vs limit=%d)",
@@ -5097,11 +5097,11 @@ bool CheckBlock(int32_t *futureblockp, int32_t height, CBlockIndex *pindex, cons
             return state.DoS(100, error("CheckBlock: failed slow_checkPOW"),REJECT_INVALID, 
                     "failed-slow_checkPOW");
     }
-    if ( height > nDecemberHardforkHeight && ASSETCHAINS_SYMBOL[0] == 0 ) // December 2019 hardfork
+    if ( height > Params().DecemberHardforkHeight() && ASSETCHAINS_SYMBOL[0] == 0 )
     {
         int32_t notaryid;
         int32_t special = komodo_chosennotary(&notaryid,height,pubkey33,tiptime);
-        if (notaryid > 0 || ( notaryid == 0 && height > nS5HardforkHeight ) ) {
+        if (notaryid > 0 || ( notaryid == 0 && height > Params().S5HardforkHeight() ) ) {
             CScript merkleroot = CScript();
             CBlock blockcopy = block; // block shouldn't be changed below, so let's make it's copy
             CBlock *pblockcopy = (CBlock *)&blockcopy;

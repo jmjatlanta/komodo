@@ -674,7 +674,7 @@ bool CheckProofOfWork(const CBlockHeader &blkHeader, uint8_t *pubkey33, int32_t 
     {
         height = komodo_currentheight() + 1;
     }
-    if ( height > 34000 && ASSETCHAINS_SYMBOL[0] == 0 )
+    if ( height > Params().NotarySpecialStartHeight() && ASSETCHAINS_SYMBOL[0] == 0 ) // 0 -> non-special notary
     {
         special = komodo_chosennotary(&notaryid,height,pubkey33,tiptime);
         for (i=0; i<33; i++)
@@ -690,19 +690,21 @@ bool CheckProofOfWork(const CBlockHeader &blkHeader, uint8_t *pubkey33, int32_t 
         special2 = komodo_is_special(pubkeys,mids,blocktimes,height,pubkey33,blkHeader.nTime);
         if ( notaryid >= 0 )
         {
-            if ( height > 10000 && height < 80000 && (special != 0 || special2 > 0) )
+            if ( height > Params().NotarySAndS2StartHeight() 
+                    && height < Params().NotaryS2StartHeight() && (special != 0 || special2 > 0) )
                 flag = 1;
-            else if ( height >= 80000 && height < 108000 && special2 > 0 )
+            else if ( height >= Params().NotaryS2StartHeight() 
+                    && height < Params().NotaryS2IncludeElectionGapHeight() && special2 > 0 )
                 flag = 1;
-            else if ( height >= 108000 && special2 > 0 )
-                flag = (height > 1000000 
+            else if ( height >= Params().NotaryS2IncludeElectionGapHeight() && special2 > 0 )
+                flag = (height > Params().NotaryElectionGapOverrideHeight() 
                         || (height % KOMODO_ELECTION_GAP) > 64 
                         || (height % KOMODO_ELECTION_GAP) == 0);
-            else if ( height == 790833 )
+            else if ( height == Params().NotarySpecialFlagHeight() )
                 flag = 1;
             else if ( special2 < 0 )
             {
-                if ( height > 792000 )
+                if ( height > Params().NotaryLimitRepeatHeight() )
                     flag = 0;
                 else 
                     fprintf(stderr,"ht.%d notaryid.%d special.%d flag.%d special2.%d\n",
@@ -730,7 +732,7 @@ bool CheckProofOfWork(const CBlockHeader &blkHeader, uint8_t *pubkey33, int32_t 
         if ( KOMODO_LOADINGBLOCKS != 0 )
             return true;
 
-        if ( ASSETCHAINS_SYMBOL[0] != 0 || height > 792000 )
+        if ( ASSETCHAINS_SYMBOL[0] != 0 || height > Params().NotaryLimitRepeatHeight() )
         {
             if ( Params().NetworkIDString() != "regtest" )
             {

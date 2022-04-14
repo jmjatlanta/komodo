@@ -20,11 +20,12 @@
 #include "notaries_staked.h"
 #include "komodo_hardfork.h"
 
-#define KOMODO_MAINNET_START 178999
-#define KOMODO_NOTARIES_HEIGHT1 814000
-#define KOMODO_NOTARIES_HEIGHT2 2588672
+#define NUM_KMD_SEASONS 6
+#define NUM_KMD_NOTARIES 64
 
 #define CRYPTO777_PUBSECPSTR "020e46e79a2a8d12b9b5d12c7a91adb4e454edfae43c0a0cb805427d2ac7613fd9"
+
+extern char NOTARY_ADDRESSES[NUM_KMD_SEASONS][64][64];
 
 int32_t getkmdseason(int32_t height);
 

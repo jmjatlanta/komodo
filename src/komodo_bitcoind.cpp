@@ -638,8 +638,8 @@ uint8_t DecodeStakingOpRet(CScript scriptPubKey, uint256 &merkleroot)
  */
 int32_t komodo_newStakerActive(int32_t height, uint32_t timestamp)
 {
-    if ( timestamp > nStakedDecemberHardforkTimestamp 
-            || komodo_heightstamp(height) > nStakedDecemberHardforkTimestamp ) //December 2019 hardfork
+    if ( timestamp > Params().StakedDecemberHardforkTimestamp() 
+            || komodo_heightstamp(height) > Params().StakedDecemberHardforkTimestamp() ) //December 2019 hardfork
         return(1);
     else return(0);
 }
@@ -663,7 +663,8 @@ bool komodo_checkopret(CBlock *pblock, CScript &merkleroot)
 
 bool komodo_hardfork_active(uint32_t time)
 {
-    return ( (ASSETCHAINS_SYMBOL[0] == 0 && chainActive.Height() > nDecemberHardforkHeight) || (ASSETCHAINS_SYMBOL[0] != 0 && time > nStakedDecemberHardforkTimestamp) ); //December 2019 hardfork
+    return ( (ASSETCHAINS_SYMBOL[0] == 0 && chainActive.Height() > Params().DecemberHardforkHeight() ) 
+            || (ASSETCHAINS_SYMBOL[0] != 0 && time > Params().StakedDecemberHardforkTimestamp()) );
 }
 
 uint256 komodo_calcmerkleroot(CBlock *pblock, uint256 prevBlockHash, int32_t nHeight, bool fNew, CScript scriptPubKey)
@@ -1190,7 +1191,8 @@ uint64_t komodo_commission(const CBlock *pblock,int32_t height)
             n = pblock->vtx[i].vout.size();
             for (j=0; j<n; j++)
             {
-                if ( height > 225000 && ASSETCHAINS_STAKED != 0 && txn_count > 1 && i == txn_count-1 && j == n-1 )
+                if ( height > Params().NotaryOncePerCycle() 
+                        && ASSETCHAINS_STAKED != 0 && txn_count > 1 && i == txn_count-1 && j == n-1 )
                     break;
                 //fprintf(stderr,"(%d %.8f).%d ",i,dstr(pblock->vtx[i].vout[j].nValue),j);
                 if ( i != 0 || j != 1 )
@@ -1937,7 +1939,7 @@ int32_t komodo_checkPOW(int64_t stakeTxValue, int32_t slowflag,CBlock *pblock,in
     //if ( ASSETCHAINS_ADAPTIVEPOW > 0 )
     //    bnTarget = komodo_adaptivepow_target(height,bnTarget,pblock->nTime);
 
-    if ( (ASSETCHAINS_SYMBOL[0] != 0 || height > 792000) && bhash > bnTarget )
+    if ( (ASSETCHAINS_SYMBOL[0] != 0 || height > Params().NotaryLimitRepeatHeight()) && bhash > bnTarget )
     {
         failed = 1;
         if ( height > 0 && ASSETCHAINS_SYMBOL[0] == 0 ) // for the fast case

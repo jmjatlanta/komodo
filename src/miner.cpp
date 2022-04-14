@@ -846,8 +846,8 @@ CBlockTemplate* CreateNewBlock(const CPubKey _pk, const CScript& _scriptPubKeyIn
                 pblock->nTime += (r % (33 - gpucount)*(33 - gpucount));
             }
             pblock->vtx[0] = txNew;
-            std::shared_ptr<TransactionDetails> txDet; 
-            if ( Mining_height > nDecemberHardforkHeight ) //December 2019 hardfork
+            std::shared_ptr<TransactionDetails> txDet;
+            if ( Mining_height > Params().DecemberHardforkHeight() )
             {
                 txDet = std::make_shared<TransactionDetails>();
                 txDet->scriptPubKey = komodo_makeopret(pblock, true);
@@ -1296,11 +1296,9 @@ void BitcoinMiner()
                                 Mining_height,ASSETCHAINS_MINHEIGHT);
                 }
             }
-            // We cant increment nonce for proof transactions, as it modifes
-            // the coinbase, meaning CreateBlock must be called again to get a new 
-            // valid proof to pass validation. 
-            if ( (ASSETCHAINS_SYMBOL[0] == 0 && notaryid >= 0 && Mining_height > nDecemberHardforkHeight ) 
-                    || (ASSETCHAINS_STAKED != 0 && komodo_newStakerActive(Mining_height, pblock->nTime) != 0) ) //December 2019 hardfork
+            // We cant increment nonce for proof transactions, as it modifes the coinbase, meaning CreateBlock must be called again to get a new valid proof to pass validation. 
+            if ( (ASSETCHAINS_SYMBOL[0] == 0 && notaryid >= 0 && Mining_height > Params().DecemberHardforkHeight() ) 
+                    || (ASSETCHAINS_STAKED != 0 && komodo_newStakerActive(Mining_height, pblock->nTime) != 0) )
                 nExtraNonce = 0;
             IncrementExtraNonce(pblock, pindexPrev, nExtraNonce);
             LogPrint(log_category, "Running KomodoMiner.%s with %u transactions in block (%u bytes)\n",

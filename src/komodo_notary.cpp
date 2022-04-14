@@ -15,8 +15,9 @@
 #include "komodo_notary.h"
 #include "komodo_extern_globals.h"
 #include "komodo.h" // komodo_stateupdate()
-#include "komodo_structs.h" // KOMODO_NOTARIES_HARDCODED
 #include "komodo_utils.h" // komodo_stateptr
+
+char NOTARY_ADDRESSES[NUM_KMD_SEASONS][64][64];
 
 const char *Notaries_genesis[][2] =
 {
@@ -57,13 +58,45 @@ const char *Notaries_genesis[][2] =
     { "titomane_SH", "035f49d7a308dd9a209e894321f010d21b7793461b0c89d6d9231a3fe5f68d9960" },
 };
 
+const uint32_t* kmd_season_timestamps()
+{
+    static uint32_t timestamps[NUM_KMD_SEASONS] = {0};
+    if (timestamps[0] == 0)
+    {
+        const auto& p = Params();
+        timestamps[0] = 1525132800;
+        timestamps[1] = 1563148800;
+        timestamps[2] = p.StakedDecemberHardforkTimestamp();
+        timestamps[3] = p.S4Timestamp();
+        timestamps[4] = p.S5Timestamp();
+        timestamps[5] = 1751328000;
+    }
+    return timestamps;
+}
+
+const int32_t* kmd_season_heights()
+{
+    static int32_t heights[NUM_KMD_SEASONS] = {0};
+    if (heights[0] = 0)
+    {
+        const auto& p = Params();
+        heights[0] = p.S1HardforkHeight();
+        heights[1] = 1444000;
+        heights[2] = p.DecemberHardforkHeight();
+        heights[3] = p.S4HardforkHeight();
+        heights[4] = p.S5HardforkHeight();
+        heights[5] = 7113400;
+    }
+    return heights;
+}
+
 int32_t getkmdseason(int32_t height)
 {
-    if ( height <= KMD_SEASON_HEIGHTS[0] )
+    if ( height <= kmd_season_heights()[0] )
         return(1);
     for (int32_t i = 1; i < NUM_KMD_SEASONS; i++)
     {
-        if ( height <= KMD_SEASON_HEIGHTS[i] && height > KMD_SEASON_HEIGHTS[i-1] )
+        if ( height <= kmd_season_heights()[i] && height > kmd_season_heights()[i-1] )
             return(i+1);
     }
     return(0);
@@ -71,11 +104,11 @@ int32_t getkmdseason(int32_t height)
 
 int32_t getacseason(uint32_t timestamp)
 {
-    if ( timestamp <= KMD_SEASON_TIMESTAMPS[0] )
+    if ( timestamp <= kmd_season_timestamps()[0] )
         return(1);
     for (int32_t i = 1; i < NUM_KMD_SEASONS; i++)
     {
-        if ( timestamp <= KMD_SEASON_TIMESTAMPS[i] && timestamp > KMD_SEASON_TIMESTAMPS[i-1] )
+        if ( timestamp <= kmd_season_timestamps()[i] && timestamp > kmd_season_timestamps()[i-1] )
             return(i+1);
     }
     return(0);
@@ -126,7 +159,7 @@ int32_t komodo_notaries(uint8_t pubkeys[64][33],int32_t height,uint32_t timestam
         if ( ASSETCHAINS_SYMBOL[0] == 0 )
         {
             // This is KMD, use block heights to determine the KMD notary season.. 
-            if ( height >= KOMODO_NOTARIES_HARDCODED )
+            if ( height >= Params().KomodoNotariesHardcoded() )
                 kmd_season = getkmdseason(height);
         }
         else 
@@ -294,7 +327,7 @@ int32_t komodo_chosennotary(int32_t *notaryidp, int32_t height,
         printf("komodo_chosennotary ht.%d illegal\n",height);
         return -1;
     }
-    if ( height >= KOMODO_NOTARIES_HARDCODED || ASSETCHAINS_SYMBOL[0] != 0 )
+    if ( height >= Params().KomodoNotariesHardcoded() || ASSETCHAINS_SYMBOL[0] != 0 )
     {
         if ( (*notaryidp= komodo_electednotary(&numnotaries,pubkey33,height,timestamp)) >= 0 
                 && numnotaries != 0 )

@@ -59,16 +59,16 @@ TEST(TestNotary, KomodoNotaries)
         // the first notary didn't change between era 1 and 2, so look at the 2nd notary
         EXPECT_EQ(my_key(pubkeys[1]), my_key("02ebfc784a4ba768aad88d44d1045d240d47b26e248cafaf1c5169a42d7a61d344"));
         // make sure the era hasn't changed before it is supposed to
-        for(;height <= 179999; ++height)
+        for(;height <= Params().KomodoNotariesHardcoded()-1; ++height)
         {
             result = komodo_notaries(pubkeys, height, timestamp);
             EXPECT_EQ(result, 36);
-            EXPECT_EQ(getkmdseason(height), 1);
+            EXPECT_EQ(getkmdseason(height), 0);
             EXPECT_EQ(my_key(pubkeys[1]), my_key("02ebfc784a4ba768aad88d44d1045d240d47b26e248cafaf1c5169a42d7a61d344"));
         }
-        EXPECT_EQ(height, 180000);
+        EXPECT_EQ(height, Params().KomodoNotariesHardcoded());
         // at 180000 we start using notaries_elected(komodo_defs.h) instead of Notaries_genesis(komodo_notary.cpp)
-        for(;height <= 814000; ++height)
+        for(;height <= Params().S1HardforkHeight(); ++height)
         {
             result = komodo_notaries(pubkeys, height, timestamp);
             EXPECT_EQ(result, 64);
@@ -76,7 +76,7 @@ TEST(TestNotary, KomodoNotaries)
             EXPECT_EQ(my_key(pubkeys[1]), my_key("02ebfc784a4ba768aad88d44d1045d240d47b26e248cafaf1c5169a42d7a61d344"));
         }
         // make sure the era changes when it was supposed to, and we have a new key
-        EXPECT_EQ(height, 814001);
+        EXPECT_EQ(height, Params().S1HardforkHeight() + 1);
         result = komodo_notaries(pubkeys, height, timestamp);
         EXPECT_EQ(result, 64);
         EXPECT_EQ(getkmdseason(height), 2);
@@ -242,9 +242,9 @@ TEST(TestNotary, HardforkActiveDecember2019)
         
         TestChain testChain;
         EXPECT_FALSE( komodo_hardfork_active(0) );
-        EXPECT_FALSE( komodo_hardfork_active(nStakedDecemberHardforkTimestamp) );
-        EXPECT_TRUE(  komodo_hardfork_active(nStakedDecemberHardforkTimestamp + 1) );
-        EXPECT_TRUE(  komodo_hardfork_active(nStakedDecemberHardforkTimestamp + 10) );
+        EXPECT_FALSE( komodo_hardfork_active( Params().StakedDecemberHardforkTimestamp() ) );
+        EXPECT_TRUE(  komodo_hardfork_active( Params().StakedDecemberHardforkTimestamp() + 1) );
+        EXPECT_TRUE(  komodo_hardfork_active( Params().StakedDecemberHardforkTimestamp() + 10) );
         ASSETCHAINS_SYMBOL[0] = 0;
     }
     // test komodo_newStakerActive based on timestamp
@@ -257,7 +257,7 @@ TEST(TestNotary, HardforkActiveDecember2019)
         // both are too low
         EXPECT_FALSE( komodo_newStakerActive(height, timestamp) );
         // timestamp is the same as activation timestamp
-        timestamp = nStakedDecemberHardforkTimestamp;
+        timestamp = Params().StakedDecemberHardforkTimestamp();
         EXPECT_FALSE( komodo_newStakerActive(height, timestamp) );
         // timestamp is 1 more than activation timestamp
         ++timestamp;
@@ -280,17 +280,17 @@ TEST(TestNotary, HardforkActiveDecember2019)
         idx.nTime = 0;
         CDataStream s1(SER_DISK, CLIENT_VERSION);
         idx.Serialize(s1);
-        idx.nTime = nStakedDecemberHardforkTimestamp + 10;
+        idx.nTime = Params().StakedDecemberHardforkTimestamp() + 10;
         CDataStream s2(SER_DISK, CLIENT_VERSION);
         idx.Serialize(s2);
         EXPECT_EQ(s2.size(), s1.size());
         // for staked chains, the serialized CDiskBlockIndex includes segid
         ASSETCHAINS_STAKED = 1;
         CDiskBlockIndex idx2;
-        idx2.nTime = nStakedDecemberHardforkTimestamp; // still no hardfork until next second
+        idx2.nTime = Params().StakedDecemberHardforkTimestamp(); // still no hardfork until next second
         CDataStream s3(SER_DISK, CLIENT_VERSION);
         idx2.Serialize(s3);
-        idx2.nTime = nStakedDecemberHardforkTimestamp + 10;
+        idx2.nTime = Params().StakedDecemberHardforkTimestamp() + 10;
         CDataStream s4(SER_DISK, CLIENT_VERSION);
         idx2.Serialize(s4);
         EXPECT_EQ(s2.size(), s3.size());
