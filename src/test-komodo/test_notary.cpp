@@ -63,7 +63,7 @@ TEST(TestNotary, KomodoNotaries)
         {
             result = komodo_notaries(pubkeys, height, timestamp);
             EXPECT_EQ(result, 36);
-            EXPECT_EQ(getkmdseason(height), 0);
+            EXPECT_EQ(getkmdseason(height), 1);
             EXPECT_EQ(my_key(pubkeys[1]), my_key("02ebfc784a4ba768aad88d44d1045d240d47b26e248cafaf1c5169a42d7a61d344"));
         }
         EXPECT_EQ(height, Params().KomodoNotariesHardcoded());

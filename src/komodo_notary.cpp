@@ -77,7 +77,7 @@ const uint32_t* kmd_season_timestamps()
 const int32_t* kmd_season_heights()
 {
     static int32_t heights[NUM_KMD_SEASONS] = {0};
-    if (heights[0] = 0)
+    if (heights[0] == 0)
     {
         const auto& p = Params();
         heights[0] = p.S1HardforkHeight();
