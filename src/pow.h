@@ -40,8 +40,16 @@ unsigned int CalculateNextWorkRequired(arith_uint256 bnAvg,
 /** Check whether the Equihash solution in a block header is valid */
 bool CheckEquihashSolution(const CBlockHeader *pblock, const CChainParams&);
 
-/** Check whether a block hash satisfies the proof-of-work requirement specified by nBits */
-bool CheckProofOfWork(const CBlockHeader &blkHeader, uint8_t *pubkey33, int32_t height, const Consensus::Params& params);
+/** 
+ * @brief Check whether a block hash satisfies the proof-of-work requirement specified by nBits
+ * @param blkHeader the header to examine
+ * @param pubkey33 who created the block
+ * @param height the chain height
+ * @param params the blockchain parameters
+ */
+bool CheckProofOfWork(const CBlockHeader &blkHeader, uint8_t *pubkey33, int32_t height, 
+        const Consensus::Params& params);
+
 arith_uint256 GetBlockProof(const CBlockIndex& block);
 
 /** Return the time it would take to redo the work difference between from and to, assuming the current hashrate corresponds to the difficulty at tip, in seconds. */

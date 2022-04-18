@@ -2408,19 +2408,6 @@ bool ReadBlockFromDisk(int32_t height,CBlock& block, const CDiskBlockPos& pos,bo
         fprintf(stderr,"readblockfromdisk err B\n");
         return error("%s: Deserialize or I/O error - %s at %s", __func__, e.what(), pos.ToString());
     }
-    // Check the header
-    if ( 0 && checkPOW != 0 )
-    {
-        komodo_block2pubkey33(pubkey33,(CBlock *)&block);
-        if (!(CheckEquihashSolution(&block, Params()) && CheckProofOfWork(block, pubkey33, height, Params().GetConsensus())))
-        {
-            int32_t i; for (i=0; i<33; i++)
-                fprintf(stderr,"%02x",pubkey33[i]);
-            fprintf(stderr," warning unexpected diff at ht.%d\n",height);
-
-            return error("ReadBlockFromDisk: Errors in block header at %s", pos.ToString());
-        }
-    }
     return true;
 }
 
@@ -5042,10 +5029,6 @@ bool CheckBlockHeader(int32_t *futureblockp,int32_t height,CBlockIndex *pindex, 
         if ( !CheckEquihashSolution(&blockhdr, Params()) )
             return state.DoS(100, error("CheckBlockHeader(): Equihash solution invalid"),REJECT_INVALID, "invalid-solution");
     }
-    // Check proof of work matches claimed amount
-    /*komodo_index2pubkey33(pubkey33,pindex,height);
-     if ( fCheckPOW && !CheckProofOfWork(height,pubkey33,blockhdr.GetHash(), blockhdr.nBits, Params().GetConsensus(),blockhdr.nTime) )
-     return state.DoS(50, error("CheckBlockHeader(): proof of work failed"),REJECT_INVALID, "high-hash");*/
     return true;
 }
 
@@ -5259,7 +5242,8 @@ bool CheckBlock(int32_t *futureblockp, int32_t height, CBlockIndex *pindex, cons
     return true;
 }
 
-bool ContextualCheckBlockHeader(const CBlockHeader& block, CValidationState& state, CBlockIndex * const pindexPrev)
+bool ContextualCheckBlockHeader(const CBlockHeader& block, CValidationState& state, 
+        CBlockIndex * const pindexPrev, bool checkPoW)
 {
     const CChainParams& chainParams = Params();
     const Consensus::Params& consensusParams = chainParams.GetConsensus();
@@ -5272,14 +5256,17 @@ bool ContextualCheckBlockHeader(const CBlockHeader& block, CValidationState& sta
     int nHeight = pindexPrev->nHeight+1;
 
     // Check proof of work
-    unsigned int nextWorkRequired = GetNextWorkRequired(pindexPrev, &block, consensusParams);
-    if ( (ASSETCHAINS_SYMBOL[0] != 0 || nHeight < 235300 || nHeight > 236000) 
-            && block.nBits != nextWorkRequired )
+    if (checkPoW)
     {
-        std::cout << std::to_string(block.nBits) << " block.nBits vs. calc " 
-                << std::to_string(nextWorkRequired) <<" for block #" << nHeight << std::endl;
-        return state.DoS(100, error("%s: incorrect proof of work", __func__),
-                        REJECT_INVALID, "bad-diffbits");
+        unsigned int nextWorkRequired = GetNextWorkRequired(pindexPrev, &block, consensusParams);
+        if ( (ASSETCHAINS_SYMBOL[0] != 0 || nHeight < 235300 || nHeight > 236000) 
+                && block.nBits != nextWorkRequired )
+        {
+            std::cout << std::to_string(block.nBits) << " block.nBits vs. calc " 
+                    << std::to_string(nextWorkRequired) <<" for block #" << nHeight << std::endl;
+            return state.DoS(100, error("%s: incorrect proof of work", __func__),
+                            REJECT_INVALID, "bad-diffbits");
+        }
     }
 
     // Check timestamp against prev
@@ -5789,7 +5776,7 @@ bool TestBlockValidity(CValidationState &state, const CBlock& block, CBlockIndex
     // JoinSplit proofs are verified in ConnectBlock
     auto verifier = libzcash::ProofVerifier::Disabled();
     // NOTE: CheckBlockHeader is called by CheckBlock
-    if (!ContextualCheckBlockHeader(block, state, pindexPrev))
+    if (!ContextualCheckBlockHeader(block, state, pindexPrev, fCheckPOW ))
     {
         //fprintf(stderr,"TestBlockValidity failure A checkPOW.%d\n",fCheckPOW);
         return false;

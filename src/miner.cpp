@@ -1412,7 +1412,6 @@ void BitcoinMiner()
                     hashTarget = HASHTarget_POW;
                 else 
                     hashTarget = HASHTarget;
-                pblock->nBits = hashTarget.GetCompact();
 
                 // lambda to validate that solution is correct
                 std::function<bool(std::vector<unsigned char>)> validBlock =

@@ -333,8 +333,14 @@ void displayBlock(const TestChain& testChain, std::shared_ptr<CBlock> block, boo
         }
 }
 
-TEST(TestNotary, NotaryMining)
+TEST(TestNotary, DISABLED_NotaryMining)
 {
+    /***
+     * This test proves the ability for notary nodes to mine
+     * blocks at reduced difficulty. It is disabled due to needing
+     * to build a large number of blocks (67) before the real test
+     * can begin.
+     */
     // setup LogPrint logging
     fDebug = true;
     fPrintToConsole = true;
@@ -345,10 +351,11 @@ TEST(TestNotary, NotaryMining)
 
     // Alice should mine some blocks
     std::shared_ptr<CBlock> lastBlock;
+    uint32_t lastHeight = testChain.GetIndex()->nHeight;
     for(int i = 0; i < 67; ++i)
     {
         lastBlock = testChain.generateBlock(alice);
-        displayBlock(testChain, lastBlock, false);
+        lastHeight = testChain.GetIndex()->nHeight;
         // this makes some txs for notary mining
         if (i > 1 && i < 55) // going above overwinter (ht.61) makes existing transactions invalid (need to research)
         {
@@ -359,20 +366,29 @@ TEST(TestNotary, NotaryMining)
         }
     }
     uint32_t prevBits = lastBlock->GetBlockHeader().nBits;
-    /***
-     * It currently seems that ContextualCheckBlockHeader does not allow the
-     * reduction in difficulty. This makes me think the test is faulty, but
-     * I do not see where.
-     */
     // a notary should be able to mine with a lower difficulty
     lastBlock = testChain.generateBlock(notary);
-    displayBlock(testChain, lastBlock, false);
-    auto notaryBits = lastBlock->GetBlockHeader().nBits;
-    EXPECT_LT(notaryBits, prevBits);
+    EXPECT_EQ(testChain.GetIndex()->nHeight, lastHeight + 1);
+    /* 
+       nBits is not an indication that THIS block has a lower difficulty.
+       nBits it set based on the needed difficulty. If a notary is able to
+       do it at a lower difficulty, it does. But nBits is not adjusted. 
+       Instead, code within CheckProofOfWork "does the right thing"
+       and verifies that if this block is from a notary, and it is their turn,
+       the PoW complies with at least the minimum hash target.
+    */
+    arith_uint256 bnTarget;
+    bnTarget.SetCompact(lastBlock->GetBlockHeader().nBits);
+    arith_uint256 actual = UintToArith256( lastBlock->GetBlockHeader().GetHash() );
+    arith_uint256 powLimit = UintToArith256(Params().GetConsensus().powLimit);
+    // The PoW algo requires that the computed hash is less (arithmetically) than the limit
+    EXPECT_GT( powLimit, bnTarget ); // the lowest allowed network limit is greater than the block nBits
+    EXPECT_GT( powLimit, actual ); // the lowest allowed network limit is greater than the actual mined hash
+    EXPECT_GT( bnTarget, actual ); // the nBits in the header is greater than the actual mined hash
+    lastHeight = testChain.GetIndex()->nHeight;
     // a non-notary should be back at the regular difficulty
     lastBlock = testChain.generateBlock(alice);
-    displayBlock(testChain, lastBlock, false);
-    EXPECT_GT(prevBits, notaryBits);
+    EXPECT_EQ( testChain.GetIndex()->nHeight, lastHeight + 1);
 }
 
 /***

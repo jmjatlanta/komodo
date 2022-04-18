@@ -654,6 +654,13 @@ int32_t komodo_is_special(uint8_t pubkeys[66][33],int32_t mids[66],uint32_t bloc
     return 0;
 }
 
+/** 
+ * @brief Check whether a block hash satisfies the proof-of-work requirement specified by nBits
+ * @param blkHeader the header to examine
+ * @param pubkey33 who created the block
+ * @param height the chain height
+ * @param params the blockchain parameters
+ */
 bool CheckProofOfWork(const CBlockHeader &blkHeader, uint8_t *pubkey33, int32_t height, 
         const Consensus::Params& params)
 {

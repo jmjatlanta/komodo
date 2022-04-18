@@ -857,8 +857,15 @@ bool CheckBlock(int32_t *futureblockp,int32_t height,CBlockIndex *pindex,const C
                 libzcash::ProofVerifier& verifier,
                 bool fCheckPOW = true, bool fCheckMerkleRoot = true);
 
-/** Context-dependent validity checks */
-bool ContextualCheckBlockHeader(const CBlockHeader& block, CValidationState& state, CBlockIndex *pindexPrev);
+/** 
+ * @brief Context-dependent validity checks 
+ * @param block the block
+ * @param state fill with error state
+ * @param pindexPrev the previous block in the chain
+ * @param checkPoW true to check nBits
+ */
+bool ContextualCheckBlockHeader(const CBlockHeader& block, CValidationState& state, 
+        CBlockIndex *pindexPrev, bool checkPoW = true);
 bool ContextualCheckBlock(int32_t slowflag,const CBlock& block, CValidationState& state, CBlockIndex *pindexPrev);
 
 /** Check a block is completely valid from start to finish (only works on top of our current best block, with cs_main held) */
