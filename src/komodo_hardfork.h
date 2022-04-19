@@ -8,23 +8,23 @@ template<class T>
 class ChainParamsWithHardfork : public ChainParams
 {
 public:
-    constexpr int32_t DecemberHardforkHeight() const { return T::nDecemberHardforkHeight; }
-    constexpr uint32_t StakedDecemberHardforkTimestamp() const { return T::nStakedDecemberHardforkTimestamp; }
-    constexpr uint32_t S4Timestamp() const { return T::nS4Timestamp; }
-    constexpr int32_t S4HardforkHeight() const { return T::nS4HardforkHeight; }
-    constexpr uint32_t S5Timestamp() const { return T::nS5Timestamp; }
-    constexpr int32_t S5HardforkHeight() const { return T::nS5HardforkHeight; }
-    constexpr int32_t NotaryLowerDifficultyStartHeight() const { return T::nNotaryLowerDifficultyStartHeight; }
-    constexpr int32_t NotaryLimitRepeatHeight() const { return T::nNotaryLimitRepeatHeight; }
-    constexpr int32_t NotarySpecialStartHeight() const { return T::nNotarySpecialStartHeight; }
-    constexpr int32_t NotarySpecialTimeTooShortHeight() const { return T::nNotarySpecialTimeTooShortHeight; }
-    constexpr int32_t NotaryMovedTo66() const { return T::nNotaryMovedTo66; }
-    constexpr int32_t NotaryOncePerCycle() const { return T::nNotaryOncePerCycle; }
-    constexpr int32_t NotarySAndS2StartHeight() const { return T::nNotarySAndS2StartHeight; }
-    constexpr int32_t NotaryS2StartHeight() const { return T::nNotaryS2StartHeight; }
-    constexpr int32_t NotaryS2IncludeElectionGapHeight() const { return T::nNotaryS2ElectionGap; }
-    constexpr int32_t NotaryElectionGapOverrideHeight() const { return T::nNotaryElectionGapOverride; }
-    constexpr int32_t NotarySpecialFlagHeight() const { return T::nNotarySpecialFlagHeight; }
+    constexpr int32_t DecemberHardforkHeight() const override { return T::nDecemberHardforkHeight; }
+    constexpr uint32_t StakedDecemberHardforkTimestamp() const override { return T::nStakedDecemberHardforkTimestamp; }
+    constexpr uint32_t S4Timestamp() const override { return T::nS4Timestamp; }
+    constexpr int32_t S4HardforkHeight() const override { return T::nS4HardforkHeight; }
+    constexpr uint32_t S5Timestamp() const override { return T::nS5Timestamp; }
+    constexpr int32_t S5HardforkHeight() const override { return T::nS5HardforkHeight; }
+    constexpr int32_t NotaryLowerDifficultyStartHeight() const override { return T::nNotaryLowerDifficultyStartHeight; }
+    constexpr int32_t NotaryLimitRepeatHeight() const override { return T::nNotaryLimitRepeatHeight; }
+    constexpr int32_t NotarySpecialStartHeight() const override { return T::nNotarySpecialStartHeight; }
+    constexpr int32_t NotarySpecialTimeTooShortHeight() const override { return T::nNotarySpecialTimeTooShortHeight; }
+    constexpr int32_t NotaryMovedTo66() const override { return T::nNotaryMovedTo66; }
+    constexpr int32_t NotaryOncePerCycle() const override { return T::nNotaryOncePerCycle; }
+    constexpr int32_t NotarySAndS2StartHeight() const override { return T::nNotarySAndS2StartHeight; }
+    constexpr int32_t NotaryS2StartHeight() const override { return T::nNotaryS2StartHeight; }
+    constexpr int32_t NotaryS2IncludeElectionGapHeight() const override { return T::nNotaryS2ElectionGap; }
+    constexpr int32_t NotaryElectionGapOverrideHeight() const override { return T::nNotaryElectionGapOverride; }
+    constexpr int32_t NotarySpecialFlagHeight() const override { return T::nNotarySpecialFlagHeight; }
 };
 
 class MainnetHardfork

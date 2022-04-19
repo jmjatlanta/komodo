@@ -160,57 +160,58 @@ protected:
 class ChainParams : public CChainParams
 {
 public:
-    constexpr int32_t DecemberHardforkHeight() const { assert(false); }
-    constexpr uint32_t StakedDecemberHardforkTimestamp() const { assert(false); }
-    constexpr uint32_t S4Timestamp() const { assert(false); }
-    constexpr int32_t S4HardforkHeight() const { assert(false); }
-    constexpr uint32_t S5Timestamp() const { assert(false); }
-    constexpr int32_t S5HardforkHeight() const { assert(false); }
+    virtual ~ChainParams() {}
+    virtual int32_t DecemberHardforkHeight() const = 0;
+    virtual uint32_t StakedDecemberHardforkTimestamp() const = 0;
+    virtual uint32_t S4Timestamp() const = 0;
+    virtual int32_t S4HardforkHeight() const = 0;
+    virtual uint32_t S5Timestamp() const = 0;
+    virtual int32_t S5HardforkHeight() const = 0;
     /****
      * @returns the height when notaries receive the privilege of mining at lower difficulty
      */
-    constexpr int32_t NotaryLowerDifficultyStartHeight() const { assert(false); }
+    virtual int32_t NotaryLowerDifficultyStartHeight() const = 0;
     /***
      * @return the height at which notaries are no longer able to mine multiple blocks per round
      */
-    constexpr int32_t NotaryLimitRepeatHeight() const { assert(false); }
+    virtual int32_t NotaryLimitRepeatHeight() const = 0;
     /**
      * @return the height for using special notary logic
      */
-    constexpr int32_t NotarySpecialStartHeight() const { assert(false); }
+    virtual int32_t NotarySpecialStartHeight() const = 0;
     /****
      * @returns height at which komodo_is_special could return -2
      */
-    constexpr int32_t NotarySpecialTimeTooShortHeight() const { assert(false); }
+    virtual int32_t NotarySpecialTimeTooShortHeight() const = 0;
     /****
      * @returns the height where number of notaries moved from 64 to 66
      */
-    constexpr int32_t NotaryMovedTo66() const { assert(false); }
+    virtual int32_t NotaryMovedTo66() const = 0;
     /***
      * @note: NotaryLowerDifficultyStartHeight overrides some of the logic that relies on ths value
      * @returns height at which notaries were not able to mine more than 1 block recently
      */
-    constexpr int32_t NotaryOncePerCycle() const { assert(false); }
+    virtual int32_t NotaryOncePerCycle() const = 0;
     /***
      * @return the height when Special and Special 2 start to be evaluated
      */
-    constexpr int32_t NotarySAndS2StartHeight() const { assert(false); }
+    virtual int32_t NotarySAndS2StartHeight() const = 0;
     /***
      * @return the height when Special stops and Special 2 starts to be evaluated
      */
-    constexpr int32_t NotaryS2StartHeight() const { assert(false); }
+    virtual int32_t NotaryS2StartHeight() const = 0;
     /****
      * @return the height when flag is set based on special 2, taking into account election gap
      */
-    constexpr int32_t NotaryS2IncludeElectionGapHeight() const { assert(false); }
+    virtual int32_t NotaryS2IncludeElectionGapHeight() const = 0;
     /****
      * @return height when election gap no longer affects flag
      */
-    constexpr int32_t NotaryElectionGapOverrideHeight() const { assert(false); }
+    virtual int32_t NotaryElectionGapOverrideHeight() const = 0;
     /****
      * @return a special height where flag is set regardless of special values
      */
-    constexpr int32_t NotarySpecialFlagHeight() const { assert(false); }
+    virtual int32_t NotarySpecialFlagHeight() const = 0;
 };
 
 /**
