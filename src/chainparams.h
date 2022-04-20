@@ -157,18 +157,32 @@ protected:
     std::vector<std::string> vFoundersRewardAddress;
 };
 
+/*****
+ * @brief Handle hardfork triggers (heights/timestamps)
+ * @see komodo_hardfork.h
+ */
 class ChainParams : public CChainParams
 {
 public:
     virtual ~ChainParams() {}
-    virtual int32_t DecemberHardforkHeight() const = 0;
-    virtual uint32_t StakedDecemberHardforkTimestamp() const = 0;
-    virtual uint32_t S4Timestamp() const = 0;
-    virtual int32_t S4HardforkHeight() const = 0;
-    virtual uint32_t S5Timestamp() const = 0;
-    virtual int32_t S5HardforkHeight() const = 0;
+    /***
+     * The following return the height/times at which Seasons start
+     * NOTE: KMD is based on height, asset chains use Timestamp
+     */
+    virtual uint32_t Season1StartHeight() const = 0;
+    virtual uint32_t Season1StartTimestamp() const = 0;
+    virtual uint32_t Season2StartHeight() const = 0;
+    virtual uint32_t Season2StartTimestamp() const = 0;
+    virtual uint32_t Season3StartHeight() const = 0;
+    virtual uint32_t Season3StartTimestamp() const = 0;
+    virtual uint32_t Season4StartHeight() const = 0;
+    virtual uint32_t Season4StartTimestamp() const = 0;
+    virtual uint32_t Season5StartHeight() const = 0;
+    virtual uint32_t Season5StartTimestamp() const = 0;
+    virtual uint32_t Season6StartHeight() const = 0;
+    virtual uint32_t Season6StartTimestamp() const = 0;
     /****
-     * @returns the height when notaries receive the privilege of mining at lower difficulty
+     * @returns the height when notaries can begin mining at lower difficulty
      */
     virtual int32_t NotaryLowerDifficultyStartHeight() const = 0;
     /***
@@ -189,6 +203,7 @@ public:
     virtual int32_t NotaryMovedTo66() const = 0;
     /***
      * @note: NotaryLowerDifficultyStartHeight overrides some of the logic that relies on ths value
+     * @note: Also determines point where PAX uses seed
      * @returns height at which notaries were not able to mine more than 1 block recently
      */
     virtual int32_t NotaryOncePerCycle() const = 0;
@@ -212,6 +227,95 @@ public:
      * @return a special height where flag is set regardless of special values
      */
     virtual int32_t NotarySpecialFlagHeight() const = 0;
+    /*****
+     * @return height where komodo_eligiblenotary returns 1 (true) even if the notary has mined in the last 66 blks
+     */
+    virtual uint32_t NotaryEligibleEvenIfMinedRecently() const = 0;
+    /****
+     * @return height where komodo_validateinterest begins to work
+     */
+    virtual uint32_t EnableValidateInterestHeight() const = 0;
+    /****
+     * @returns below this height, computations within komodo_validateinterest reduce time by 16000
+     */
+    virtual uint32_t ValidateInterestTrueTimeHeight() const = 0;
+    /****
+     * @returns height where AdaptivePoW begins to work (see komodo_adaptivepow_target)
+     */
+    virtual uint32_t AdaptivePoWMinHeight() const = 0;
+    /****
+     * @returns height at which transactions are considered "Early"
+     * @note Notes seem to refer to the HEMP chain, and a scheme to "lock in" a rule prior to this height.
+     * @note also seems to be used with a repayment plan
+     * @see GetKomodoEarlytxidScriptPub()
+     * @see src/cc/prices.cpp
+     * @see src/cc/hempcoin_notes.txt
+     */
+    virtual uint32_t KomodoEarlyTXIDHeight() const = 0;
+    /****
+     * @returns minimum height to calculate PoW
+     * @see komodo_checkPOW()
+     */
+    virtual uint32_t EnableCheckPoWHeight() const  = 0;
+    /*****
+     * @returns the minimum height for PoW calc on PoS chain
+     * @note (requires a small number of blocks before chain PoW can be calculated)
+     */
+    virtual uint32_t MinPoWHeight() const = 0;
+    /****
+     * @returns lower limit where blocks on non-KMD chains should check for the appropriate notary
+     * @note this works in conjuntion with KomodoNotaryUpperLimitHeight. There is a gap between these
+     * two heights where checking the notary should not be done.
+     * @note this is also the height where some komodo_gateway.komodo_check_deposit() logic is activated
+     * @see BitcoinMiner()
+     * @see komodo_check_deposit()
+     */
+    virtual uint32_t KomodoNotaryLowerLimitHeight() const = 0;
+    /****
+     * @returns the upper limit where blocks on non-KMD chains should check fo rthe appropriate notary
+     * @see KomodoNotaryLowerLImitHeight() above.
+     * @note this is also the height where the komodo gateway is activated
+    */
+    virtual uint32_t KomodoNotaryUpperLimitHeight() const = 0;
+    /*****
+     * @returns lower limit in PAX
+     */
+    virtual uint32_t KomodoPaxLowerLimitHeight() const = 0;
+    /****
+     * @returns height at which non-z message will be logged
+     * @see komodo_gateway.komodo_check_deposit()
+     */
+    virtual uint32_t KomodoPrintNonZMessageHeight() const = 0;
+    /****
+     * @return height at which komodo_gateway.komodo_check_deposit() rejects strange vouts
+     */
+    virtual uint32_t KomodoGatewayRejectStrangeoutHeight() const = 0;
+    virtual uint32_t KomodoGatewayPaxHeight() const = 0;
+    virtual uint32_t KomodoGatewayPaxMessageLowerHeight() const = 0;
+    virtual uint32_t KomodoGatewayPaxMessageUpperHeight() const = 0;
+    /*****
+     * @return height at which notaries in Notaries_genesis should no longer be used
+     */
+    virtual uint32_t KomodoNotariesHardcodedHeight() const = 0;
+    /***
+     * @return height where values are swapped
+     * @note fields got switched around due to legacy issues and approves
+     * @see komodo_gateway.cpp->komodo_opreturn
+     */
+    virtual uint32_t KomodoOpReturnSwapHeight() const = 0;
+    /*****
+     * @returns height where the signed mask changed
+     * @see komodo.cpp->komodo_connectblock()
+     */
+    virtual uint32_t KomodoSignedMaskChangeHeight() const = 0;
+    /****
+     * @returns height at which minimum to ratify changes from 7 to 11
+     */
+    virtual uint32_t KomodoMinRatifyHeight() const = 0;
+    /***
+     * @returns height where interest is calculated
+     */
+    virtual uint32_t KomodoInterestMinSpendHeight() const = 0;
 };
 
 /**

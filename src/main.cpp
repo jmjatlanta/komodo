@@ -2825,7 +2825,7 @@ namespace Consensus {
             // Check for negative or overflow input values
             nValueIn += coins->vout[prevout.n].nValue;
 #ifdef KOMODO_ENABLE_INTEREST
-            if ( ASSETCHAINS_SYMBOL[0] == 0 && nSpendHeight > 60000 )//chainActive.LastTip() != 0 && chainActive.LastTip()->nHeight >= 60000 )
+            if ( ASSETCHAINS_SYMBOL[0] == 0 && nSpendHeight > ::Params().KomodoInterestMinSpendHeight() )//chainActive.LastTip() != 0 && chainActive.LastTip()->nHeight >= 60000 )
             {
                 if ( coins->vout[prevout.n].nValue >= 10*COIN )
                 {
@@ -3774,7 +3774,8 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
     }
     if ( block.vtx[0].GetValueOut() > blockReward+KOMODO_EXTRASATOSHI )
     {
-        if ( ASSETCHAINS_SYMBOL[0] != 0 || pindex->nHeight >= KOMODO_NOTARIES_HEIGHT1 || block.vtx[0].vout[0].nValue > blockReward )
+        if ( ASSETCHAINS_SYMBOL[0] != 0 || pindex->nHeight >= Params().Season1StartHeight() 
+                || block.vtx[0].vout[0].nValue > blockReward )
         {
             //fprintf(stderr, "coinbase pays too much\n");
             //sleepflag = true;
@@ -5142,11 +5143,11 @@ bool CheckBlock(int32_t *futureblockp,int32_t height,CBlockIndex *pindex,const C
         if ( ASSETCHAINS_STAKED == 0 && komodo_checkPOW(0,1,(CBlock *)&block,height) < 0 ) // checks Equihash
             return state.DoS(100, error("CheckBlock: failed slow_checkPOW"),REJECT_INVALID, "failed-slow_checkPOW");
     }
-    if ( height > Params().DecemberHardforkHeight() && ASSETCHAINS_SYMBOL[0] == 0 )
+    if ( height > Params().Season3StartHeight() && ASSETCHAINS_SYMBOL[0] == 0 )
     {
         int32_t notaryid;
         int32_t special = komodo_chosennotary(&notaryid,height,pubkey33,tiptime);
-        if (notaryid > 0 || ( notaryid == 0 && height > Params().S5HardforkHeight() ) ) {
+        if (notaryid > 0 || ( notaryid == 0 && height > Params().Season5StartHeight() ) ) {
             CScript merkleroot = CScript();
             CBlock blockcopy = block; // block shouldn't be changed below, so let's make it's copy
             CBlock *pblockcopy = (CBlock *)&blockcopy;
@@ -5319,7 +5320,9 @@ bool ContextualCheckBlockHeader(const CBlockHeader& block, CValidationState& sta
     int nHeight = pindexPrev->nHeight+1;
 
     // Check proof of work
-    if ( (ASSETCHAINS_SYMBOL[0] != 0 || nHeight < 235300 || nHeight > 236000) && block.nBits != GetNextWorkRequired(pindexPrev, &block, consensusParams))
+    if ( (ASSETCHAINS_SYMBOL[0] != 0 || nHeight < Params().KomodoNotaryLowerLimitHeight() 
+            || nHeight > Params().KomodoNotaryUpperLimitHeight() ) 
+            && block.nBits != GetNextWorkRequired(pindexPrev, &block, consensusParams))
     {
         cout << block.nBits << " block.nBits vs. calc " << GetNextWorkRequired(pindexPrev, &block, consensusParams) <<
                                " for block #" << nHeight << endl;

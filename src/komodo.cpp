@@ -331,6 +331,8 @@ int32_t komodo_validate_chain(uint256 srchash,int32_t notarized_height)
     } else return(1);
 }
 
+#define KOMODO_MINRATIFY ((height < Params().KomodoMinRatifyHeight()) ? 7 : 11)
+
 int32_t komodo_voutupdate(bool fJustCheck,int32_t *isratificationp,int32_t notaryid,uint8_t *scriptbuf,
         int32_t scriptlen,int32_t height,uint256 txhash,int32_t i,int32_t j,uint64_t *voutmaskp,
         int32_t *specialtxp,int32_t *notarizedheightp,uint64_t value,int32_t notarized,
@@ -543,8 +545,9 @@ int32_t komodo_voutupdate(bool fJustCheck,int32_t *isratificationp,int32_t notar
                 }
             } else if ( opretlen != 149 && height > 600000 && matched != 0 )
                 printf("%s validated.%d notarized.%d %llx reject ht.%d NOTARIZED.%d prev.%d %s.%s DESTTXID.%s len.%d opretlen.%d\n",
-                        ccdata.symbol,validated,notarized,(long long)signedmask,height,*notarizedheightp,sp->LastNotarizedHeight(),
-                        ASSETCHAINS_SYMBOL[0]==0?"KMD":ASSETCHAINS_SYMBOL,srchash.ToString().c_str(),desttxid.ToString().c_str(),len,opretlen);
+                        ccdata.symbol,validated,notarized,(long long)signedmask,height,*notarizedheightp,
+                        sp->LastNotarizedHeight(), ASSETCHAINS_SYMBOL[0]==0?"KMD":ASSETCHAINS_SYMBOL,
+                        srchash.ToString().c_str(),desttxid.ToString().c_str(),len,opretlen);
         }
         else if ( matched != 0 && i == 0 && j == 1 && opretlen == 149 )
         {
@@ -673,7 +676,7 @@ int32_t komodo_connectblock(bool fJustCheck, CBlockIndex *pindex,CBlock& block)
             numvouts = block.vtx[i].vout.size();
             notaryid = -1;
             voutmask = specialtx = notarizedheight = isratification = notarized = 0;
-            signedmask = (height < 91400) ? 1 : 0;
+            signedmask = (height < Params().KomodoSignedMaskChangeHeight() ) ? 1 : 0;
             numvins = block.vtx[i].vin.size();
             for (j=0; j<numvins; j++)
             {
@@ -693,7 +696,7 @@ int32_t komodo_connectblock(bool fJustCheck, CBlockIndex *pindex,CBlock& block)
                 } //else printf("cant get scriptPubKey for ht.%d txi.%d vin.%d\n",height,i,j);
             }
             numvalid = bitweight(signedmask);
-            if ( ((height < 90000 || (signedmask & 1) != 0) && numvalid >= KOMODO_MINRATIFY) ||
+            if ( ((height < Params().KomodoMinRatifyHeight() || (signedmask & 1) != 0) && numvalid >= KOMODO_MINRATIFY) ||
                 (numvalid >= KOMODO_MINRATIFY && ASSETCHAINS_SYMBOL[0] != 0) ||
                 numvalid > (numnotaries/5) )
             {

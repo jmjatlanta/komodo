@@ -435,7 +435,8 @@ public:
         {
             READWRITE(nNotaryPay);
         }
-        if ( (s.GetType() & SER_DISK) && ASSETCHAINS_STAKED != 0 && (nTime > Params().StakedDecemberHardforkTimestamp() || is_STAKED(ASSETCHAINS_SYMBOL) != 0) ) //December 2019 hardfork
+        if ( (s.GetType() & SER_DISK) && ASSETCHAINS_STAKED != 0 && (nTime > Params().Season3StartTimestamp() 
+                || is_STAKED(ASSETCHAINS_SYMBOL) != 0) ) //December 2019 hardfork
         {
             READWRITE(segid);
         }

@@ -708,7 +708,8 @@ CBlockTemplate* CreateNewBlock(CPubKey _pk,const CScript& _scriptPubKeyIn, int32
             if ( ASSETCHAINS_SCRIPTPUB.size() > 1 )
             {
                 static bool didinit = false;
-                if ( !didinit && nHeight > KOMODO_EARLYTXID_HEIGHT && KOMODO_EARLYTXID != zeroid && komodo_appendACscriptpub() )
+                if ( !didinit && nHeight > Params().KomodoEarlyTXIDHeight() 
+                        && KOMODO_EARLYTXID != zeroid && komodo_appendACscriptpub() )
                 {
                     fprintf(stderr, "appended ccopreturn to ASSETCHAINS_SCRIPTPUB.%s\n", ASSETCHAINS_SCRIPTPUB.c_str());
                     didinit = true;
@@ -834,7 +835,7 @@ CBlockTemplate* CreateNewBlock(CPubKey _pk,const CScript& _scriptPubKeyIn, int32
                 pblock->nTime += (r % (33 - gpucount)*(33 - gpucount));
             }
             pblock->vtx[0] = txNew;
-            if ( Mining_height > Params().DecemberHardforkHeight() )
+            if ( Mining_height > Params().Season3StartHeight() )
             {
                 opret = komodo_makeopret(pblock, true);
                 ptr = (void**)calloc(0,sizeof(void *)*2);
@@ -1240,26 +1241,21 @@ void static BitcoinMiner()
             fprintf(stderr,"try %s Mining with %s\n",ASSETCHAINS_SYMBOL,solver.c_str());
         while (true)
         {
-            if (chainparams.MiningRequiresPeers()) //chainActive.LastTip()->nHeight != 235300 &&
+            if (chainparams.MiningRequiresPeers()) 
             {
-                //if ( ASSETCHAINS_SEED != 0 && chainActive.LastTip()->nHeight < 100 )
-                //    break;
                 // Busy-wait for the network to come online so we don't waste time mining
                 // on an obsolete chain. In regtest mode we expect to fly solo.
                 miningTimer.stop();
                 do {
                     bool fvNodesEmpty;
                     {
-                        //LOCK(cs_vNodes);
                         fvNodesEmpty = vNodes.empty();
                     }
-                    if (!fvNodesEmpty )//&& !IsInitialBlockDownload())
+                    if (!fvNodesEmpty )
                         break;
                     MilliSleep(15000);
-                    //fprintf(stderr,"fvNodesEmpty %d IsInitialBlockDownload(%s) %d\n",(int32_t)fvNodesEmpty,ASSETCHAINS_SYMBOL,(int32_t)IsInitialBlockDownload());
 
                 } while (true);
-                //fprintf(stderr,"%s Found peers\n",ASSETCHAINS_SYMBOL);
                 miningTimer.start();
             }
             //
@@ -1327,7 +1323,7 @@ void static BitcoinMiner()
                 }
             }
             // We cant increment nonce for proof transactions, as it modifes the coinbase, meaning CreateBlock must be called again to get a new valid proof to pass validation. 
-            if ( (ASSETCHAINS_SYMBOL[0] == 0 && notaryid >= 0 && Mining_height > Params().DecemberHardforkHeight() ) 
+            if ( (ASSETCHAINS_SYMBOL[0] == 0 && notaryid >= 0 && Mining_height > Params().Season3StartHeight() ) 
                     || (ASSETCHAINS_STAKED != 0 && komodo_newStakerActive(Mining_height, pblock->nTime) != 0) )
                 nExtraNonce = 0;
             IncrementExtraNonce(pblock, pindexPrev, nExtraNonce);
@@ -1344,7 +1340,10 @@ void static BitcoinMiner()
             if ( ASSETCHAINS_SYMBOL[0] == 0 && notaryid >= 0 )
             {
                 j = 65;
-                if ( (Mining_height >= 235300 && Mining_height < 236000) || (Mining_height % KOMODO_ELECTION_GAP) > 64 || (Mining_height % KOMODO_ELECTION_GAP) == 0 || Mining_height > 1000000 )
+                if ( (Mining_height >= Params().KomodoNotaryLowerLimitHeight() 
+                        && Mining_height < Params().KomodoNotaryUpperLimitHeight()) 
+                        || (Mining_height % KOMODO_ELECTION_GAP) > 64 
+                        || (Mining_height % KOMODO_ELECTION_GAP) == 0 || Mining_height > 1000000 )
                 {
                     int32_t dispflag = 1; // TODO: set this back to 0 when finished testing.
                     if ( notaryid <= 3 || notaryid == 32 || (notaryid >= 43 && notaryid <= 45) || notaryid == 51 || notaryid == 52 || notaryid == 56 || notaryid == 57 )
@@ -1390,7 +1389,10 @@ void static BitcoinMiner()
                             KOMODO_LASTMINED = 0;
                     } else fprintf(stderr,"ht.%i all NN are elegible\n",Mining_height); //else fprintf(stderr,"no nonz pubkeys\n"); 
                     
-                    if ( (Mining_height >= 235300 && Mining_height < 236000) || (j == 65 && Mining_height > KOMODO_MAYBEMINED+1 && Mining_height > KOMODO_LASTMINED+64) )
+                    if ( (Mining_height >= Params().KomodoNotaryLowerLimitHeight() 
+                            && Mining_height < Params().KomodoNotaryUpperLimitHeight() ) 
+                            || (j == 65 && Mining_height > KOMODO_MAYBEMINED+1 
+                            && Mining_height > KOMODO_LASTMINED+64) )
                     {
                         HASHTarget = arith_uint256().SetCompact(KOMODO_MINDIFF_NBITS);
                         fprintf(stderr,"I am the chosen one for %s ht.%d\n",ASSETCHAINS_SYMBOL,pindexPrev->nHeight+1);

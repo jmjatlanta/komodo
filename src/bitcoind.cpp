@@ -71,9 +71,11 @@ void WaitForShutdown(boost::thread_group* threadGroup)
     int32_t i,height; CBlockIndex *pindex; const uint256 zeroid;
     bool fShutdown = ShutdownRequested();
     // Tell the main threads to shutdown.
-    if (komodo_currentheight()>KOMODO_EARLYTXID_HEIGHT && KOMODO_EARLYTXID!=zeroid && ((height=tx_height(KOMODO_EARLYTXID))==0 || height>KOMODO_EARLYTXID_HEIGHT))
+    if (komodo_currentheight() > Params().KomodoEarlyTXIDHeight() 
+            && KOMODO_EARLYTXID!=zeroid 
+            && ((height=tx_height(KOMODO_EARLYTXID))==0 || height > Params().KomodoEarlyTXIDHeight()))
     {
-        fprintf(stderr,"error: earlytx must be before block height %d or tx does not exist\n",KOMODO_EARLYTXID_HEIGHT);
+        fprintf(stderr,"error: earlytx must be before block height %d or tx does not exist\n", Params().KomodoEarlyTXIDHeight() );
         StartShutdown();
     }
     /*if ( ASSETCHAINS_STAKED == 0 && ASSETCHAINS_ADAPTIVEPOW == 0 && (pindex= komodo_chainactive(1)) != 0 )

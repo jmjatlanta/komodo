@@ -407,7 +407,7 @@ uint64_t komodo_paxcalc(int32_t height,uint32_t *pvals,int32_t baseid,int32_t re
     {
         if ( relid == MAX_CURRENCIES )
         {
-            if ( height < 236000 )
+            if ( height < Params().KomodoNotaryUpperLimitHeight() )
             {
                 if ( kmdbtc == 0 )
                     kmdbtc = pvals[MAX_CURRENCIES];
@@ -428,7 +428,7 @@ uint64_t komodo_paxcalc(int32_t height,uint32_t *pvals,int32_t baseid,int32_t re
                 baseusd = (((uint64_t)pvalb * 1000000000) / pvals[USD]);
                 usdvol = komodo_paxvol(basevolume,baseusd);
                 usdkmd = ((uint64_t)kmdbtc * 1000000000) / btcusd;
-                if ( height >= 236000-10 )
+                if ( height >= Params().KomodoNotaryUpperLimitHeight() - 10 )
                 {
                     BTCUSD = PAX_BTCUSD(height,btcusd);
                     if ( height < BTCFACTOR_HEIGHT || (height < 500000 && BTCUSD > 20000) )
@@ -577,7 +577,7 @@ uint64_t _komodo_paxpriceB(uint64_t seed,int32_t height,char *base,char *rel,uin
 uint64_t komodo_paxpriceB(uint64_t seed,int32_t height,char *base,char *rel,uint64_t basevolume)
 {
     uint64_t baseusd,basekmd,usdkmd; int32_t baseid = komodo_baseid(base);
-    if ( height >= 236000 && strcmp(rel,"kmd") == 0 )
+    if ( height >= Params().KomodoNotaryUpperLimitHeight() && strcmp(rel,"kmd") == 0 )
     {
         usdkmd = _komodo_paxpriceB(seed,height,(char *)"USD",(char *)"KMD",SATOSHIDEN);
         if ( strcmp("usd",base) == 0 )
@@ -633,7 +633,7 @@ uint64_t komodo_paxprice(uint64_t *seedp,int32_t height,char *base,char *rel,uin
                         break;
                 }
             }
-            if ( height < 165000 || height > 236000 )
+            if ( height < Params().KomodoPaxLowerLimitHeight() || height > Params().KomodoNotaryUpperLimitHeight() )
                 break;
         }
     }

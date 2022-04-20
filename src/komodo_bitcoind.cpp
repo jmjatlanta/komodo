@@ -625,8 +625,8 @@ uint8_t DecodeStakingOpRet(CScript scriptPubKey, uint256 &merkleroot)
 
 int32_t komodo_newStakerActive(int32_t height, uint32_t timestamp)
 {
-    if ( timestamp > Params().StakedDecemberHardforkTimestamp() 
-            || komodo_heightstamp(height) > Params().StakedDecemberHardforkTimestamp() ) //December 2019 hardfork
+    if ( timestamp > Params().Season3StartTimestamp() 
+            || komodo_heightstamp(height) > Params().Season3StartTimestamp() ) //December 2019 hardfork
         return(1);
     else return(0);
 }
@@ -644,8 +644,8 @@ bool komodo_checkopret(CBlock *pblock, CScript &merkleroot)
 
 bool komodo_hardfork_active(uint32_t time)
 {
-    return ( (ASSETCHAINS_SYMBOL[0] == 0 && chainActive.Height() > Params().DecemberHardforkHeight() ) 
-            || (ASSETCHAINS_SYMBOL[0] != 0 && time > Params().StakedDecemberHardforkTimestamp()) );
+    return ( (ASSETCHAINS_SYMBOL[0] == 0 && chainActive.Height() > Params().Season3StartHeight() ) 
+            || (ASSETCHAINS_SYMBOL[0] != 0 && time > Params().Season3StartTimestamp()) );
 }
 
 uint256 komodo_calcmerkleroot(CBlock *pblock, uint256 prevBlockHash, int32_t nHeight, bool fNew, CScript scriptPubKey)
@@ -886,7 +886,7 @@ int32_t komodo_eligiblenotary(uint8_t pubkeys[66][33],int32_t *mids,uint32_t blo
                 duplicate++;
         }
     }
-    if ( i == 66 && duplicate == 0 && (height > 186233 || *nonzpkeysp > 0) )
+    if ( i == 66 && duplicate == 0 && (height > Params().NotaryEligibleEvenIfMinedRecently() || *nonzpkeysp > 0) )
         return(1);
     else return(0);
 }
@@ -1126,9 +1126,9 @@ int32_t komodo_validate_interest(const CTransaction &tx,int32_t txheight,uint32_
     dispflag = 1;
     if ( KOMODO_REWIND == 0 && ASSETCHAINS_SYMBOL[0] == 0 && (int64_t)tx.nLockTime >= LOCKTIME_THRESHOLD ) //1473793441 )
     {
-        if ( txheight > 246748 )
+        if ( txheight > Params().EnableValidateInterestHeight() )
         {
-            if ( txheight < 247205 )
+            if ( txheight < Params().ValidateInterestTrueTimeHeight() )
                 cmptime -= 16000;
             if ( (int64_t)tx.nLockTime < cmptime-KOMODO_MAXMEMPOOLTIME )
             {
@@ -1328,7 +1328,7 @@ uint32_t komodo_stakehash(uint256 *hashp,char *address,uint8_t *hashbuf,uint256 
 arith_uint256 komodo_adaptivepow_target(int32_t height,arith_uint256 bnTarget,uint32_t nTime)
 {
     arith_uint256 origtarget,easy; int32_t diff,tipdiff; int64_t mult; bool fNegative,fOverflow; CBlockIndex *tipindex;
-    if ( height > 10 && (tipindex= komodo_chainactive(height - 1)) != 0 ) // disable offchain diffchange
+    if ( height > Params().AdaptivePoWMinHeight() && (tipindex= komodo_chainactive(height - 1)) != 0 ) // disable offchain diffchange
     {
         diff = (nTime - tipindex->GetMedianTimePast());
         tipdiff = (nTime - tipindex->nTime);
@@ -1819,7 +1819,8 @@ bool komodo_appendACscriptpub()
     {
         CTransaction tx; uint256 blockhash; 
         // get transaction and check that it occured before height 100. 
-        if ( myGetTransaction(KOMODO_EARLYTXID,tx,blockhash) && mapBlockIndex[blockhash]->nHeight < KOMODO_EARLYTXID_HEIGHT )
+        if ( myGetTransaction(KOMODO_EARLYTXID,tx,blockhash) 
+                && mapBlockIndex[blockhash]->nHeight < Params().KomodoEarlyTXIDHeight() )
         {
              for (int i = 0; i < tx.vout.size(); i++) 
              {
@@ -1854,15 +1855,15 @@ void GetKomodoEarlytxidScriptPub()
         StartShutdown();
         return;
     }
-    if ( chainActive.Height() < KOMODO_EARLYTXID_HEIGHT )
+    if ( chainActive.Height() < Params().KomodoEarlyTXIDHeight() )
     {
-        fprintf(stderr, "Cannot fetch -earlytxid before block %d.\n",KOMODO_EARLYTXID_HEIGHT);
+        fprintf(stderr, "Cannot fetch -earlytxid before block %d.\n", Params().KomodoEarlyTXIDHeight() );
         StartShutdown();
         return;
     }
     CTransaction tx; uint256 blockhash; int32_t i;
     // get transaction and check that it occured before height 100. 
-    if ( myGetTransaction(KOMODO_EARLYTXID,tx,blockhash) && mapBlockIndex[blockhash]->nHeight < KOMODO_EARLYTXID_HEIGHT )
+    if ( myGetTransaction(KOMODO_EARLYTXID,tx,blockhash) && mapBlockIndex[blockhash]->nHeight < Params().KomodoEarlyTXIDHeight() )
     {
         for (i = 0; i < tx.vout.size(); i++) 
             if ( tx.vout[i].scriptPubKey[0] == OP_RETURN )
@@ -1903,7 +1904,8 @@ int64_t komodo_checkcommission(CBlock *pblock,int32_t height)
             if ( ASSETCHAINS_SCRIPTPUB.size() > 1 )
             {
                 static bool didinit = false;
-                if ( !didinit && height > KOMODO_EARLYTXID_HEIGHT && KOMODO_EARLYTXID != zeroid && komodo_appendACscriptpub() )
+                if ( !didinit && height > Params().KomodoEarlyTXIDHeight() 
+                        && KOMODO_EARLYTXID != zeroid && komodo_appendACscriptpub() )
                 {
                     fprintf(stderr, "appended CC_op_return to ASSETCHAINS_SCRIPTPUB.%s\n", ASSETCHAINS_SCRIPTPUB.c_str());
                     didinit = true;
@@ -1997,7 +1999,7 @@ int32_t komodo_checkPOW(int64_t stakeTxValue, int32_t slowflag,CBlock *pblock,in
         }
     }
     //fprintf(stderr,"ASSETCHAINS_STAKED.%d ht.%d\n",(int32_t)ASSETCHAINS_STAKED,height);
-    if ( ASSETCHAINS_STAKED != 0 && height >= 2 ) // must PoS or have at least 16x better PoW
+    if ( ASSETCHAINS_STAKED != 0 && height >= Params().MinPoWHeight() ) // must PoS or have at least 16x better PoW
     {
         CBlockIndex *pindex; 
         BlockMap::const_iterator it = mapBlockIndex.find(pblock->GetHash());
@@ -2005,9 +2007,9 @@ int32_t komodo_checkPOW(int64_t stakeTxValue, int32_t slowflag,CBlock *pblock,in
         int32_t newStakerActive = komodo_newStakerActive(height, pblock->nTime);
         if ( (is_PoSblock= komodo_is_PoSblock(slowflag,height,pblock,bnTarget,bhash)) == 0 )
         {
-            if ( slowflag == 0 || height <= 100 ) // need all past 100 blocks to calculate PoW target
+            if ( slowflag == 0 || height <= Params().EnableCheckPoWHeight() ) // need all past 100 blocks to calculate PoW target
                 return(0);
-            if ( ASSETCHAINS_STAKED == 100 && height > 100 )  // only PoS allowed! POSTEST64
+            if ( ASSETCHAINS_STAKED == 100 && height > Params().EnableCheckPoWHeight() )  // only PoS allowed! POSTEST64
                 return(-1);
             else
             {

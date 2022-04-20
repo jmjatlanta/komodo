@@ -18,10 +18,8 @@
 #include "komodo_cJSON.h"
 
 #include "notaries_staked.h"
-#include "komodo_hardfork.h"
 
 #define KOMODO_MAINNET_START 178999
-#define KOMODO_NOTARIES_HEIGHT1 814000
 #define KOMODO_NOTARIES_HEIGHT2 2588672
 #define NUM_KMD_SEASONS 6
 #define NUM_KMD_NOTARIES 64
