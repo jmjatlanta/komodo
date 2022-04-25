@@ -60,33 +60,27 @@ const char *Notaries_genesis[][2] =
 
 const uint32_t* kmd_season_timestamps()
 {
-    static uint32_t timestamps[NUM_KMD_SEASONS] = {0};
-    if (timestamps[0] == 0)
-    {
-        const auto& p = Params();
-        timestamps[0] = p.Season1StartTimestamp();
-        timestamps[1] = p.Season2StartTimestamp();
-        timestamps[2] = p.Season3StartTimestamp();
-        timestamps[3] = p.Season4StartTimestamp();
-        timestamps[4] = p.Season5StartTimestamp();
-        timestamps[5] = p.Season6StartTimestamp();
-    }
+    static uint32_t timestamps[NUM_KMD_SEASONS] = {
+        Params().Season1StartTimestamp(),
+        Params().Season2StartTimestamp(),
+        Params().Season3StartTimestamp(),
+        Params().Season4StartTimestamp(),
+        Params().Season5StartTimestamp(),
+        Params().Season6StartTimestamp()
+    };
     return timestamps;
 }
 
-const int32_t* kmd_season_heights()
+const uint32_t* kmd_season_heights()
 {
-    static int32_t heights[NUM_KMD_SEASONS] = {0};
-    if (heights[0] = 0)
-    {
-        const auto& p = Params();
-        heights[0] = p.Season1StartHeight();
-        heights[1] = p.Season2StartHeight();
-        heights[2] = p.Season3StartHeight();
-        heights[3] = p.Season4StartHeight();
-        heights[4] = p.Season5StartHeight();
-        heights[5] = p.Season6StartHeight();
-    }
+    static uint32_t heights[NUM_KMD_SEASONS] = { 
+        Params().Season1StartHeight(),
+        Params().Season2StartHeight(),
+        Params().Season3StartHeight(),
+        Params().Season4StartHeight(),
+        Params().Season5StartHeight(),
+        Params().Season6StartHeight()
+        };
     return heights;
 }
 
