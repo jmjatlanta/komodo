@@ -41,6 +41,21 @@ TEST_F(CCTest, testIsPayToCryptoCondition)
 
     s = CScript() << OP_CHECKCRYPTOCONDITION;
     ASSERT_FALSE(s.IsPayToCryptoCondition());
+
+    // old style
+    {
+        std::vector<unsigned char> bytes = { 1, 1, OP_CHECKCRYPTOCONDITION };
+        CScript scr(bytes.begin(), bytes.end());
+        ASSERT_TRUE(scr.IsPayToCryptoCondition() );
+    }
+
+    // new style
+    {
+        // even though the pay script could be more than 77 bytes, the 'M' prefix saves it
+        std::vector<unsigned char> bytes = { OP_PUSHDATA2, 1, 0, 'M', OP_CHECKCRYPTOCONDITION };
+        CScript scr(bytes.begin(), bytes.end());
+        ASSERT_TRUE(scr.IsPayToCryptoCondition() );
+    }
 }
 
 
