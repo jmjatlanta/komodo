@@ -1,8 +1,8 @@
 #pragma once
 
-#include "komodo_defs.h"
-
 #include <cstdint>
+
+#include "komodo_defs.h"
 #include "chainparams.h"
 
 template<class T>

@@ -43,6 +43,7 @@ extern int32_t USE_EXTERNAL_PUBKEY;
 extern std::string NOTARY_PUBKEY;
 
 void adjust_hwmheight(int32_t in); // in komodo.cpp
+CCriticalSection& get_cs_main(); // in main.cpp
 
 void setupChain(CBaseChainParams::Network network)
 {
@@ -414,6 +415,13 @@ CBlock TestChain::BuildBlock(std::shared_ptr<TestWallet> who)
 
     CBlock retVal = *pblock;
     return retVal;
+}
+
+bool TestChain::ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pindex, 
+        bool fJustCheck, bool fCheckPOW)
+{
+    LOCK( get_cs_main() );
+    return ::ConnectBlock(block, state, pindex, *(this->GetCoinsViewCache()), fJustCheck, fCheckPOW);
 }
 
 CKey TestChain::getNotaryKey() { return notaryKey; }
