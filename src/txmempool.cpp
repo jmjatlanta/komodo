@@ -414,7 +414,7 @@ void CTxMemPool::removeForReorg(const CCoinsViewCache *pcoins, unsigned int nMem
                     continue;
                 const CCoins *coins = pcoins->AccessCoins(txin.prevout.hash);
 		        if (nCheckFrequency != 0) assert(coins);
-                if (!coins || (coins->IsCoinBase() && (((signed long)nMemPoolHeight) - coins->nHeight < Params().GetConsensus().coinbase_maturity) && 
+                if (!coins || (coins->IsCoinBase() && (((signed long)nMemPoolHeight) - coins->nHeight < consensus.coinbase_maturity) && 
                                                        ((signed long)nMemPoolHeight < komodo_block_unlocktime(coins->nHeight) && 
                                                          coins->IsAvailable(0) && coins->vout[0].nValue >= ASSETCHAINS_TIMELOCKGTE))) {
                     transactionsToRemove.push_back(tx);

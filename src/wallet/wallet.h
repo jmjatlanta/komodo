@@ -749,6 +749,8 @@ private:
  */
 class CWallet : public CCryptoKeyStore, public CValidationInterface
 {
+protected:
+    bool fBroadcastTransactions;
 private:
     bool SelectCoins(const CAmount& nTargetValue, std::set<std::pair<const CWalletTx*,unsigned int> >& setCoinsRet, CAmount& nValueRet, bool& fOnlyCoinbaseCoinsRet, bool& fNeedCoinbaseCoinsRet, const CCoinControl *coinControl = NULL) const;
 
@@ -762,7 +764,6 @@ private:
 
     int64_t nNextResend;
     int64_t nLastResend;
-    bool fBroadcastTransactions;
 
     template <class T>
     using TxSpendMap = std::multimap<T, uint256>;

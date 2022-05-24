@@ -1874,7 +1874,7 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
             if (pool.mapNextTx.count(outpoint))
             {
                 // Disable replacement feature for now
-                return false;
+                return state.Invalid(false, REJECT_INVALID, "mempool conflict");
             }
         }
         BOOST_FOREACH(const JSDescription &joinsplit, tx.vjoinsplit) {

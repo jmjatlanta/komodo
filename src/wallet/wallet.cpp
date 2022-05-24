@@ -771,12 +771,12 @@ set<uint256> CWallet::GetConflicts(const uint256& txid) const
 
 void CWallet::Flush(bool shutdown)
 {
-    bitdb.Flush(shutdown);
+    bitdb->Flush(shutdown);
 }
 
 bool CWallet::Verify(const string& walletFile, string& warningString, string& errorString)
 {
-    if (!bitdb.Open(GetDataDir()))
+    if (!bitdb->Open(GetDataDir()))
     {
         // try moving the database env out of the way
         boost::filesystem::path pathDatabase = GetDataDir() / "database";
@@ -789,7 +789,7 @@ bool CWallet::Verify(const string& walletFile, string& warningString, string& er
         }
 
         // try again
-        if (!bitdb.Open(GetDataDir())) {
+        if (!bitdb->Open(GetDataDir())) {
             // if it still fails, it probably means we can't even create the database env
             string msg = strprintf(_("Error initializing wallet database environment %s!"), GetDataDir());
             errorString += msg;
@@ -800,13 +800,13 @@ bool CWallet::Verify(const string& walletFile, string& warningString, string& er
     if (GetBoolArg("-salvagewallet", false))
     {
         // Recover readable keypairs:
-        if (!CWalletDB::Recover(bitdb, walletFile, true))
+        if (!CWalletDB::Recover(*bitdb, walletFile, true))
             return false;
     }
 
     if (boost::filesystem::exists(GetDataDir() / walletFile))
     {
-        CDBEnv::VerifyResult r = bitdb.Verify(walletFile, CWalletDB::Recover);
+        CDBEnv::VerifyResult r = bitdb->Verify(walletFile, CWalletDB::Recover);
         if (r == CDBEnv::RECOVER_OK)
         {
             warningString += strprintf(_("Warning: wallet.dat corrupt, data salvaged!"
@@ -3536,7 +3536,9 @@ bool CWallet::SelectCoinsMinConf(const CAmount& nTargetValue, int nConfMine, int
     return true;
 }
 
-bool CWallet::SelectCoins(const CAmount& nTargetValue, set<pair<const CWalletTx*,unsigned int> >& setCoinsRet, CAmount& nValueRet,  bool& fOnlyCoinbaseCoinsRet, bool& fNeedCoinbaseCoinsRet, const CCoinControl* coinControl) const
+bool CWallet::SelectCoins(const CAmount& nTargetValue, set<pair<const CWalletTx*,unsigned int> >& setCoinsRet, 
+        CAmount& nValueRet,  bool& fOnlyCoinbaseCoinsRet, bool& fNeedCoinbaseCoinsRet, 
+        const CCoinControl* coinControl) const
 {
     // Output parameter fOnlyCoinbaseCoinsRet is set to true when the only available coins are coinbase utxos.
     uint64_t tmp; int32_t retval;
@@ -3633,7 +3635,16 @@ bool CWallet::SelectCoins(const CAmount& nTargetValue, set<pair<const CWalletTx*
     return retval;
 }
 
-bool CWallet::FundTransaction(CMutableTransaction& tx, CAmount &nFeeRet, int& nChangePosRet, std::string& strFailReason)
+/****
+ * @brief add vIns to transaction
+ * @param tx the transaction with vouts
+ * @param nFeeRet
+ * @param nChangePosRet
+ * @param strFailReason
+ * @returns true on success
+ */
+bool CWallet::FundTransaction(CMutableTransaction& tx, CAmount &nFeeRet, int& nChangePosRet, 
+        std::string& strFailReason)
 {
     vector<CRecipient> vecSend;
 
@@ -3677,8 +3688,20 @@ bool CWallet::FundTransaction(CMutableTransaction& tx, CAmount &nFeeRet, int& nC
     return true;
 }
 
-bool CWallet::CreateTransaction(const vector<CRecipient>& vecSend, CWalletTx& wtxNew, CReserveKey& reservekey, CAmount& nFeeRet,
-                                int& nChangePosRet, std::string& strFailReason, const CCoinControl* coinControl, bool sign)
+/*****
+ * @brief create a transaction
+ * @param vecSend who to send to
+ * @param wtxNew wallet transaction
+ * @param reservekey
+ * @param nFeeRet
+ * @param nChangePosRet
+ * @param strFailReason
+ * @param coinControl
+ * @param sign true to sign inputs
+ */
+bool CWallet::CreateTransaction(const vector<CRecipient>& vecSend, CWalletTx& wtxNew, CReserveKey& reservekey,
+        CAmount& nFeeRet, int& nChangePosRet, std::string& strFailReason, const CCoinControl* coinControl,
+        bool sign)
 {
     uint64_t interest2 = 0; CAmount nValue = 0; unsigned int nSubtractFeeFromAmount = 0;
     BOOST_FOREACH (const CRecipient& recipient, vecSend)
