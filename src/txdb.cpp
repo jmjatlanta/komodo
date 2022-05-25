@@ -278,7 +278,7 @@ bool CCoinsViewDB::GetStats(CCoinsStats &stats) const {
     }
     {
         LOCK(cs_main);
-        stats.nHeight = mapBlockIndex.find(stats.hashBlock)->second->GetHeight();
+        stats.nHeight = mapBlockIndex.find(stats.hashBlock)->second->nHeight;
     }
     stats.hashSerialized = ss.GetHash();
     stats.nTotalAmount = nTotalAmount;
@@ -706,7 +706,7 @@ bool CBlockTreeDB::LoadBlockIndexGuts()
                     // Construct block index object
                     CBlockIndex* pindexNew = InsertBlockIndex(diskindex.GetBlockHash());
                     pindexNew->pprev          = InsertBlockIndex(diskindex.hashPrev);
-                    pindexNew->SetHeight(diskindex.GetHeight());
+                    pindexNew->nHeight = diskindex.nHeight;
                     pindexNew->nFile          = diskindex.nFile;
                     pindexNew->nDataPos       = diskindex.nDataPos;
                     pindexNew->nUndoPos       = diskindex.nUndoPos;

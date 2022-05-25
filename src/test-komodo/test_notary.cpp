@@ -250,9 +250,9 @@ TEST(TestNotary, HardforkActiveDecember2019)
     // test komodo_newStakerActive based on timestamp
     {
         TestChain testChain;
-        auto notary = testChain.AddWallet(testChain.getNotaryKey(), "notary");
-        auto alice = testChain.AddWallet("alice");
-        auto height = testChain.GetIndex()->GetHeight();
+        auto notary = std::make_shared<TestWallet>(testChain.getNotaryKey(), "notary");
+        auto alice = std::make_shared<TestWallet>("alice");
+        auto height = testChain.GetIndex()->nHeight;
         uint32_t timestamp = 0;
         // both are too low
         EXPECT_FALSE( komodo_newStakerActive(height, timestamp) );
@@ -268,7 +268,7 @@ TEST(TestNotary, HardforkActiveDecember2019)
         // because we are well beyond the hardfork time, making just 
         // 1 block should cause the hardfork
         testChain.generateBlock(alice);
-        height = testChain.GetIndex()->GetHeight();
+        height = testChain.GetIndex()->nHeight;
         EXPECT_TRUE( komodo_newStakerActive(height, timestamp) );
     }
     {
@@ -305,7 +305,7 @@ TEST(TestNotary, HardforkActiveDecember2019)
 void displayBlock(const TestChain& testChain, std::shared_ptr<CBlock> block, bool withTransactions = false)
 {
     static uint32_t lastBlockTime;
-    auto height = testChain.GetIndex()->GetHeight();
+    auto height = testChain.GetIndex()->nHeight;
     uint32_t currentBlockTime = time(nullptr);
     if (height == 1)
         lastBlockTime = currentBlockTime;
@@ -340,8 +340,8 @@ TEST(TestNotary, DISABLED_NotaryMining)
     fPrintToConsole = true;
     mapMultiArgs["-debug"] = testing::internal::Strings{"mining", "pow"};
     TestChain testChain;
-    std::shared_ptr<TestWallet> notary = testChain.AddWallet(testChain.getNotaryKey(), "notary");
-    std::shared_ptr<TestWallet> alice = testChain.AddWallet("alice");
+    auto notary = std::make_shared<TestWallet>(testChain.getNotaryKey(), "notary");
+    auto alice = std::make_shared<TestWallet>("alice");
 
     // Alice should mine some blocks
     std::shared_ptr<CBlock> lastBlock;
@@ -352,10 +352,13 @@ TEST(TestNotary, DISABLED_NotaryMining)
         // this makes some txs for notary mining
         if (i > 1 && i < 55) // going above overwinter (ht.61) makes existing transactions invalid (need to research)
         {
-            auto result = alice->Transfer(notary, 10000);
-            if (!result.IsValid())
-                std::cerr << "Unable to transfer from Alice to Notary: " << result.GetRejectReason() << "\n";
-            EXPECT_TRUE( result.IsValid() );
+            try {
+                alice->Transfer(notary, 10000);
+            }
+            catch(const std::logic_error& le)
+            {
+                FAIL() << "Unable to transfer from Alice to Notary: " << le.what() << "\n";
+            }
         }
     }
     uint32_t prevBits = lastBlock->GetBlockHeader().nBits;
@@ -381,8 +384,8 @@ TEST(TestNotary, DISABLED_NotaryMining)
 TEST(TestNotary, DISABLED_GenesisBlock)
 {
     TestChain testChain;
-    std::shared_ptr<TestWallet> notary = testChain.AddWallet( testChain.getNotaryKey() );
-    std::shared_ptr<TestWallet> alice = testChain.AddWallet();
+    auto notary = std::make_shared<TestWallet>( testChain.getNotaryKey(), "notary" );
+    auto alice = std::make_shared<TestWallet>("alice");
     CBlock genesis = Params().GenesisBlock();
     genesis.nNonce = ArithToUint256((UintToArith256(genesis.nNonce)-1));
     ASSERT_TRUE( CalcPoW(&genesis) );
@@ -404,8 +407,8 @@ TEST(TestNotary, DISABLED_GenesisBlock)
 TEST(TestNotary, DISABLED_Wallet)
 {
     TestChain testChain;
-    std::shared_ptr<TestWallet> notary = testChain.AddWallet(testChain.getNotaryKey(), "notary");
-    std::shared_ptr<TestWallet> alice = testChain.AddWallet("alice");
+    auto notary = std::make_shared<TestWallet>(testChain.getNotaryKey(), "notary");
+    auto alice = std::make_shared<TestWallet>("alice");
 
     // Alice should mine some blocks
     std::shared_ptr<CBlock> lastBlock;
@@ -413,14 +416,17 @@ TEST(TestNotary, DISABLED_Wallet)
     {
         lastBlock = testChain.generateBlock(alice);
         displayBlock(testChain, lastBlock, true);
-        alice->DisplayContents();
         // this makes some txs for notary mining
         if (i > 0)
         {
-            auto result = alice->Transfer(notary, 10000);
-            if (!result.IsValid())
-                std::cerr << "Unable to transfer from Alice to Notary: " << result.GetRejectReason() << "\n";
-            EXPECT_TRUE( result.IsValid() );
+            try
+            {
+                alice->Transfer(notary, 10000);
+            }
+            catch(const std::logic_error& le)
+            {
+                FAIL() << "Unable to transfer from Alice to Notary: " << le.what() << "\n";
+            }
         }
     }
     uint32_t prevBits = lastBlock->GetBlockHeader().nBits;

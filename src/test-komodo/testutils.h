@@ -2,7 +2,7 @@
 
 #include "main.h"
 #include "wallet/wallet.h" // CWallet, CReserveKey, etc.
-#include <unordered_map>
+#include "consensus/validation.h"
 
 #define VCH(a,b) std::vector<unsigned char>(a, a + b)
 
@@ -16,6 +16,18 @@ extern std::string notaryPubkey;
 extern std::string notarySecret;
 extern CKey notaryKey;
 
+/***
+ * @brief Look inside a transaction
+ * @param tx the transaction to look at
+ */
+void displayTransaction(const CTransaction& tx);
+/****
+ * @brief Look inside a block
+ * @param blk the block to look at
+ */
+void displayBlock(const CBlock& blk);
+
+void setConsoleDebugging(bool enable);
 
 void setupChain(CBaseChainParams::Network network = CBaseChainParams::REGTEST);
 /***
@@ -34,6 +46,14 @@ void acceptTxFail(const CTransaction tx);
 CTransaction getInputTx(CScript scriptPubKey);
 CMutableTransaction spendTx(const CTransaction &txIn, int nOut=0);
 std::vector<uint8_t> getSig(const CMutableTransaction mtx, CScript inputPubKey, int nIn=0);
+
+class TransactionInProcess
+{
+public:
+    TransactionInProcess(CWallet* wallet) : reserveKey(wallet) {}
+    CWalletTx transaction;
+    CReserveKey reserveKey;
+};
 
 class TestWallet;
 class CCoinsViewDB;
@@ -78,23 +98,10 @@ public:
      * @param who who will mine the block
      * @returns the block generated
      */
-    std::shared_ptr<CBlock> generateBlock(std::shared_ptr<TestWallet> who = nullptr);
-
-    /****
-     * @brief generate PoW on block and submit to chain
-     * @param in the block to push
-     * @return the block
-     */
-    std::shared_ptr<CBlock> generateBlock(const CBlock& in);
-
-    /***
-     * @brief Build a block, but do not add PoW or submit to chain
-     * @param who the miner
-     */
-    CBlock BuildBlock( std::shared_ptr<TestWallet> who );
-
-    std::shared_ptr<CBlock> GetBlock(CBlockIndex* idx) const;
+    std::shared_ptr<CBlock> generateBlock(std::shared_ptr<CWallet> wallet, 
+            CValidationState* validationState = nullptr);
     
+    std::shared_ptr<CBlock> GetBlock(CBlockIndex* idx) const;
     /****
      * @brief set the chain time to something reasonable
      * @note must be called after generateBlock if you
@@ -111,25 +118,29 @@ public:
      * @returns the results
      */
     CValidationState acceptTx(const CTransaction &tx);
-    /***
-     * Creates a wallet with a specific key
-     * @param key the key
-     * @returns the wallet
-     */
-    std::shared_ptr<TestWallet> AddWallet(const CKey &key, const std::string& name = "");
     /****
-     * Create a wallet
-     * @returns the wallet
+     * @brief attempt to connect a block to the chain
+     * @param block the block to connect
+     * @param state where to hold the results
+     * @param pindex the new chain index
+     * @param justCheck whether or not to do all checks
+     * @param checkPOW true to check PoW
+     * @returns true on success
      */
-    std::shared_ptr<TestWallet> AddWallet(const std::string& name = "");
+    bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pindex,
+            bool fJustCheck = false,bool fCheckPOW = false);
+    
+    boost::filesystem::path GetDataDir();
+
 protected:
-    std::vector<std::shared_ptr<TestWallet>> toBeNotified;
     boost::filesystem::path dataDir;
+    bool removeDataOnDestruction = true;
+
+private:
     std::string previousNetwork;
     void CleanGlobals();
     void SetupMining(std::shared_ptr<TestWallet> who);
     std::vector<std::shared_ptr<CBlock>> minedBlocks;
-    bool removeDataOnDestruction = true;
     bool inMemory = true;
     CCoinsViewDB* pcoinsdbview = nullptr;
     /***
@@ -150,15 +161,14 @@ public:
 };
 
 /***
- * A simplistic (dumb) wallet for helping with testing
- * - It does not keep track of spent transactions
- * - Blocks containing vOuts that apply are added to the front of a vector
+ * An easy-to-use wallet for testing Komodo
  */
 class TestWallet : public CWallet
 {
 public:
-    TestWallet(TestChain* chain, const std::string& name = "");
-    TestWallet(TestChain* chain, const CKey& in, const std::string& name = "");
+    TestWallet(const std::string& name);
+    TestWallet(const CKey& in, const std::string& name);
+    ~TestWallet();
     /***
      * @returns the public key
      */
@@ -187,17 +197,6 @@ public:
      * @returns the bytes to add to ScriptSig
      */
     std::vector<unsigned char> Sign(CC* cc, uint256 hash);
-    /***
-     * Notifies this wallet of a new block
-     */
-    void BlockNotification(std::shared_ptr<CBlock> block);
-
-    /***
-     * Add a transaction to the list of available vouts
-     * @param tx the transaction
-     * @param n the n value of the vout
-     */
-    CWalletTx& AddOut(const CTransaction& tx, uint32_t n);
     /*****
      * @brief create a transaction with 1 recipient (signed)
      * @param to who to send funds to
@@ -205,41 +204,39 @@ public:
      * @param fee
      * @returns the transaction
      */
-    CTransaction CreateSpendTransaction(std::shared_ptr<TestWallet> to, CAmount amount, CAmount fee = 0);
+    TransactionInProcess CreateSpendTransaction(std::shared_ptr<TestWallet> to, CAmount amount,
+            CAmount fee = 0, bool commit = true);
+    /*************
+     * @brief Create a transaction, do not place in mempool
+     * @note throws std::logic_error if there was a problem
+     * @param to who to send to
+     * @param amount the amount to send
+     * @param fee the fee
+     * @param txToSpend the specific transaction to spend (ok if not transmitted yet)
+     * @returns the transaction
+    */
+    TransactionInProcess CreateSpendTransaction(std::shared_ptr<TestWallet> to, 
+            CAmount amount, CAmount fee, CCoinControl& coinControl);
+    /****
+     * @brief create a transaction spending a vout that is not yet in the wallet
+     * @param vecSend the recipients
+     * @param wtxNew the resultant tx
+     * @param reserveKey the key used
+     * @param strFailReason the reason for any failure
+     * @param outputControl the tx to spend
+     * @returns true on success
+     */
+    bool CreateTransaction(const std::vector<CRecipient>& vecSend, CWalletTx& wtxNew, 
+            CReserveKey& reservekey, std::string& strFailReason, CCoinControl* coinControl);
+    using CWallet::CommitTransaction;
+    bool CommitTransaction(CWalletTx& wtxNew, CReserveKey& reservekey, CValidationState& state);
     /***
      * Transfer to another user (sends to mempool)
      * @param to who to transfer to
      * @param amount the amount
      * @returns the results
      */
-    CValidationState Transfer(std::shared_ptr<TestWallet> to, CAmount amount, CAmount fee = 0);
-    virtual CReserveKey GetReserveKey() override;
-    virtual void ReserveKeyFromKeyPool(int64_t& nIndex, CKeyPool& keypool) override;
-
-
-    /****
-     * @brief get avalable outputs
-     * @param[out] vCoins available outputs
-     * @param fOnlyConfirmed only include confirmed txs
-     * @param coinControl
-     * @param fIncludeZeroValue
-     * @param fIncludeCoinBase
-     */
-    virtual void AvailableCoins(std::vector<COutput>& vCoins, 
-            bool fOnlyConfirmed=true, const CCoinControl *coinControl = NULL, 
-            bool fIncludeZeroValue=false, bool fIncludeCoinBase=true) const override;
-
-    bool IsSpent(const uint256& hash, unsigned int n) const override;
-    bool IsMine(const uint256& hash, uint32_t voutNum) const;
-
-    void DisplayContents();
-
+    CTransaction Transfer(std::shared_ptr<TestWallet> to, CAmount amount, CAmount fee = 0);
 private:
-    TestChain *chain;
     CKey key;
-    std::unordered_multimap<std::string, CWalletTx> availableTransactions;
-    // the tx hash and the index within the tx
-    std::unordered_multimap<std::string, uint32_t> spentTransactions;
-    CScript destScript;
-    const std::string name;
 };
