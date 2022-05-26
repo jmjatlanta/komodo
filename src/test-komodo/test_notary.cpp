@@ -44,7 +44,7 @@ bool operator==(const my_key& lhs, const my_key& rhs)
     return false;
 }
 
-TEST(TestNotary, KomodoNotaries)
+TEST(test_notary, KomodoNotaries)
 {
     // Test komodo_notaries(), getkmdseason()
     ASSETCHAINS_SYMBOL[0] = 0;
@@ -125,7 +125,7 @@ TEST(TestNotary, KomodoNotaries)
     }
 }
 
-TEST(TestNotary, ElectedNotary)
+TEST(test_notary, ElectedNotary)
 {
     // exercise the routine that checks to see if a particular public key is a notary at the current height
 
@@ -178,7 +178,7 @@ uint32_t GetCoinbaseNonce(const CBlock& in)
     return retVal;
 }
 
-TEST(TestNotary, HardforkActiveDecember2019)
+TEST(test_notary, HardforkActiveDecember2019)
 {
     /*
     {
@@ -299,41 +299,7 @@ TEST(TestNotary, HardforkActiveDecember2019)
     }
 }
 
-/***
- * Prints out some details of a block
- */
-void displayBlock(const TestChain& testChain, std::shared_ptr<CBlock> block, bool withTransactions = false)
-{
-    static uint32_t lastBlockTime;
-    auto height = testChain.GetIndex()->nHeight;
-    uint32_t currentBlockTime = time(nullptr);
-    if (height == 1)
-        lastBlockTime = currentBlockTime;
-    std::cout << "Block " << block->GetHash().ToString() 
-            << " contains " << std::to_string( block->vtx.size() ) 
-            << " transactions, and a difficulty of " 
-            << std::to_string( block->GetBlockHeader().nBits)
-            << ". There are " << std::to_string( currentBlockTime - lastBlockTime)
-            << " seconds between the last block and this one.\n";
-    lastBlockTime = currentBlockTime;
-    if (withTransactions)
-        for (auto& tx : block->vtx)
-        {
-            std::cout << " Transaction hash: " << tx.GetHash().ToString() << "\n";
-            std::cout << "  Inputs:\n";
-            for( auto i : tx.vin)
-            {
-                std::cout << "  Hash of prevout: " << i.prevout.hash.ToString() << "\n";
-            }
-            std::cout << "  Outputs:\n";
-            for( auto o : tx.vout )
-            {
-                std::cout << "  Hash of out: " << o.GetHash().ToString() << "\n";
-            }
-        }
-}
-
-TEST(TestNotary, DISABLED_NotaryMining)
+TEST(test_notary, DISABLED_NotaryMining)
 {
     // setup LogPrint logging
     fDebug = true;
@@ -348,7 +314,7 @@ TEST(TestNotary, DISABLED_NotaryMining)
     for(int i = 0; i < 67; ++i)
     {
         lastBlock = testChain.generateBlock(alice);
-        displayBlock(testChain, lastBlock, false);
+        displayBlock(*lastBlock);
         // this makes some txs for notary mining
         if (i > 1 && i < 55) // going above overwinter (ht.61) makes existing transactions invalid (need to research)
         {
@@ -369,19 +335,19 @@ TEST(TestNotary, DISABLED_NotaryMining)
      */
     // a notary should be able to mine with a lower difficulty
     lastBlock = testChain.generateBlock(notary);
-    displayBlock(testChain, lastBlock, false);
+    displayBlock(*lastBlock);
     auto notaryBits = lastBlock->GetBlockHeader().nBits;
     EXPECT_LT(notaryBits, prevBits);
     // a non-notary should be back at the regular difficulty
     lastBlock = testChain.generateBlock(alice);
-    displayBlock(testChain, lastBlock, false);
+    displayBlock(*lastBlock);
     EXPECT_GT(prevBits, notaryBits);
 }
 
 /***
  * Checking the Genesis block
  */
-TEST(TestNotary, DISABLED_GenesisBlock)
+TEST(test_notary, DISABLED_GenesisBlock)
 {
     TestChain testChain;
     auto notary = std::make_shared<TestWallet>( testChain.getNotaryKey(), "notary" );
@@ -404,18 +370,21 @@ TEST(TestNotary, DISABLED_GenesisBlock)
 /****
  * Checking some things in the TestWallet
  */
-TEST(TestNotary, DISABLED_Wallet)
+TEST(test_notary, Wallet)
 {
     TestChain testChain;
     auto notary = std::make_shared<TestWallet>(testChain.getNotaryKey(), "notary");
     auto alice = std::make_shared<TestWallet>("alice");
+
+    std::cout << "Notary Public Key: " << notary->GetPubKey().GetHash().ToString() << "\n";
+    std::cout << "Alice Public key: " << alice->GetPubKey().GetHash().ToString() << "\n";
 
     // Alice should mine some blocks
     std::shared_ptr<CBlock> lastBlock;
     for(int i = 0; i < 20; ++i)
     {
         lastBlock = testChain.generateBlock(alice);
-        displayBlock(testChain, lastBlock, true);
+        displayBlock(*lastBlock);
         // this makes some txs for notary mining
         if (i > 0)
         {
@@ -432,12 +401,12 @@ TEST(TestNotary, DISABLED_Wallet)
     uint32_t prevBits = lastBlock->GetBlockHeader().nBits;
     // a notary should be able to mine with a lower difficulty
     lastBlock = testChain.generateBlock(notary);
-    displayBlock(testChain, lastBlock);
+    displayBlock(*lastBlock);
     auto notaryBits = lastBlock->GetBlockHeader().nBits;
     EXPECT_LT(notaryBits, prevBits);
     // a non-notary should be back at the regular difficulty
     lastBlock = testChain.generateBlock(alice);
-    displayBlock(testChain, lastBlock);
+    displayBlock(*lastBlock);
     EXPECT_GT(prevBits, notaryBits);
 }
 

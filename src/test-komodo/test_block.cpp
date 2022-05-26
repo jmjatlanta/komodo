@@ -44,9 +44,20 @@ TEST(test_block, TestConnectWithoutChecks)
     auto alice = std::make_shared<TestWallet>("alice");
     std::shared_ptr<CBlock> lastBlock = chain.generateBlock(notary); // genesis block
     ASSERT_GT( chain.GetIndex()->nHeight, 0 );
+    displayBlock(*lastBlock);
     // Add some transaction to a block
     int32_t newHeight = chain.GetIndex()->nHeight + 1;
-    TransactionInProcess fundAlice = notary->CreateSpendTransaction(alice, 100000);
+    TransactionInProcess fundAlice(notary.get());
+    try
+    {
+        fundAlice = notary->CreateSpendTransaction(alice, 100000, 0, false);
+        displayTransaction(fundAlice.transaction);
+        EXPECT_TRUE(notary->CommitTransaction(fundAlice.transaction, fundAlice.reserveKey));
+    } 
+    catch( const std::logic_error& le)
+    {
+        FAIL() << le.what();
+    }
     // construct the block
     CBlock block;
     // first a coinbase tx
@@ -145,7 +156,7 @@ TEST(test_block, TestDoubleSpendInSameBlock)
     */
 }
 
-bool CalcPoW(CBlock *pblock);
+bool CalcPoW(CBlock *);
 
 TEST(test_block, TestProcessBlock)
 {
@@ -252,7 +263,7 @@ public:
     void RemoveOnDestruction(bool in) { removeDataOnDestruction = in; }
 };
 
-TEST(BlockTest, CorruptBlockFile)
+TEST(test_block, CorruptBlockFile)
 {
     /****
      * in main.h set the sizes to something small to prevent this from running a VERY

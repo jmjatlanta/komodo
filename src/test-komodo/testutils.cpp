@@ -25,7 +25,6 @@
 #include "testutils.h"
 
 void undo_init_notaries(); // test helper
-bool CalcPoW(CBlock *pblock); // generate PoW on a block
 void BitcoinMiner(CWallet *pwallet); // in miner.cpp
 void komodo_init(int32_t height); // in komodo_bitcoind.cpp
 void ThreadImport(std::vector<boost::filesystem::path> vImport); // in main.cpp
@@ -96,9 +95,6 @@ void setupChain(CBaseChainParams::Network network)
     NOTARY_PUBKEY = notaryPubkey;
     STAKED_NOTARY_ID = -1;
     USE_EXTERNAL_PUBKEY = 0;
-    // dirty trick to release coinbase funds
-    ASSETCHAINS_TIMEUNLOCKFROM = 100;
-    ASSETCHAINS_TIMEUNLOCKTO = 100;
     mapArgs["-mineraddress"] = "bogus";
     // Global mock time
     nMockTime = GetTime();
@@ -320,7 +316,11 @@ TestChain::TestChain(CBaseChainParams::Network desiredNetwork, boost::filesystem
 TestChain::~TestChain()
 {
     if (removeDataOnDestruction)
+    {
+        // cruel and crude, but cleans up any wallet dbs so subsequent tests run.
+        bitdb = std::shared_ptr<CDBEnv>(new CDBEnv{});
         boost::filesystem::remove_all(dataDir);
+    }
     else
         FlushStateToDisk();
     if (pnotarisations != nullptr)
@@ -344,9 +344,6 @@ TestChain::~TestChain()
         pblocktree = nullptr;
     }
     CleanGlobals();
-    // cruel and crude, but cleans up any wallet dbs so subsequent tests run.
-    bitdb = std::shared_ptr<CDBEnv>(new CDBEnv{});
-    boost::filesystem::remove_all(dataDir);
     if (previousNetwork == "main")
         SelectParams(CBaseChainParams::MAIN);
     if (previousNetwork == "regtest")
@@ -365,8 +362,6 @@ void TestChain::StartChain(CBaseChainParams::Network network, bool existing)
     STAKED_NOTARY_ID = -1;
     USE_EXTERNAL_PUBKEY = 0;
     // dirty trick to release coinbase funds
-    ASSETCHAINS_TIMEUNLOCKFROM = 100;
-    ASSETCHAINS_TIMEUNLOCKTO = 100;
     mapArgs["-mineraddress"] = "bogus";
     // Global mock time
     nMockTime = GetTime();
@@ -533,32 +528,6 @@ CPubKey TestWallet::GetPubKey() const { return key.GetPubKey(); }
 CKey TestWallet::GetPrivKey() const { return key; }
 
 /***
- * Sign a typical transaction
- * @param hash the hash to sign
- * @param hashType SIGHASH_ALL or something similar
- * @returns the bytes to add to ScriptSig
-*/
-std::vector<unsigned char> TestWallet::Sign(uint256 hash, unsigned char hashType)
-{
-    std::vector<unsigned char> retVal;
-    key.Sign(hash, retVal);
-    retVal.push_back(hashType);
-    return retVal;
-}
-
-/***
- * Sign a cryptocondition
- * @param cc the cryptocondition
- * @param hash the hash to sign
- * @returns the bytes to add to ScriptSig
-*/
-std::vector<unsigned char> TestWallet::Sign(CC* cc, uint256 hash)
-{
-    int out = cc_signTreeSecp256k1Msg32(cc, key.begin(), hash.begin());            
-    return CCSigVec(cc);
-}
-
-/***
  * Transfer to another user
  * @param to who to transfer to
  * @param amount the amount
@@ -566,7 +535,7 @@ std::vector<unsigned char> TestWallet::Sign(CC* cc, uint256 hash)
  */
 CTransaction TestWallet::Transfer(std::shared_ptr<TestWallet> to, CAmount amount, CAmount fee)
 {
-    TransactionInProcess tip = CreateSpendTransaction(to, amount, fee);
+    TransactionInProcess tip = CreateSpendTransaction(to, amount, fee, false);
     if (!CWallet::CommitTransaction( tip.transaction, tip.reserveKey))
         throw std::logic_error("Error: The transaction was rejected! This might happen if some of the coins in your wallet were already spent, such as if you used a copy of wallet.dat and coins were spent in the copy but not marked as spent here.");
     return tip.transaction;
@@ -605,7 +574,7 @@ TransactionInProcess TestWallet::CreateSpendTransaction(std::shared_ptr<TestWall
     int nChangePosRet = -1;
     TransactionInProcess retVal(this);
     if (!CWallet::CreateTransaction(vecSend, retVal.transaction, retVal.reserveKey, nFeeRequired,
-            nChangePosRet, strError))
+            nChangePosRet, strError, nullptr, true))
     {
         if (!fSubtractFeeFromAmount && amount + nFeeRequired > GetBalance())
             strError = strprintf("Error: This transaction requires a transaction fee of at least %s because of its amount, complexity, or use of recently received funds!",
@@ -613,6 +582,7 @@ TransactionInProcess TestWallet::CreateSpendTransaction(std::shared_ptr<TestWall
         throw std::logic_error(strError);
     }
 
+    // now commit
     if (commit && !CommitTransaction(retVal.transaction, retVal.reserveKey))
     {
         std::logic_error("Unable to commit transaction");

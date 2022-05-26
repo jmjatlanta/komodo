@@ -193,8 +193,6 @@ UniValue getgenerate(const UniValue& params, bool fHelp, const CPubKey& mypk)
     return obj;
 }
 
-extern uint8_t NOTARY_PUBKEY33[33];
-
 /*****
  * Calculate the PoW value for a block
  * @param pblock the block to work on
@@ -235,6 +233,7 @@ bool CalcPoW(CBlock *pblock)
             LOCK(cs_main);
             pblock->nSolution = soln;
             solutionTargetChecks.increment();
+            
             return CheckProofOfWork(*pblock,NOTARY_PUBKEY33,chainActive.Height(),Params().GetConsensus());
         };
         bool found = EhBasicSolveUncancellable(n, k, curr_state, validBlock);
