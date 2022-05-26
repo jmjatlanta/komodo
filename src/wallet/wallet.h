@@ -798,11 +798,6 @@ public:
 
     void ClearNoteWitnessCache();
 
-    /***
-     * @return a key from the reserve pool
-     */
-    virtual CReserveKey GetReserveKey();
-
 protected:
     /**
      * pindex is the new tip being connected.

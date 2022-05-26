@@ -449,6 +449,8 @@ std::shared_ptr<CBlock> TestChain::GetBlock(CBlockIndex* idx) const
 
 std::shared_ptr<CBlock> TestChain::generateBlock(std::shared_ptr<CWallet> wallet, CValidationState* state)
 {
+    // make sure blocks are not created in the same second
+    IncrementChainTime();
     std::shared_ptr<CBlock> block;
     if (wallet == nullptr)
     {
@@ -489,8 +491,11 @@ TestWallet::TestWallet(const std::string& name)
     LOCK(cs_wallet);
     bool firstRunRet;
     DBErrors err = LoadWallet(firstRunRet);
-    if (!AddKey(key))
-        throw std::logic_error("Unable to add key to wallet");
+    if (firstRunRet)
+        if (!AddKey(key))
+            throw std::logic_error("Unable to add key to wallet");
+        else
+            SetDefaultKey(key.GetPubKey());
     RegisterValidationInterface(this);
 }
 
@@ -506,8 +511,11 @@ TestWallet::TestWallet(const CKey& in, const std::string& name)
     LOCK( cs_wallet );
     bool firstRunRet;
     DBErrors err = LoadWallet(firstRunRet);
-    if (!AddKey(key))
-        throw std::logic_error("Unable to add key to wallet");
+    if (firstRunRet)
+        if (!AddKey(key))
+            throw std::logic_error("Unable to add key to wallet");
+        else
+            SetDefaultKey(in.GetPubKey());
     RegisterValidationInterface(this);
 }
 

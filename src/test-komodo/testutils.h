@@ -177,12 +177,7 @@ public:
      * @returns the private key
      */
     CKey GetPrivKey() const;
-    /****
-     * @brief shortcuts the real wallet to return the private key
-     * @return true
-     */
-    virtual bool GetKey(const CKeyID &address, CKey &keyOut) const override 
-            { keyOut = GetPrivKey(); return true; }
+
     /***
      * Sign a typical transaction
      * @param hash the hash to sign

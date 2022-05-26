@@ -1180,7 +1180,7 @@ void BitcoinMiner()
 
 #ifdef ENABLE_WALLET
     // Each thread has its own key
-    CReserveKey reservekey = pwallet->GetReserveKey();
+    CReserveKey reservekey(pwallet);
 #endif
 
     // Each thread has its own counter
