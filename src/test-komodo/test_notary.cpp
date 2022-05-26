@@ -44,7 +44,7 @@ bool operator==(const my_key& lhs, const my_key& rhs)
     return false;
 }
 
-TEST(TestNotary, KomodoNotaries)
+TEST(test_notary, KomodoNotaries)
 {
     // Test komodo_notaries(), getkmdseason()
     ASSETCHAINS_SYMBOL[0] = 0;
@@ -125,7 +125,7 @@ TEST(TestNotary, KomodoNotaries)
     }
 }
 
-TEST(TestNotary, ElectedNotary)
+TEST(test_notary, ElectedNotary)
 {
     // exercise the routine that checks to see if a particular public key is a notary at the current height
 
@@ -178,7 +178,7 @@ uint32_t GetCoinbaseNonce(const CBlock& in)
     return retVal;
 }
 
-TEST(TestNotary, HardforkActiveDecember2019)
+TEST(test_notary, HardforkActiveDecember2019)
 {
     /*
     {
@@ -302,6 +302,7 @@ TEST(TestNotary, HardforkActiveDecember2019)
 /***
  * Prints out some details of a block
  */
+/*
 void displayBlock(const TestChain& testChain, std::shared_ptr<CBlock> block, bool withTransactions = false)
 {
     static uint32_t lastBlockTime;
@@ -332,8 +333,9 @@ void displayBlock(const TestChain& testChain, std::shared_ptr<CBlock> block, boo
             }
         }
 }
+*/
 
-TEST(TestNotary, DISABLED_NotaryMining)
+TEST(test_notary, DISABLED_NotaryMining)
 {
     /***
      * This test proves the ability for notary nodes to mine
@@ -398,7 +400,7 @@ TEST(TestNotary, DISABLED_NotaryMining)
 /***
  * Checking the Genesis block
  */
-TEST(TestNotary, DISABLED_GenesisBlock)
+TEST(test_notary, DISABLED_GenesisBlock)
 {
     TestChain testChain;
     std::shared_ptr<TestWallet> notary = std::make_shared<TestWallet>( testChain.getNotaryKey(), "notary" );
@@ -421,18 +423,20 @@ TEST(TestNotary, DISABLED_GenesisBlock)
 /****
  * Checking some things in the TestWallet
  */
-TEST(TestNotary, DISABLED_Wallet)
+TEST(test_notary, DISABLED_Wallet)
 {
     TestChain testChain;
     std::shared_ptr<TestWallet> notary = std::make_shared<TestWallet>(testChain.getNotaryKey(), "notary");
+    notary->SetBroadcastTransactions(true);
     std::shared_ptr<TestWallet> alice = std::make_shared<TestWallet>("alice");
+    alice->SetBroadcastTransactions(true);
 
     // Alice should mine some blocks
     std::shared_ptr<CBlock> lastBlock;
     for(int i = 0; i < 20; ++i)
     {
         lastBlock = testChain.generateBlock(alice);
-        displayBlock(testChain, lastBlock, true);
+        displayBlock(*lastBlock);
         // this makes some txs for notary mining
         if (i > 0)
         {
@@ -445,17 +449,7 @@ TEST(TestNotary, DISABLED_Wallet)
                 FAIL() << "Unable to transfer from Alice to Notary: " << le.what() << "\n";
             }
         }
-        }
-    uint32_t prevBits = lastBlock->GetBlockHeader().nBits;
-    // a notary should be able to mine with a lower difficulty
-    lastBlock = testChain.generateBlock(notary);
-    displayBlock(testChain, lastBlock);
-    auto notaryBits = lastBlock->GetBlockHeader().nBits;
-    EXPECT_LT(notaryBits, prevBits);
-    // a non-notary should be back at the regular difficulty
-    lastBlock = testChain.generateBlock(alice);
-    displayBlock(testChain, lastBlock);
-    EXPECT_GT(prevBits, notaryBits);
+    }
 }
 
 } // namespace TestNotary

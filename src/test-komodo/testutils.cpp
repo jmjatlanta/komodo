@@ -520,7 +520,7 @@ std::vector<unsigned char> TestWallet::Sign(CC* cc, uint256 hash)
  */
 CTransaction TestWallet::Transfer(std::shared_ptr<TestWallet> to, CAmount amount, CAmount fee)
 {
-    TransactionInProcess tip = CreateSpendTransaction(to, amount, fee);
+    TransactionInProcess tip = CreateSpendTransaction(to, amount, fee, false);
     if (!CWallet::CommitTransaction( tip.transaction, tip.reserveKey))
         throw std::logic_error("Error: The transaction was rejected! This might happen if some of the coins in your wallet were already spent, such as if you used a copy of wallet.dat and coins were spent in the copy but not marked as spent here.");
     return tip.transaction;
