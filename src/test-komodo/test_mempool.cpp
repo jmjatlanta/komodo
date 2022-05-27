@@ -121,7 +121,7 @@ public:
     }
 };
 
-TEST(Mempool, PriorityStatsDoNotCrash) {
+TEST(test_mempool, PriorityStatsDoNotCrash) {
     // Test for security issue 2017-04-11.a
     // https://z.cash/blog/security-announcement-2017-04-12.html
 
@@ -151,10 +151,11 @@ TEST(Mempool, PriorityStatsDoNotCrash) {
     EXPECT_EQ(dPriority, MAX_PRIORITY);
 }
 
-TEST(Mempool, TxInputLimit) {
-    teardownChain();
-    setupChain();
-    SelectParams(CBaseChainParams::REGTEST);
+CCriticalSection& get_cs_main(); // in main.cpp
+
+TEST(test_mempool, TxInputLimit)
+{
+    TestChain chain;
 
     CTxMemPool pool(::minRelayTxFee);
     bool missingInputs;
@@ -170,6 +171,7 @@ TEST(Mempool, TxInputLimit) {
     // Check it fails as expected
     CValidationState state1;
     CTransaction tx1(mtx);
+    LOCK( get_cs_main() );
     EXPECT_FALSE(AcceptToMemoryPool(pool, state1, tx1, false, &missingInputs));
     EXPECT_EQ(state1.GetRejectReason(), "bad-txns-version-too-low");
 
@@ -218,7 +220,7 @@ TEST(Mempool, TxInputLimit) {
 }
 
 // Valid overwinter v3 format tx gets rejected because overwinter hasn't activated yet.
-TEST(Mempool, OverwinterNotActiveYet) {
+TEST(test_mempool, OverwinterNotActiveYet) {
     SelectParams(CBaseChainParams::REGTEST);
     UpdateNetworkUpgradeParameters(Consensus::UPGRADE_OVERWINTER, Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT);
 
@@ -233,6 +235,7 @@ TEST(Mempool, OverwinterNotActiveYet) {
     CValidationState state1;
 
     CTransaction tx1(mtx);
+    LOCK( get_cs_main() );
     EXPECT_FALSE(AcceptToMemoryPool(pool, state1, tx1, false, &missingInputs));
     EXPECT_EQ(state1.GetRejectReason(), "tx-overwinter-not-active");
 
@@ -245,7 +248,7 @@ TEST(Mempool, OverwinterNotActiveYet) {
 // 1. pass CheckTransaction (and CheckTransactionWithoutProofVerification)
 // 2. pass ContextualCheckTransaction
 // 3. fail IsStandardTx
-TEST(Mempool, SproutV3TxFailsAsExpected) {
+TEST(test_mempool, SproutV3TxFailsAsExpected) {
     SelectParams(CBaseChainParams::TESTNET);
 
     CTxMemPool pool(::minRelayTxFee);
@@ -257,6 +260,7 @@ TEST(Mempool, SproutV3TxFailsAsExpected) {
     CValidationState state1;
     CTransaction tx1(mtx);
 
+    LOCK( get_cs_main() );
     EXPECT_FALSE(AcceptToMemoryPool(pool, state1, tx1, false, &missingInputs));
     EXPECT_EQ(state1.GetRejectReason(), "version");
 }
@@ -265,7 +269,7 @@ TEST(Mempool, SproutV3TxFailsAsExpected) {
 // Sprout transaction version 3 when Overwinter is always active:
 // 1. pass CheckTransaction (and CheckTransactionWithoutProofVerification)
 // 2. fails ContextualCheckTransaction
-TEST(Mempool, SproutV3TxWhenOverwinterActive) {
+TEST(test_mempool, SproutV3TxWhenOverwinterActive) {
     SelectParams(CBaseChainParams::REGTEST);
     UpdateNetworkUpgradeParameters(Consensus::UPGRADE_OVERWINTER, Consensus::NetworkUpgrade::ALWAYS_ACTIVE);
 
@@ -278,6 +282,7 @@ TEST(Mempool, SproutV3TxWhenOverwinterActive) {
     CValidationState state1;
     CTransaction tx1(mtx);
 
+    LOCK( get_cs_main() );
     EXPECT_FALSE(AcceptToMemoryPool(pool, state1, tx1, false, &missingInputs));
     EXPECT_EQ(state1.GetRejectReason(), "tx-overwinter-flag-not-set");
 
@@ -289,7 +294,7 @@ TEST(Mempool, SproutV3TxWhenOverwinterActive) {
 // Sprout transaction with negative version, rejected by the mempool in CheckTransaction
 // under Sprout consensus rules, should still be rejected under Overwinter consensus rules.
 // 1. fails CheckTransaction (specifically CheckTransactionWithoutProofVerification)
-TEST(Mempool, SproutNegativeVersionTxWhenOverwinterActive) {
+TEST(test_mempool, SproutNegativeVersionTxWhenOverwinterActive) {
     SelectParams(CBaseChainParams::REGTEST);
     UpdateNetworkUpgradeParameters(Consensus::UPGRADE_OVERWINTER, Consensus::NetworkUpgrade::ALWAYS_ACTIVE);
 
@@ -298,6 +303,8 @@ TEST(Mempool, SproutNegativeVersionTxWhenOverwinterActive) {
     CMutableTransaction mtx = GetValidTransaction();
     mtx.vjoinsplit.resize(0); // no joinsplits
     mtx.fOverwintered = false;
+
+    LOCK( get_cs_main() );
 
     // A Sprout transaction with version -3 is created using Sprout code (as found in zcashd <= 1.0.14).
     // First four bytes of transaction, parsed as an uint32_t, has the value: 0xfffffffd
@@ -337,7 +344,7 @@ TEST(Mempool, SproutNegativeVersionTxWhenOverwinterActive) {
     UpdateNetworkUpgradeParameters(Consensus::UPGRADE_OVERWINTER, Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT);
 }
 
-TEST(Mempool, TransactionsRemain)
+TEST(test_mempool, TransactionsRemain)
 {
     /****
      * Transactions that are not part of a block should remain in the pool
@@ -345,87 +352,95 @@ TEST(Mempool, TransactionsRemain)
      */
     TestChain testChain;
     Params().SetRegTestSimulateNotarizations(false); // don't fake notarizations
-    COINBASE_MATURITY = 100;
-    USE_EXTERNAL_PUBKEY = 0; // we need custom keys for this
-    std::shared_ptr<TestWallet> notaryWallet = testChain.AddWallet(testChain.getNotaryKey());
-    std::shared_ptr<TestWallet> aliceWallet = testChain.AddWallet();
-    std::shared_ptr<TestWallet> charlieWallet = testChain.AddWallet();
-    CBlock blockA0 = testChain.generateBlock(uint256(), true, notaryWallet);
-    // mature the coinbase
-    for(uint8_t i = chainActive.Height() + 1 ; i < 110; ++i)
-    {
-        blockA0 = testChain.generateBlock(blockA0.GetHash(), true, notaryWallet);
-    }
+    auto notaryWallet = std::make_shared<TestWallet>(testChain.getNotaryKey(), "notary");
+    auto aliceWallet = std::make_shared<TestWallet>("alice");
+    auto charlieWallet = std::make_shared<TestWallet>("charlie");
+    auto blockA0 = testChain.generateBlock(notaryWallet);
+    // mature coinbase
+    for(int i = 0; i < 100; ++i)
+        blockA0 = testChain.generateBlock(notaryWallet);
     // put a transaction in the mempool
-    uint32_t lastMempoolSize = testChain.MempoolSize();
-    CTransaction testTx = notaryWallet->CreateSpendTransaction(aliceWallet, 100000, 1000);
-    EXPECT_TRUE( testChain.acceptTx(testTx).IsValid() );
-    EXPECT_EQ( testChain.MempoolSize(), lastMempoolSize+1);
-    lastMempoolSize = testChain.MempoolSize();
-    // Chain A is longest
-    CBlock blockA1 = testChain.generateBlock(blockA0.GetHash(), false, charlieWallet);
-    EXPECT_EQ( testChain.BlockHash(), blockA1.GetHash() );
-    // Tx still in mempool?
-    EXPECT_EQ( testChain.MempoolSize(), lastMempoolSize);
-    // Add another block to the A chain
-    CBlock blockA2 = testChain.generateBlock(blockA1.GetHash(), false, charlieWallet);
-    EXPECT_EQ( testChain.MempoolSize(), lastMempoolSize);
-    EXPECT_EQ( testChain.BlockHash(), blockA2.GetHash() );
-    // Chain B forks from block A1, and block contains mempool tx. But chain A is still longest
-    CBlock blockB2 = testChain.generateBlock(blockA1.GetHash(), true, aliceWallet);
+    uint32_t lastMempoolSize = mempool.size();
+    TransactionInProcess testTx = notaryWallet->CreateSpendTransaction(aliceWallet, 100000, 1000);
+    EXPECT_TRUE( testChain.acceptTx(testTx.transaction).IsValid() );
+    EXPECT_EQ( mempool.size(), lastMempoolSize+1);
+    lastMempoolSize = mempool.size();
+    // Add another block to chain A (A1)
+    CValidationState state;
+    auto blockA1 = testChain.generateBlock(charlieWallet, &state, false);
+    int blockA1Height = testChain.GetIndex()->nHeight;
+    EXPECT_TRUE( state.IsValid() );
+    EXPECT_EQ( testChain.GetIndex()->GetBlockHash(), blockA1->GetHash() );
+    // Verify Tx is still in mempool
+    EXPECT_EQ( mempool.size(), lastMempoolSize);
+    // Add another block to the A chain (A2)
+    auto blockA2 = testChain.generateBlock(charlieWallet, nullptr, false);
+    // Verify Tx is still in mempool
+    EXPECT_EQ( mempool.size(), lastMempoolSize);
+    EXPECT_EQ( testChain.GetIndex()->GetBlockHash(), blockA2->GetHash() );
+
+    // Chain B forks from block A1 to make B2, and block contains mempool tx. But chain A is still longest
+    auto blockB2 = testChain.generateBlock(blockA1->GetHash(), blockA1Height, aliceWallet, &state, true);
+    EXPECT_TRUE( state.IsValid() );
     // Tx still in mempool? Yes, as B is not longest chain
-    EXPECT_EQ( testChain.MempoolSize(), lastMempoolSize);
-    // Is Chain A is still longest
-    EXPECT_EQ( testChain.BlockHash(), blockA2.GetHash() );
-    // Chain B should become longest
-    CBlock blockB3 = testChain.generateBlock(blockB2.GetHash(), false, aliceWallet); 
-    EXPECT_EQ( testChain.BlockHash(), blockB3.GetHash() );
+    EXPECT_EQ( mempool.size(), lastMempoolSize);
+    EXPECT_EQ( testChain.GetIndex()->GetBlockHash(), blockA2->GetHash() );
+    // Add block B3 to make Chain B the longest
+    auto blockB3 = testChain.generateBlock(blockB2->GetHash(), blockA1Height+1, aliceWallet, &state, false); 
+    EXPECT_TRUE( state.IsValid() );
+    EXPECT_EQ( testChain.GetIndex()->GetBlockHash(), blockB3->GetHash() );
     // Tx still in mempool? No, as B ate it
-    EXPECT_EQ( testChain.MempoolSize(), lastMempoolSize-1);
+    EXPECT_EQ( mempool.size(), lastMempoolSize-1);
     // Chain A returns to being the longest chain
-    CBlock blockA3 = testChain.generateBlock(blockA2.GetHash(), false, charlieWallet);
-    CBlock blockA4 = testChain.generateBlock(blockA3.GetHash(), false, charlieWallet);
-    EXPECT_EQ( testChain.BlockHash(), blockA4.GetHash());
+    auto blockA3 = testChain.generateBlock(blockA2->GetHash(), blockA1Height+1, charlieWallet, nullptr, false);
+    auto blockA4 = testChain.generateBlock(blockA3->GetHash(), blockA1Height+2, charlieWallet, nullptr, false);
+    EXPECT_EQ( testChain.GetIndex()->GetBlockHash(), blockA4->GetHash());
     // Tx still in mempool? Yes. The reorg put it back.
-    EXPECT_EQ( testChain.MempoolSize(), lastMempoolSize);
+    EXPECT_EQ( mempool.size(), lastMempoolSize);
 }
 
 extern uint32_t VALIDATE_INTEREST_HARDFORK_HEIGHT;
 extern uint32_t VALIDATE_INTEREST_HARDFORK_TIMEADJUST_HEIGHT;
 
-TEST(Mempool, OldTransactions)
+TEST(test_mempool, OldTransactions)
 {
     // get past the hardfork
     VALIDATE_INTEREST_HARDFORK_HEIGHT = 0;
     VALIDATE_INTEREST_HARDFORK_TIMEADJUST_HEIGHT = 0;
 
     TestChain testChain;
-    auto notaryWallet = testChain.AddWallet(testChain.getNotaryKey());
-    auto aliceWallet = testChain.AddWallet();
-    testChain.generateBlock();
+    auto notaryWallet = std::make_shared<TestWallet>(testChain.getNotaryKey(), "notary");
+    auto aliceWallet = std::make_shared<TestWallet>("alice");
+    testChain.generateBlock(notaryWallet);
+    // mature the coinbase so we can give the notary some coin
+    for(int i = 0; i < 100; ++i)
+        testChain.generateBlock(notaryWallet);
 
     // a transaction that is too old (nLockTime is old) should not be admitted to the pool
     {
-        auto txToSpend = notaryWallet->GetAvailable(100000 + 1000);
-        CMutableTransaction oldTransaction = 
-                notaryWallet->CreateUnsignedSpendTransaction(aliceWallet, txToSpend, 100000, 1000);
+        TransactionInProcess txToSpend = notaryWallet->CreateSpendTransaction(aliceWallet, 1000000, 1000, false);
+        CMutableTransaction oldTransaction(txToSpend.transaction);
         oldTransaction.nLockTime = chainActive.Tip()->GetMedianTimePast() - 86400; // median block time - 1 day
-        EXPECT_FALSE( testChain.acceptTx( notaryWallet->SignTransaction(oldTransaction, txToSpend)).IsValid() );
+        EXPECT_TRUE(notaryWallet->Sign(oldTransaction));
+        CTransaction signedTx(oldTransaction);
+        EXPECT_FALSE( testChain.acceptTx( signedTx ).IsValid() );
     }
 
     // a transaction that is admitted to the pool and then grows old should be expelled from the pool
     {
-        auto txToSpend = notaryWallet->GetAvailable(100000 + 1000);
-        CMutableTransaction oldTransaction = 
-                notaryWallet->CreateUnsignedSpendTransaction(aliceWallet, txToSpend, 100000, 1000);
+        TransactionInProcess txToSpend = notaryWallet->CreateSpendTransaction(aliceWallet, 1000000, 1000, false, false);
+        CMutableTransaction oldTransaction(txToSpend.transaction);
         oldTransaction.nLockTime = chainActive.Tip()->GetMedianTimePast() - 1800; // median block time - 1/2 hour
-        EXPECT_TRUE( testChain.acceptTx( notaryWallet->SignTransaction(oldTransaction, txToSpend)).IsValid() );
+        EXPECT_TRUE( notaryWallet->Sign(oldTransaction));
+        txToSpend.transaction = CWalletTx(notaryWallet.get(), oldTransaction);
+        EXPECT_TRUE( notaryWallet->CommitTransaction(txToSpend.transaction, txToSpend.reserveKey) );
+
         // now mine blocks to push GetMedianTimePast() to the point the tx is removed from the mempool
         uint32_t numBlocksMined = 0;
-        while( testChain.MempoolSize() == 1 && numBlocksMined < 30)
+        while( mempool.size() == 1 && numBlocksMined < 30)
         {
             SetMockTime( chainActive.Tip()->GetMedianTimePast() + 300); // add 5 minutes
-            testChain.generateBlock(false);
+            testChain.generateBlock(notaryWallet, nullptr, false);
             numBlocksMined++;
         }
         EXPECT_LT(numBlocksMined, 20);
@@ -435,14 +450,16 @@ TEST(Mempool, OldTransactions)
     {
         // fast-forward several blocks
         for(auto i = 0; i < 100; ++i)
-            testChain.generateBlock();
-        auto txToSpend = notaryWallet->GetAvailable(100000 + 1000);
-        CMutableTransaction oldTransaction = 
-                notaryWallet->CreateUnsignedSpendTransaction(aliceWallet, txToSpend, 100000, 1000);
+            testChain.generateBlock(notaryWallet);
+        TransactionInProcess txToSpend = notaryWallet->CreateSpendTransaction(aliceWallet, 1000000, 1000, false);
+        CMutableTransaction oldTransaction(txToSpend.transaction);
         oldTransaction.nLockTime = 1;
+        EXPECT_TRUE( notaryWallet->Sign(oldTransaction) );
         // the following test is TRUE, as komodo_validate_interest only looks at time values, not block height.
         // the transaction is accepted although old.
-        EXPECT_TRUE( testChain.acceptTx( notaryWallet->SignTransaction(oldTransaction, txToSpend)).IsValid() );
+        txToSpend.transaction = CWalletTx(notaryWallet.get(), oldTransaction);
+        CTransaction signedTx(oldTransaction);
+        EXPECT_TRUE( notaryWallet->CommitTransaction(txToSpend.transaction, txToSpend.reserveKey ) );
     }
 
 

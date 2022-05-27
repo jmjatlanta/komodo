@@ -747,6 +747,8 @@ private:
  */
 class CWallet : public CCryptoKeyStore, public CValidationInterface
 {
+protected:
+    bool fBroadcastTransactions;
 private:
     bool SelectCoins(const CAmount& nTargetValue, std::set<std::pair<const CWalletTx*,unsigned int> >& setCoinsRet, CAmount& nValueRet, bool& fOnlyCoinbaseCoinsRet, bool& fNeedCoinbaseCoinsRet, const CCoinControl *coinControl = NULL) const;
 
@@ -760,7 +762,6 @@ private:
 
     int64_t nNextResend;
     int64_t nLastResend;
-    bool fBroadcastTransactions;
 
     template <class T>
     using TxSpendMap = std::multimap<T, uint256>;
@@ -1329,10 +1330,6 @@ public:
                           bool ignoreSpent=true,
                           bool requireSpendingKey=true,
                           bool ignoreLocked=true);
-
-    // staking functions
-    bool VerusSelectStakeOutput(CBlock *pBlock, arith_uint256 &hashResult, CTransaction &stakeSource, int32_t &voutNum, int32_t nHeight, uint32_t &bnTarget) const;
-    int32_t VerusStakeTransaction(CBlock *pBlock, CMutableTransaction &txNew, uint32_t &bnTarget, arith_uint256 &hashResult, uint8_t *utxosig, CPubKey pk) const;
 };
 
 /** A key allocated from the key pool. */

@@ -41,11 +41,8 @@ bool operator==(const my_key& lhs, const my_key& rhs)
     return false;
 }
 
-TEST(TestNotary, KomodoNotaries)
+TEST(test_notary, KomodoNotaries)
 {
-    // Test komodo_notaries(), getkmdseason()
-    ASSETCHAINS_SYMBOL[0] = 0;
-    teardownChain();
     uint8_t pubkeys[64][33];
     int32_t height = 0;
     uint32_t timestamp = 0;
@@ -58,18 +55,18 @@ TEST(TestNotary, KomodoNotaries)
     for(;height <= 179999; ++height)
     {
         result = komodo_notaries(pubkeys, height, timestamp);
-        EXPECT_EQ(result, 35);
-        EXPECT_EQ( getkmdseason(height), 1);
-        EXPECT_EQ( my_key(pubkeys[1]), my_key("02ebfc784a4ba768aad88d44d1045d240d47b26e248cafaf1c5169a42d7a61d344"));
+        ASSERT_EQ(result, 35);
+        ASSERT_EQ( getkmdseason(height), 1);
+        ASSERT_EQ( my_key(pubkeys[1]), my_key("02ebfc784a4ba768aad88d44d1045d240d47b26e248cafaf1c5169a42d7a61d344"));
     }
     EXPECT_EQ(height, 180000);
     // at 180000 we start using notaries_elected(komodo_defs.h) instead of Notaries_genesis(komodo_notary.cpp)
     for(;height <= 814000; ++height)
     {
         result = komodo_notaries(pubkeys, height, timestamp);
-        EXPECT_EQ(result, 64);
-        EXPECT_EQ( getkmdseason(height), 1);
-        EXPECT_EQ( my_key(pubkeys[1]), my_key("02ebfc784a4ba768aad88d44d1045d240d47b26e248cafaf1c5169a42d7a61d344"));
+        ASSERT_EQ(result, 64);
+        ASSERT_EQ( getkmdseason(height), 1);
+        ASSERT_EQ( my_key(pubkeys[1]), my_key("02ebfc784a4ba768aad88d44d1045d240d47b26e248cafaf1c5169a42d7a61d344"));
     }
     // make sure the era changes when it was supposed to, and we have a new key
     EXPECT_EQ(height, 814001);
@@ -84,7 +81,6 @@ TEST(TestNotary, KomodoNotaries)
     // also tests STAKED_era()
     height = 0;
     timestamp = 1;
-    teardownChain();
     strcpy(ASSETCHAINS_SYMBOL, "LABS");
     // we should be in era 1 now
     result = komodo_notaries(pubkeys, height, timestamp);
@@ -117,17 +113,13 @@ TEST(TestNotary, KomodoNotaries)
     EXPECT_EQ( getacseason(1525132801), 2);
     EXPECT_EQ( getacseason(1751328000), 6);
     EXPECT_EQ( getacseason(1751328001), 0);
-
-    // cleanup
-    teardownChain();
 }
 
-TEST(TestNotary, ElectedNotary)
+TEST(test_notary, ElectedNotary)
 {
     // exercise the routine that checks to see if a particular public key is a notary at the current height
 
-    // setup
-    teardownChain();
+    TestChain chain;
     my_key first_era("02ebfc784a4ba768aad88d44d1045d240d47b26e248cafaf1c5169a42d7a61d344");
     my_key second_era("030f34af4b908fb8eb2099accb56b8d157d49f6cfb691baa80fdd34f385efed961");
 
