@@ -571,12 +571,12 @@ int32_t komodo_gateway_deposits(CMutableTransaction *txNew,char *base,int32_t to
         txNew->vout[numvouts].nValue = (opcode == 'I') ? pax->fiatoshis : pax->komodoshis;
         txNew->vout[numvouts].scriptPubKey.resize(25);
         script = (uint8_t *)&txNew->vout[numvouts].scriptPubKey[0];
-        *script++ = 0x76;
-        *script++ = 0xa9;
+        *script++ = OP_DUP;
+        *script++ = OP_HASH160;
         *script++ = 20;
         memcpy(script,pax->rmd160,20), script += 20;
-        *script++ = 0x88;
-        *script++ = 0xac;
+        *script++ = OP_EQUALVERIFY;
+        *script++ = OP_CHECKSIG;
         if ( tokomodo == 0 )
         {
             for (i=0; i<32; i++)

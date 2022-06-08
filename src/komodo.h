@@ -62,6 +62,28 @@ int32_t komodo_parsestatefiledata(struct komodo_state *sp,uint8_t *filedata,long
 
 void komodo_stateupdate(int32_t height,uint8_t notarypubs[][33],uint8_t numnotaries,uint8_t notaryid,uint256 txhash,uint64_t voutmask,uint8_t numvouts,uint32_t *pvals,uint8_t numpvals,int32_t KMDheight,uint32_t KMDtimestamp,uint64_t opretvalue,uint8_t *opretbuf,uint16_t opretlen,uint16_t vout,uint256 MoM,int32_t MoMdepth);
 
+/*****
+ * @brief get details of a script
+ * @note often used to get details from an OP_RETURN
+ * @note also often logs what was found in komodostate
+ * @param fJustCheck
+ * @param isratificationp will be set to 1 if this is an OP_RETURN and is a ratification
+ * @param notaryid notary id of this node
+ * @param scriptbuf the actual script
+ * @param scriptlen number of bytes in the script
+ * @param height chain height
+ * @param txhash tx where this script came from
+ * @param i the transaction index within the block
+ * @param j the vout index within the transaction
+ * @param voutmaskp will contain the mask of notaries
+ * @param specialtxp will be set to 1 if pubkey in script matches CRYPTO777_PUBSECPSTR
+ * @param notarizedheightp the notarized height within an OP_RETURN
+ * @param value the value of this vOut
+ * @param notarized 1 if notarized
+ * @param signedmask the mask of notary signers
+ * @param timestamp timestamp (used to determine chosen notary)
+ * @returns -1 could mean error or a KV opreturn, -2 if fJestCheck is true and the chain symbol in OP_RETURN matches ASSETCHAINS_SYMBOL, positive number is notaryid
+ */
 int32_t komodo_voutupdate(bool fJustCheck,int32_t *isratificationp,int32_t notaryid,
         uint8_t *scriptbuf,int32_t scriptlen,int32_t height,uint256 txhash,int32_t i,
         int32_t j,uint64_t *voutmaskp,int32_t *specialtxp,int32_t *notarizedheightp,

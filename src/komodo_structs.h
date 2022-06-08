@@ -255,25 +255,47 @@ bool operator==(const notarized_checkpoint& lhs, const notarized_checkpoint& rhs
 struct komodo_ccdataMoM
 {
     uint256 MoM;
-    int32_t MoMdepth,notarized_height,height,txi;
+    int32_t MoMdepth = 0;
+    int32_t notarized_height = 0;
+    int32_t height = 0;
+    int32_t txi = 0;
 };
 
-struct komodo_ccdata_entry { uint256 MoM; int32_t notarized_height,kmdheight,txi; char symbol[65]; };
-struct komodo_ccdatapair { int32_t notarized_height,MoMoMoffset; };
+struct komodo_ccdata_entry 
+{ 
+    uint256 MoM;
+    int32_t notarized_height = 0;
+    int32_t kmdheight = 0;
+    int32_t txi = 0;
+    char symbol[65] = {0};
+};
+
+struct komodo_ccdatapair
+{ 
+    int32_t notarized_height = 0;
+    int32_t MoMoMoffset = 0;
+};
 
 struct komodo_ccdataMoMoM
 {
     uint256 MoMoM;
-    int32_t kmdstarti,kmdendi,MoMoMoffset,MoMoMdepth,numpairs,len;
-    struct komodo_ccdatapair *pairs;
+    int32_t kmdstarti = 0;
+    int32_t kmdendi = 0;
+    int32_t MoMoMoffset = 0;
+    int32_t MoMoMdepth = 0;
+    int32_t numpairs = 0;
+    int32_t len = 0;
+    komodo_ccdatapair *pairs = nullptr;
 };
 
 struct komodo_ccdata
 {
-    struct komodo_ccdata *next,*prev;
-    struct komodo_ccdataMoM MoMdata;
-    uint32_t CCid,len;
-    char symbol[65];
+    komodo_ccdata *next = nullptr;
+    komodo_ccdata *prev = nullptr;
+    komodo_ccdataMoM MoMdata;
+    uint32_t CCid = 0;
+    uint32_t len = 0;
+    char symbol[65] = {0};
 };
 
 class komodo_state
