@@ -77,7 +77,7 @@ static const bool DEFAULT_ALERTS = true;
 /** Minimum alert priority for enabling safe mode. */
 static const int ALERT_PRIORITY_SAFE_MODE = 4000;
 /** Maximum reorg length we will accept before we shut down and alert the user. */
-static unsigned int MAX_REORG_LENGTH = 100 - 1; // based on COINBASE_MATURITY
+static unsigned int MAX_REORG_LENGTH = 100 - 1;
 /** Maximum number of signature check operations in an IsStandard() P2SH script */
 static const unsigned int MAX_P2SH_SIGOPS = 15;
 /** The maximum number of sigops we're willing to relay/mine in a single tx */
@@ -857,8 +857,15 @@ bool CheckBlock(int32_t *futureblockp,int32_t height,CBlockIndex *pindex,const C
                 libzcash::ProofVerifier& verifier,
                 bool fCheckPOW = true, bool fCheckMerkleRoot = true);
 
-/** Context-dependent validity checks */
-bool ContextualCheckBlockHeader(const CBlockHeader& block, CValidationState& state, CBlockIndex *pindexPrev);
+/** 
+ * @brief Context-dependent validity checks 
+ * @param block the block
+ * @param state fill with error state
+ * @param pindexPrev the previous block in the chain
+ * @param checkPoW true to check nBits
+ */
+bool ContextualCheckBlockHeader(const CBlockHeader& block, CValidationState& state, 
+        CBlockIndex *pindexPrev, bool checkPoW = true);
 bool ContextualCheckBlock(int32_t slowflag,const CBlock& block, CValidationState& state, CBlockIndex *pindexPrev);
 
 /** Check a block is completely valid from start to finish (only works on top of our current best block, with cs_main held) */

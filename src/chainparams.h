@@ -26,8 +26,6 @@
 #include "primitives/block.h"
 #include "protocol.h"
 
-#define KOMODO_MINDIFF_NBITS 0x200f0f0f
-
 #include <vector>
 
 struct CDNSSeedData {
@@ -41,7 +39,6 @@ struct SeedSpec6 {
 };
 
 typedef std::map<int, uint256> MapCheckpoints;
-
 
 /**
  * CChainParams defines various tweakable parameters of a given instance of the
@@ -163,14 +160,82 @@ protected:
     uint32_t originalCoinbaseMaturity = 100;
 };
 
+class ChainParams : public CChainParams
+{
+public:
+    /***
+     * @brief height at which hard-coded genesis notaries are no longer used
+     */
+    virtual uint32_t KomodoNotariesHardcoded() const = 0;
+    /****
+     * @brief start (height) of season 1
+     */
+    virtual int32_t S1HardforkHeight() const = 0;
+    /****
+     * @brief start (height) of season 2
+     */
+    virtual int32_t S2HardforkHeight() const = 0;
+    virtual int32_t DecemberHardforkHeight() const = 0;
+    virtual uint32_t StakedDecemberHardforkTimestamp() const = 0;
+    virtual uint32_t S4Timestamp() const = 0;
+    virtual int32_t S4HardforkHeight() const = 0;
+    virtual uint32_t S5Timestamp() const = 0;
+    virtual int32_t S5HardforkHeight() const = 0;
+    /****
+     * @returns the height when notaries receive the privilege of mining at lower difficulty
+     */
+    virtual int32_t NotaryLowerDifficultyStartHeight() const = 0;
+    /***
+     * @return the height at which notaries are no longer able to mine multiple blocks per round
+     */
+    virtual int32_t NotaryLimitRepeatHeight() const = 0;
+    /**
+     * @return the height for using special notary logic
+     */
+    virtual int32_t NotarySpecialStartHeight() const = 0;
+    /****
+     * @returns height at which komodo_is_special could return -2
+     */
+    virtual int32_t NotarySpecialTimeTooShortHeight() const = 0;
+    /****
+     * @returns the height where number of notaries moved from 64 to 66
+     */
+    virtual int32_t NotaryMovedTo66() const = 0;
+    /***
+     * @note: NotaryLowerDifficultyStartHeight overrides some of the logic that relies on ths value
+     * @returns height at which notaries were not able to mine more than 1 block recently
+     */
+    virtual int32_t NotaryOncePerCycle() const = 0;
+    /***
+     * @return the height when Special and Special 2 start to be evaluated
+     */
+    virtual int32_t NotarySAndS2StartHeight() const = 0;
+    /***
+     * @return the height when Special stops and Special 2 starts to be evaluated
+     */
+    virtual int32_t NotaryS2StartHeight() const = 0;
+    /****
+     * @return the height when flag is set based on special 2, taking into account election gap
+     */
+    virtual int32_t NotaryS2IncludeElectionGapHeight() const = 0;
+    /****
+     * @return height when election gap no longer affects flag
+     */
+    virtual int32_t NotaryElectionGapOverrideHeight() const = 0;
+    /****
+     * @return a special height where flag is set regardless of special values
+     */
+    virtual int32_t NotarySpecialFlagHeight() const = 0;
+};
+
 /**
  * Return the currently selected parameters. This won't change after app
  * startup, except for unit tests.
  */
-const CChainParams &Params();
+const ChainParams &Params();
 
 /** Return parameters for the given network. */
-CChainParams &Params(CBaseChainParams::Network network);
+ChainParams &Params(CBaseChainParams::Network network);
 
 /** Sets the params returned by Params() to those for the given network. */
 void SelectParams(CBaseChainParams::Network network);

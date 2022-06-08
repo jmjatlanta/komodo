@@ -306,18 +306,32 @@ void komodo_stateupdate(int32_t height,uint8_t notarypubs[][33],uint8_t numnotar
     }
 }
 
+/***
+ * @brief perform some notary checks
+ * @param srchash the block hash that is attempting to be notarized
+ * @param notarized_height the height of srchash
+ * @returns 0 on error, 1 on success
+ */
 int32_t komodo_validate_chain(uint256 srchash,int32_t notarized_height)
 {
-    static int32_t last_rewind; int32_t rewindtarget; CBlockIndex *pindex; struct komodo_state *sp; char symbol[KOMODO_ASSETCHAIN_MAXLEN],dest[KOMODO_ASSETCHAIN_MAXLEN];
+    static int32_t last_rewind; 
+
+    komodo_state *sp; 
+    char symbol[KOMODO_ASSETCHAIN_MAXLEN],dest[KOMODO_ASSETCHAIN_MAXLEN];
     if ( (sp= komodo_stateptr(symbol,dest)) == 0 )
-        return(0);
-    if ( IsInitialBlockDownload() == 0 && ((pindex= komodo_getblockindex(srchash)) == 0 || pindex->nHeight != notarized_height) )
+        return 0;
+
+    CBlockIndex *pindex = komodo_getblockindex(srchash);
+    if ( !IsInitialBlockDownload() && ( pindex == nullptr || pindex->nHeight != notarized_height) )
     {
+        // something doesn't line up, find the rewind target and print error
+        int32_t rewindtarget = 0;
         if ( sp->LastNotarizedHeight() > 0 && sp->LastNotarizedHeight() < notarized_height )
             rewindtarget = sp->LastNotarizedHeight() - 1;
         else if ( notarized_height > 101 )
             rewindtarget = notarized_height - 101;
-        else rewindtarget = 0;
+        else 
+            rewindtarget = 0;
         if ( rewindtarget != 0 && rewindtarget > KOMODO_REWIND && rewindtarget > last_rewind )
         {
             if ( last_rewind != 0 )
@@ -327,8 +341,9 @@ int32_t komodo_validate_chain(uint256 srchash,int32_t notarized_height)
             }
             last_rewind = rewindtarget;
         }
-        return(0);
-    } else return(1);
+        return 0;
+    } 
+    return 1;
 }
 
 int32_t komodo_voutupdate(bool fJustCheck,int32_t *isratificationp,int32_t notaryid,uint8_t *scriptbuf,
@@ -336,11 +351,14 @@ int32_t komodo_voutupdate(bool fJustCheck,int32_t *isratificationp,int32_t notar
         int32_t *specialtxp,int32_t *notarizedheightp,uint64_t value,int32_t notarized,
         uint64_t signedmask,uint32_t timestamp)
 {
-    static uint256 zero; static FILE *signedfp;
-    int32_t opretlen,nid,offset,k,MoMdepth,matched,len = 0; uint256 MoM,srchash,desttxid; uint8_t crypto777[33]; struct komodo_state *sp; char symbol[KOMODO_ASSETCHAIN_MAXLEN],dest[KOMODO_ASSETCHAIN_MAXLEN];
+    static uint256 zero; 
+    
+    komodo_state *sp; 
+    char symbol[KOMODO_ASSETCHAIN_MAXLEN],dest[KOMODO_ASSETCHAIN_MAXLEN];
     if ( (sp= komodo_stateptr(symbol,dest)) == 0 )
-        return(-1);
-    if ( scriptlen == 35 && scriptbuf[0] == 33 && scriptbuf[34] == 0xac )
+        return -1;
+    
+    if ( scriptlen == 35 && scriptbuf[0] == 33 && scriptbuf[34] == OP_CHECKSIG )
     {
         if ( i == 0 && j == 0 && memcmp(NOTARY_PUBKEY33,scriptbuf+1,33) == 0 && IS_KOMODO_NOTARY )
         {
@@ -348,21 +366,15 @@ int32_t komodo_voutupdate(bool fJustCheck,int32_t *isratificationp,int32_t notar
             prevKOMODO_LASTMINED = KOMODO_LASTMINED;
             KOMODO_LASTMINED = height;
         }
+        uint8_t crypto777[33];
+        int32_t nid = 0; // notary id
         decode_hex(crypto777,33,CRYPTO777_PUBSECPSTR);
-        /*for (k=0; k<33; k++)
-            printf("%02x",crypto777[k]);
-        printf(" crypto777 ");
-        for (k=0; k<scriptlen; k++)
-            printf("%02x",scriptbuf[k]);
-        printf(" <- script ht.%d i.%d j.%d cmp.%d\n",height,i,j,memcmp(crypto777,scriptbuf+1,33));*/
         if ( memcmp(crypto777,scriptbuf+1,33) == 0 )
         {
             *specialtxp = 1;
-            //printf(">>>>>>>> ");
         }
         else if ( komodo_chosennotary(&nid,height,scriptbuf + 1,timestamp) >= 0 )
         {
-            //printf("found notary.k%d\n",k);
             if ( notaryid < 64 )
             {
                 if ( notaryid < 0 )
@@ -372,9 +384,6 @@ int32_t komodo_voutupdate(bool fJustCheck,int32_t *isratificationp,int32_t notar
                 }
                 else if ( notaryid != nid )
                 {
-                    //for (i=0; i<33; i++)
-                    //    printf("%02x",scriptbuf[i+1]);
-                    //printf(" %s mismatch notaryid.%d k.%d\n",ASSETCHAINS_SYMBOL,notaryid,nid);
                     notaryid = 64;
                     *voutmaskp = 0;
                 }
@@ -382,19 +391,22 @@ int32_t komodo_voutupdate(bool fJustCheck,int32_t *isratificationp,int32_t notar
             }
         }
     }
-    if ( scriptbuf[len++] == 0x6a )
+    int32_t len = 0;
+    if ( scriptbuf[len++] == 0x6a ) // OP_RETURN
     {
-        struct komodo_ccdata ccdata; struct komodo_ccdataMoMoM MoMoMdata;
-        int32_t validated = 0,nameoffset,opoffset = 0;
-        if ( (opretlen= scriptbuf[len++]) == 0x4c )
+        int32_t validated = 0;
+
+        // get the length
+        int32_t opretlen = 0;
+        if ( (opretlen= scriptbuf[len++]) == OP_PUSHDATA1 )
             opretlen = scriptbuf[len++];
-        else if ( opretlen == 0x4d )
+        else if ( opretlen == OP_PUSHDATA2 )
         {
             opretlen = scriptbuf[len++];
             opretlen += (scriptbuf[len++] << 8);
         }
-        opoffset = len;
-        matched = 0;
+        int32_t opoffset = len; // where the "real" data begins
+        int32_t matched = 0; // whether or not the coin name in the script matches the chain name
         if ( ASSETCHAINS_SYMBOL[0] == 0 )
         {
             if ( strcmp("KMD",(char *)&scriptbuf[len+32 * 2 + 4]) == 0 )
@@ -402,68 +414,74 @@ int32_t komodo_voutupdate(bool fJustCheck,int32_t *isratificationp,int32_t notar
         }
         else
         {
-            if ( scriptbuf[len] == 'K' )
+            if ( scriptbuf[len] == 'K' ) 
             {
-                //fprintf(stderr,"i.%d j.%d KV OPRET len.%d %.8f\n",i,j,opretlen,dstr(value));
+                // OP_RETURN for the KV (key-value) feature
                 komodo_stateupdate(height,0,0,0,txhash,0,0,0,0,0,0,value,&scriptbuf[len],opretlen,j,zero,0);
-                return(-1);
+                return -1;
             }
             if ( strcmp(ASSETCHAINS_SYMBOL,(char *)&scriptbuf[len+32*2+4]) == 0 )
                 matched = 1;
         }
-        offset = 32 * (1 + matched) + 4;
-        nameoffset = (int32_t)strlen((char *)&scriptbuf[len+offset]);
-        nameoffset++;
-        memset(&ccdata,0,sizeof(ccdata));
+        int32_t offset = 32 * (1 + matched) + 4; // len+offset = where the coin symbol starts
+        int32_t nameoffset = (int32_t)strlen((char *)&scriptbuf[len++]);
+        nameoffset++; // length of coin symbol including terminating NULL
+        komodo_ccdata ccdata; 
         strncpy(ccdata.symbol,(char *)&scriptbuf[len+offset],sizeof(ccdata.symbol));
-        if ( j == 1 && opretlen >= len+offset-opoffset )
+        if ( j == 1 && opretlen >= len+offset-opoffset ) // notarization includes MoM data
         {
-            memset(&MoMoMdata,0,sizeof(MoMoMdata));
+            komodo_ccdataMoMoM MoMoMdata;
+            uint256 srchash;
+            uint256 desttxid;
             if ( matched == 0 && signedmask != 0 && bitweight(signedmask) >= KOMODO_MINRATIFY )
+                notarized = 1; // we are notarizing for a foreign chain, and we have the minimum ratifications
+            if ( strcmp("PIZZA",ccdata.symbol) == 0 
+                    || strncmp("TXSCL",ccdata.symbol,5) == 0 
+                    || strcmp("BEER",ccdata.symbol) == 0)
                 notarized = 1;
-            if ( strcmp("PIZZA",ccdata.symbol) == 0 || strncmp("TXSCL",ccdata.symbol,5) == 0 || strcmp("BEER",ccdata.symbol) == 0)
-                notarized = 1;
-            if ( 0 && opretlen != 149 )
-                printf("[%s].%d (%s) matched.%d i.%d j.%d notarized.%d %llx opretlen.%d len.%d offset.%d opoffset.%d\n",ASSETCHAINS_SYMBOL,height,ccdata.symbol,matched,i,j,notarized,(long long)signedmask,opretlen,len,offset,opoffset);
-            len += iguana_rwbignum(0,&scriptbuf[len],32,(uint8_t *)&srchash);
-            len += iguana_rwnum(0,&scriptbuf[len],sizeof(*notarizedheightp),(uint8_t *)notarizedheightp);
+            len += iguana_rwbignum(0,&scriptbuf[len],32,(uint8_t *)&srchash); // block hash
+            len += iguana_rwnum(0,&scriptbuf[len],sizeof(*notarizedheightp),(uint8_t *)notarizedheightp); // block height
             if ( matched != 0 )
-                len += iguana_rwbignum(0,&scriptbuf[len],32,(uint8_t *)&desttxid);
-            if ( matched != 0 )
+            {
+                // this script is notarizing this chain, so a destination txid is included in this OP_RETURN
+                len += iguana_rwbignum(0,&scriptbuf[len],32,(uint8_t *)&desttxid); // txid
                 validated = komodo_validate_chain(srchash,*notarizedheightp);
-            else validated = 1;
-            // Any notarization that is matched and has a decodable op_return is enough to pay notaries. Otherwise bugs! 
+            }
+            else 
+                validated = 1;
+            // Any notarization that is matched and has a decodable op_return is enough to
+            // pay notaries. Otherwise bugs! 
             if ( fJustCheck && matched != 0 )
-                return(-2);
+                return -2;
             if ( notarized != 0 && validated != 0 )
             {
-                //sp->NOTARIZED_HEIGHT = *notarizedheightp;
-                //sp->NOTARIZED_HASH = srchash;
-                //sp->NOTARIZED_DESTTXID = desttxid;
-                memset(&MoM,0,sizeof(MoM));
-                MoMdepth = 0;
-                len += nameoffset;
                 ccdata.MoMdata.notarized_height = *notarizedheightp;
                 ccdata.MoMdata.height = height;
                 ccdata.MoMdata.txi = i;
-                //printf("nameoffset.%d len.%d + 36 %d opoffset.%d vs opretlen.%d\n",nameoffset,len,len+36,opoffset,opretlen);
+                uint256 MoM;
+                int32_t MoMdepth = 0;
+                len += nameoffset; // fast-forward beyond coin name
                 if ( len+36-opoffset <= opretlen )
                 {
+                    // there is still at least 36 more bytes data in the OP_RETURN
+                    // which is an MoM and MoM depth
                     len += iguana_rwbignum(0,&scriptbuf[len],32,(uint8_t *)&MoM);
                     len += iguana_rwnum(0,&scriptbuf[len],sizeof(MoMdepth),(uint8_t *)&MoMdepth);
                     ccdata.MoMdata.MoM = MoM;
-                    ccdata.MoMdata.MoMdepth = MoMdepth & 0xffff;
+                    ccdata.MoMdata.MoMdepth = MoMdepth & 0xffff; // Stored as 32, only interested in the 16 LSBs
                     if ( len+sizeof(ccdata.CCid)-opoffset <= opretlen )
                     {
+                        // there is at least a CCid's width of data remaining in the OP_RETURN
                         len += iguana_rwnum(0,&scriptbuf[len],sizeof(ccdata.CCid),(uint8_t *)&ccdata.CCid);
-                        //if ( ((MoMdepth>>16) & 0xffff) != (ccdata.CCid & 0xffff) )
-                        //    fprintf(stderr,"%s CCid mismatch %u != %u\n",ASSETCHAINS_SYMBOL,((MoMdepth>>16) & 0xffff),(ccdata.CCid & 0xffff));
                         ccdata.len = sizeof(ccdata.CCid);
-                        if ( ASSETCHAINS_SYMBOL[0] != 0 )
+                        if ( ASSETCHAINS_SYMBOL[0] != 0 ) // not on the KMD chain
                         {
                             // MoMoM, depth, numpairs, (notarization ht, MoMoM offset)
-                            if ( len+48-opoffset <= opretlen && strcmp(ccdata.symbol,ASSETCHAINS_SYMBOL) == 0 )
+                            if ( len+48-opoffset <= opretlen 
+                                    && strcmp(ccdata.symbol,ASSETCHAINS_SYMBOL) == 0 )
                             {
+                                // we have enough data to fill a MoMoM struct, and we are on the same chain as
+                                // this notarization.
                                 len += iguana_rwnum(0,&scriptbuf[len],sizeof(uint32_t),(uint8_t *)&MoMoMdata.kmdstarti);
                                 len += iguana_rwnum(0,&scriptbuf[len],sizeof(uint32_t),(uint8_t *)&MoMoMdata.kmdendi);
                                 len += iguana_rwbignum(0,&scriptbuf[len],sizeof(MoMoMdata.MoMoM),(uint8_t *)&MoMoMdata.MoMoM);
@@ -472,26 +490,38 @@ int32_t komodo_voutupdate(bool fJustCheck,int32_t *isratificationp,int32_t notar
                                 MoMoMdata.len += sizeof(MoMoMdata.MoMoM) + sizeof(uint32_t)*4;
                                 if ( len+MoMoMdata.numpairs*8-opoffset == opretlen )
                                 {
-                                    MoMoMdata.pairs = (struct komodo_ccdatapair *)calloc(MoMoMdata.numpairs,sizeof(*MoMoMdata.pairs));
-                                    for (k=0; k<MoMoMdata.numpairs; k++)
+                                    // we have enough data to fill a ccdata pair struct and add it to the
+                                    // MoMoM struct
+                                    MoMoMdata.pairs = (struct komodo_ccdatapair *)calloc(
+                                            MoMoMdata.numpairs,sizeof(*MoMoMdata.pairs));
+                                    for (int32_t k=0; k<MoMoMdata.numpairs; k++)
                                     {
-                                        len += iguana_rwnum(0,&scriptbuf[len],sizeof(int32_t),(uint8_t *)&MoMoMdata.pairs[k].notarized_height);
-                                        len += iguana_rwnum(0,&scriptbuf[len],sizeof(uint32_t),(uint8_t *)&MoMoMdata.pairs[k].MoMoMoffset);
+                                        len += iguana_rwnum(0,&scriptbuf[len],sizeof(int32_t),
+                                                (uint8_t *)&MoMoMdata.pairs[k].notarized_height);
+                                        len += iguana_rwnum(0,&scriptbuf[len],sizeof(uint32_t),
+                                                (uint8_t *)&MoMoMdata.pairs[k].MoMoMoffset);
                                         MoMoMdata.len += sizeof(uint32_t) * 2;
                                     }
-                                } else ccdata.len = MoMoMdata.len = 0;
-                            } else ccdata.len = MoMoMdata.len = 0;
+                                } 
+                                else 
+                                    ccdata.len = MoMoMdata.len = 0;
+                            } 
+                            else 
+                                ccdata.len = MoMoMdata.len = 0;
                         }
                     }
                     if ( MoM == zero || (MoMdepth&0xffff) > *notarizedheightp || (MoMdepth&0xffff) < 0 )
                     {
+                        // MoM data id evidently wrong. Clear it out...
                         memset(&MoM,0,sizeof(MoM));
                         MoMdepth = 0;
                     }
                     else
                     {
                         if ( matched != 0 )
-                            printf("[%s] matched.%d VALID (%s) MoM.%s [%d] CCid.%u\n",ASSETCHAINS_SYMBOL,matched,ccdata.symbol,MoM.ToString().c_str(),MoMdepth&0xffff,(MoMdepth>>16)&0xffff);
+                            printf("[%s] matched.%d VALID (%s) MoM.%s [%d] CCid.%u\n",
+                                    ASSETCHAINS_SYMBOL,matched,ccdata.symbol,MoM.ToString().c_str(),
+                                    MoMdepth&0xffff,(MoMdepth>>16)&0xffff);
                     }
                     if ( MoMoMdata.pairs != 0 )
                         free(MoMoMdata.pairs);
@@ -501,6 +531,7 @@ int32_t komodo_voutupdate(bool fJustCheck,int32_t *isratificationp,int32_t notar
                 
                 if ( matched != 0 && *notarizedheightp > sp->LastNotarizedHeight() && *notarizedheightp < height )
                 {
+                    // we've notarized our own chain, update komodo_state
                     sp->SetLastNotarizedHeight(*notarizedheightp);
                     sp->SetLastNotarizedHash(srchash);
                     sp->SetLastNotarizedDestTxId(desttxid);
@@ -509,7 +540,8 @@ int32_t komodo_voutupdate(bool fJustCheck,int32_t *isratificationp,int32_t notar
                         sp->SetLastNotarizedMoM(MoM);
                         sp->SetLastNotarizedMoMDepth(MoMdepth);
                     }
-                    komodo_stateupdate(height,0,0,0,zero,0,0,0,0,0,0,0,0,0,0,sp->LastNotarizedMoM(),sp->LastNotarizedMoMDepth());
+                    komodo_stateupdate(height,0,0,0,zero,0,0,0,0,0,0,0,0,0,0,
+                            sp->LastNotarizedMoM(),sp->LastNotarizedMoMDepth());
                     printf("[%s] ht.%d NOTARIZED.%d %s.%s %sTXID.%s lens.(%d %d) MoM.%s %d\n",
                             ASSETCHAINS_SYMBOL,height,sp->LastNotarizedHeight(),
                             ASSETCHAINS_SYMBOL[0]==0?"KMD":ASSETCHAINS_SYMBOL,srchash.ToString().c_str(),
@@ -518,13 +550,16 @@ int32_t komodo_voutupdate(bool fJustCheck,int32_t *isratificationp,int32_t notar
                     
                     if ( ASSETCHAINS_SYMBOL[0] == 0 )
                     {
+                        // for KMD, write a new record in the signedmasks file with notaries that approved
+                        static FILE *signedfp;
                         if ( signedfp == 0 )
                         {
                             char fname[512];
                             komodo_statefname(fname,ASSETCHAINS_SYMBOL,(char *)"signedmasks");
                             if ( (signedfp= fopen(fname,"rb+")) == 0 )
                                 signedfp = fopen(fname,"wb");
-                            else fseek(signedfp,0,SEEK_END);
+                            else 
+                                fseek(signedfp,0,SEEK_END);
                         }
                         if ( signedfp != 0 )
                         {
@@ -532,19 +567,25 @@ int32_t komodo_voutupdate(bool fJustCheck,int32_t *isratificationp,int32_t notar
                             fwrite(&signedmask,1,sizeof(signedmask),signedfp);
                             fflush(signedfp);
                         }
+                        // put the OP_RETURN into the komodostate file
                         if ( opretlen > len && scriptbuf[len] == 'A' )
                         {
-                            //for (i=0; i<opretlen-len; i++)
-                            //    printf("%02x",scriptbuf[len+i]);
-                            //printf(" Found extradata.[%d] %d - %d\n",opretlen-len,opretlen,len);
-                            komodo_stateupdate(height,0,0,0,txhash,0,0,0,0,0,0,value,&scriptbuf[len],opretlen-len+4+3+(scriptbuf[1] == 0x4d),j,zero,0);
+                            komodo_stateupdate(height,0,0,0,txhash,0,0,0,0,0,0,value,&scriptbuf[len],
+                                    opretlen-len+4+3+(scriptbuf[1] == 0x4d),j,zero,0);
                         }
                     }
                 }
-            } else if ( opretlen != 149 && height > 600000 && matched != 0 )
-                printf("%s validated.%d notarized.%d %llx reject ht.%d NOTARIZED.%d prev.%d %s.%s DESTTXID.%s len.%d opretlen.%d\n",
-                        ccdata.symbol,validated,notarized,(long long)signedmask,height,*notarizedheightp,sp->LastNotarizedHeight(),
-                        ASSETCHAINS_SYMBOL[0]==0?"KMD":ASSETCHAINS_SYMBOL,srchash.ToString().c_str(),desttxid.ToString().c_str(),len,opretlen);
+            } 
+            else if ( opretlen != 149 && height > 600000 && matched != 0 )
+            {
+                // not a pax pricefeed (probably?), on the same chain, above a height, and didn't 
+                // satisfy the if above (which was notarized != 0 && validated != 0).
+                printf("%s validated.%d notarized.%d %llx reject ht.%d NOTARIZED.%d "
+                        "prev.%d %s.%s DESTTXID.%s len.%d opretlen.%d\n",
+                        ccdata.symbol,validated,notarized,(long long)signedmask,height,*notarizedheightp,
+                        sp->LastNotarizedHeight(), ASSETCHAINS_SYMBOL[0]==0?"KMD":ASSETCHAINS_SYMBOL,
+                        srchash.ToString().c_str(),desttxid.ToString().c_str(),len,opretlen);
+            }
         }
         else if ( matched != 0 && i == 0 && j == 1 && opretlen == 149 )
         {
@@ -553,11 +594,13 @@ int32_t komodo_voutupdate(bool fJustCheck,int32_t *isratificationp,int32_t notar
         }
         else if ( matched != 0 )
         {
-            //int32_t k; for (k=0; k<scriptlen; k++)
-            //    printf("%02x",scriptbuf[k]);
-            //printf(" <- script ht.%d i.%d j.%d value %.8f %s\n",height,i,j,dstr(value),ASSETCHAINS_SYMBOL);
-            if ( opretlen >= 32*2+4 && strcmp(ASSETCHAINS_SYMBOL[0]==0?"KMD":ASSETCHAINS_SYMBOL,(char *)&scriptbuf[len+32*2+4]) == 0 )
+            if ( opretlen >= 32*2+4 && strcmp(ASSETCHAINS_SYMBOL[0]==0
+                    ?"KMD"
+                    :ASSETCHAINS_SYMBOL,(char *)&scriptbuf[len+32*2+4]) == 0 )
             {
+                // on our own chain (doesn't have to be KMD, but does have to match what is stated in OP_RETURN)
+                // If we successfully grab the first real 32 bytes of the OP_RETURN (no 0s), it is a ratification
+                int32_t k = 0;
                 for (k=0; k<32; k++)
                     if ( scriptbuf[len+k] != 0 )
                         break;
@@ -568,11 +611,14 @@ int32_t komodo_voutupdate(bool fJustCheck,int32_t *isratificationp,int32_t notar
                 }
             }
 
-            if ( *isratificationp == 0 && (signedmask != 0 || (scriptbuf[len] != 'X' && scriptbuf[len] != 'A')) ) // && scriptbuf[len] != 'I')
+            // X and A is for PAX/Gateway stuff
+            if ( *isratificationp == 0 && (signedmask != 0 || (scriptbuf[len] != 'X' && scriptbuf[len] != 'A')) )
+            {
                 komodo_stateupdate(height,0,0,0,txhash,0,0,0,0,0,0,value,&scriptbuf[len],opretlen,j,zero,0);
+            }
         }
     }
-    return(notaryid);
+    return notaryid;
 }
 
 // Special tx have vout[0] -> CRYPTO777
@@ -728,7 +774,7 @@ int32_t komodo_connectblock(bool fJustCheck, CBlockIndex *pindex,CBlock& block)
             }
             // simulate DPoW in regtest mode for dpowconfs tests/etc
             if ( Params().NetworkIDString() == "regtest" && ( height%7 == 0) ) {
-                notarized              = 1;
+                notarized = 1;
                 sp->SetLastNotarizedHeight(height);
                 sp->SetLastNotarizedHash(block.GetHash());
                 sp->SetLastNotarizedDestTxId(txhash);

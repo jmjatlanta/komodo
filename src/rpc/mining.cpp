@@ -360,7 +360,7 @@ UniValue generate(const UniValue& params, bool fHelp, const CPubKey& mypk)
             IncrementExtraNonce(pblock, chainActive.LastTip(), nExtraNonce);
         }
 
-        CalcPoW(pblock); // add PoW
+        CalcPoW(pblock);
         CValidationState state;
         if (!ProcessNewBlock(1,chainActive.LastTip()->nHeight+1,state, NULL, pblock, true, NULL))
             throw JSONRPCError(RPC_INTERNAL_ERROR, "ProcessNewBlock, block not accepted");

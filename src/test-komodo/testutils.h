@@ -29,12 +29,12 @@ void displayBlock(const CBlock& blk);
 
 void setConsoleDebugging(bool enable);
 
-void setupChain();
+void setupChain(CBaseChainParams::Network network = CBaseChainParams::REGTEST);
 /***
  * Generate a block
  * @param block a place to store the block (read from disk)
  */
-void generateBlock(CBlock *block=NULL);
+void generateBlock(std::shared_ptr<CBlock> block = nullptr);
 bool acceptTx(const CTransaction tx, CValidationState &state);
 void acceptTxFail(const CTransaction tx);
 /****
@@ -63,7 +63,7 @@ public:
     /***
      * ctor to create a chain
      */
-    TestChain();
+    TestChain(CBaseChainParams::Network desiredNetwork = CBaseChainParams::REGTEST);
     /***
      * dtor to release resources
      */
@@ -73,18 +73,36 @@ public:
      * @param height the height (0 indicates current height
      * @returns the block index
      */
-    CBlockIndex *GetIndex(uint32_t height = 0);
+    CBlockIndex *GetIndex(uint32_t height = 0) const;
     /***
      * Get this chains view of the state of the chain
      * @returns the view
      */
     CCoinsViewCache *GetCoinsViewCache();
+
     /**
      * Generate a block
+     * @param who who will mine the block
      * @returns the block generated
      */
     std::shared_ptr<CBlock> generateBlock(std::shared_ptr<CWallet> wallet, 
             CValidationState* validationState = nullptr);
+
+    /****
+     * @brief generate PoW on block and submit to chain
+     * @param in the block to push
+     * @return the block
+     */
+    std::shared_ptr<CBlock> generateBlock(const CBlock& in);
+
+    /***
+     * @brief Build a block, but do not add PoW or submit to chain
+     * @param who the miner
+     */
+    CBlock BuildBlock( std::shared_ptr<TestWallet> who );
+
+    std::shared_ptr<CBlock> GetBlock(CBlockIndex* idx) const;
+    
     /****
      * @brief set the chain time to something reasonable
      * @note must be called after generateBlock if you
@@ -118,6 +136,16 @@ private:
     boost::filesystem::path dataDir;
     std::string previousNetwork;
     void CleanGlobals();
+    void SetupMining(std::shared_ptr<TestWallet> who);
+    std::vector<std::shared_ptr<CBlock>> minedBlocks;
+};
+
+class TransactionReference
+{
+public:
+    uint256 hash;
+    uint32_t index;
+    TransactionReference(uint256 h, uint32_t i) : hash(h), index(i) {}
 };
 
 /***
@@ -137,6 +165,12 @@ public:
      * @returns the private key
      */
     CKey GetPrivKey() const;
+    /****
+     * @brief shortcuts the real wallet to return the private key
+     * @return true
+     */
+    virtual bool GetKey(const CKeyID &address, CKey &keyOut) const override 
+            { keyOut = GetPrivKey(); return true; }
     /***
      * Sign a typical transaction
      * @param hash the hash to sign
@@ -191,6 +225,9 @@ public:
      * @returns the results
      */
     CTransaction Transfer(std::shared_ptr<TestWallet> to, CAmount amount, CAmount fee = 0);
+    virtual CReserveKey GetReserveKey() override;
+    virtual void ReserveKeyFromKeyPool(int64_t& nIndex, CKeyPool& keypool) override;
+
 private:
     CKey key;
 };

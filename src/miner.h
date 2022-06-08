@@ -60,7 +60,12 @@ CBlockTemplate* CreateNewBlockWithKey();
 #endif
 
 #ifdef ENABLE_MINING
-/** Modify the extranonce in a block */
+/***
+ * @brief increment the nonce in the coinbase scriptSig and set hashMerkleRoot
+ * @param[in] pblock the block whos coinbase is to be adjusted
+ * @param[in] pindexPrev to calculate height
+ * @param[out] nExtraNonce the new value
+ */
 void IncrementExtraNonce(CBlock* pblock, CBlockIndex* pindexPrev, unsigned int& nExtraNonce);
 /** Run the miner threads */
  #ifdef ENABLE_WALLET

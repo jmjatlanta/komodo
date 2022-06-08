@@ -23,8 +23,6 @@
 #include "cc/CCinclude.h"
 
 int32_t komodo_notaries(uint8_t pubkeys[64][33],int32_t height,uint32_t timestamp);
-int32_t komodo_electednotary(int32_t *numnotariesp,uint8_t *pubkey33,int32_t height,uint32_t timestamp);
-int32_t komodo_voutupdate(bool fJustCheck,int32_t *isratificationp,int32_t notaryid,uint8_t *scriptbuf,int32_t scriptlen,int32_t height,uint256 txhash,int32_t i,int32_t j,uint64_t *voutmaskp,int32_t *specialtxp,int32_t *notarizedheightp,uint64_t value,int32_t notarized,uint64_t signedmask,uint32_t timestamp);
 unsigned int lwmaGetNextPOSRequired(const CBlockIndex* pindexLast, const Consensus::Params& params);
 bool EnsureWalletIsAvailable(bool avoidException);
 extern bool fRequestShutdown;
@@ -121,6 +119,12 @@ int32_t komodo_newStakerActive(int32_t height, uint32_t timestamp);
 
 int32_t komodo_hasOpRet(int32_t height, uint32_t timestamp);
 
+/****
+ * @brief see if the Merkle Root in the OP_RETURN is correct for the block
+ * @param pblock the block to check
+ * @param[out] merkleroot the OP_RETURN found
+ * @returns true if OP_RETURN is found and is correct
+ */
 bool komodo_checkopret(CBlock *pblock, CScript &merkleroot);
 
 bool komodo_hardfork_active(uint32_t time);
@@ -150,8 +154,6 @@ void komodo_index2pubkey33(uint8_t *pubkey33,CBlockIndex *pindex,int32_t height)
 int32_t komodo_eligiblenotary(uint8_t pubkeys[66][33],int32_t *mids,uint32_t blocktimes[66],int32_t *nonzpkeysp,int32_t height);
 
 int32_t komodo_minerids(uint8_t *minerids,int32_t height,int32_t width);
-
-int32_t komodo_is_special(uint8_t pubkeys[66][33],int32_t mids[66],uint32_t blocktimes[66],int32_t height,uint8_t pubkey33[33],uint32_t blocktime);
 
 int32_t komodo_MoM(int32_t *notarized_heightp,uint256 *MoMp,uint256 *kmdtxidp,int32_t nHeight,uint256 *MoMoMp,int32_t *MoMoMoffsetp,int32_t *MoMoMdepthp,int32_t *kmdstartip,int32_t *kmdendip);
 

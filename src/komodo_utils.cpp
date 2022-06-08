@@ -1308,7 +1308,7 @@ void komodo_args(char *argv0)
     }
     KOMODO_STOPAT = GetArg("-stopat",0);
     MAX_REORG_LENGTH = GetArg("-maxreorg",MAX_REORG_LENGTH);
-    WITNESS_CACHE_SIZE = MAX_REORG_LENGTH+10;
+    Params().GetConsensus().SetWitnessCacheSize(MAX_REORG_LENGTH+10);
     ASSETCHAINS_CC = GetArg("-ac_cc",0);
     KOMODO_CCACTIVATE = GetArg("-ac_ccactivate",0);
     ASSETCHAINS_BLOCKTIME = GetArg("-ac_blocktime",60);
@@ -1806,10 +1806,10 @@ void komodo_args(char *argv0)
             else komodo_configfile(ASSETCHAINS_SYMBOL,ASSETCHAINS_P2PPORT + 1);
 
             if (ASSETCHAINS_CBMATURITY != 0)
-                Params().SetCoinbaseMaturity(ASSETCHAINS_CBMATURITY);
+                Params().GetConsensus().SetCoinbaseMaturity(ASSETCHAINS_CBMATURITY);
             else if (ASSETCHAINS_LASTERA == 0 || is_STAKED(ASSETCHAINS_SYMBOL) != 0)
-                Params().SetCoinbaseMaturity(1);
-            if (Params().CoinbaseMaturity() < 1)
+                Params().GetConsensus().SetCoinbaseMaturity(1);
+            if (Params().GetConsensus().coinbase_maturity < 1)
             {
                 fprintf(stderr,"ac_cbmaturity must be >0, shutting down\n");
                 StartShutdown();
@@ -1873,7 +1873,7 @@ void komodo_args(char *argv0)
             else strcat(fname,ntz_dest_path.c_str());
 #else
             if ( iter == 0 )
-                strcat(fname,".komodo/komodo.conf");
+                strcat(fname,"komodo.conf");
             else strcat(fname,ntz_dest_path.c_str());
 #endif
 #endif
@@ -2026,5 +2026,5 @@ void komodo_prefetch(FILE *fp)
 // this function is to activate the ExtractDestination fix 
 bool komodo_is_vSolutionsFixActive()
 {
-    return GetLatestTimestamp(komodo_currentheight()) > nS5Timestamp;
+    return GetLatestTimestamp(komodo_currentheight()) > Params().S5Timestamp();
 }

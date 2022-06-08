@@ -16,6 +16,7 @@
 #include "komodo_extern_globals.h"
 #include "komodo_utils.h" // OS_milliseconds
 #include "komodo_notary.h" // komodo_chosennotary()
+#include "komodo.h" // komodo_voutupdate
 
 /************************************************************************
  *
@@ -533,6 +534,12 @@ int32_t komodo_verifynotarization(char *symbol,char *dest,int32_t height,int32_t
     return(retval);
 }
 
+/***
+ * @brief build an OP_RETURN script
+ * @param pblock the block that has the transaction hashes
+ * @param fNew true if this is a new block
+ * @returns the OP_RETURN CScript that contains the Merkle Root of the txs
+ */
 CScript komodo_makeopret(CBlock *pblock, bool fNew)
 {
     std::vector<uint256> vLeaves;
@@ -623,9 +630,17 @@ uint8_t DecodeStakingOpRet(CScript scriptPubKey, uint256 &merkleroot)
     return(0);
 }
 
+/****
+ * @brief determine if the staker hardfork has happened
+ * @note either of the inputs must be higher than the hardfork timestamp. Both are not required.
+ * @param height the current chain height
+ * @param timestamp the current chain time
+ * @returns 1 if the hardfork has happened, 0 if not
+ */
 int32_t komodo_newStakerActive(int32_t height, uint32_t timestamp)
 {
-    if ( timestamp > nStakedDecemberHardforkTimestamp || komodo_heightstamp(height) > nStakedDecemberHardforkTimestamp ) //December 2019 hardfork
+    if ( timestamp > Params().StakedDecemberHardforkTimestamp() 
+            || komodo_heightstamp(height) > Params().StakedDecemberHardforkTimestamp() ) //December 2019 hardfork
         return(1);
     else return(0);
 }
@@ -635,6 +650,12 @@ int32_t komodo_hasOpRet(int32_t height, uint32_t timestamp)
     return komodo_newStakerActive(height, timestamp) == 1;
 }
 
+/****
+ * @brief see if the Merkle Root in the OP_RETURN is correct for the block
+ * @param pblock the block to check
+ * @param[out] merkleroot the OP_RETURN found
+ * @returns true if OP_RETURN is found and is correct
+ */
 bool komodo_checkopret(CBlock *pblock, CScript &merkleroot)
 {
     merkleroot = pblock->vtx.back().vout.back().scriptPubKey;
@@ -643,7 +664,8 @@ bool komodo_checkopret(CBlock *pblock, CScript &merkleroot)
 
 bool komodo_hardfork_active(uint32_t time)
 {
-    return ( (ASSETCHAINS_SYMBOL[0] == 0 && chainActive.Height() > nDecemberHardforkHeight) || (ASSETCHAINS_SYMBOL[0] != 0 && time > nStakedDecemberHardforkTimestamp) ); //December 2019 hardfork
+    return ( (ASSETCHAINS_SYMBOL[0] == 0 && chainActive.Height() > Params().DecemberHardforkHeight() ) 
+            || (ASSETCHAINS_SYMBOL[0] != 0 && time > Params().StakedDecemberHardforkTimestamp()) );
 }
 
 uint256 komodo_calcmerkleroot(CBlock *pblock, uint256 prevBlockHash, int32_t nHeight, bool fNew, CScript scriptPubKey)
@@ -918,63 +940,6 @@ int32_t komodo_minerids(uint8_t *minerids,int32_t height,int32_t width)
     return(nonz);
 }
 
-int32_t komodo_is_special(uint8_t pubkeys[66][33],int32_t mids[66],uint32_t blocktimes[66],int32_t height,uint8_t pubkey33[33],uint32_t blocktime)
-{
-    int32_t i,j,notaryid=0,minerid,limit,nid; uint8_t destpubkey33[33];
-    komodo_chosennotary(&notaryid,height,pubkey33,blocktimes[0]);
-    if ( height >= 82000 )
-    {
-        if ( notaryid >= 0 )
-        {
-            for (i=1; i<66; i++)
-            {
-                if ( mids[i] == notaryid )
-                {
-                    if ( height > 792000 )
-                    {
-                        for (j=0; j<66; j++)
-                            fprintf(stderr,"%d ",mids[j]);
-                        fprintf(stderr,"ht.%d repeat notaryid.%d in mids[%d]\n",height,notaryid,i);
-                        return(-1);
-                    } else break;
-                }
-            }
-            if ( blocktime != 0 && blocktimes[1] != 0 && blocktime < blocktimes[1]+57 )
-            {
-                if ( height > 807000 )
-                    return(-2);
-            }
-            return(1);
-        } else return(0);
-    }
-    else
-    {
-        if ( height >= 34000 && notaryid >= 0 )
-        {
-            if ( height < 79693 )
-                limit = 64;
-            else if ( height < 82000 )
-                limit = 8;
-            else limit = 66;
-            for (i=1; i<limit; i++)
-            {
-                komodo_chosennotary(&nid,height-i,pubkey33,blocktimes[i]);
-                if ( nid == notaryid )
-                {
-                    //for (j=0; j<66; j++)
-                    //    fprintf(stderr,"%d ",mids[j]);
-                    //fprintf(stderr,"ht.%d repeat mids[%d] nid.%d notaryid.%d\n",height-i,i,nid,notaryid);
-                    if ( height > 225000 )
-                        return(-1);
-                }
-            }
-            //fprintf(stderr,"special notaryid.%d ht.%d limit.%d\n",notaryid,height,limit);
-            return(1);
-        }
-    }
-    return(0);
-}
-
 int32_t komodo_MoM(int32_t *notarized_heightp,uint256 *MoMp,uint256 *kmdtxidp,int32_t nHeight,uint256 *MoMoMp,int32_t *MoMoMoffsetp,int32_t *MoMoMdepthp,int32_t *kmdstartip,int32_t *kmdendip)
 {
     int32_t depth,notarized_ht; uint256 MoM,kmdtxid;
@@ -1227,7 +1192,8 @@ uint64_t komodo_commission(const CBlock *pblock,int32_t height)
             n = pblock->vtx[i].vout.size();
             for (j=0; j<n; j++)
             {
-                if ( height > 225000 && ASSETCHAINS_STAKED != 0 && txn_count > 1 && i == txn_count-1 && j == n-1 )
+                if ( height > Params().NotaryOncePerCycle() 
+                        && ASSETCHAINS_STAKED != 0 && txn_count > 1 && i == txn_count-1 && j == n-1 )
                     break;
                 //fprintf(stderr,"(%d %.8f).%d ",i,dstr(pblock->vtx[i].vout[j].nValue),j);
                 if ( i != 0 || j != 1 )
@@ -1341,7 +1307,7 @@ arith_uint256 komodo_adaptivepow_target(int32_t height,arith_uint256 bnTarget,ui
             mult = (mult / ASSETCHAINS_BLOCKTIME) * ASSETCHAINS_BLOCKTIME + ASSETCHAINS_BLOCKTIME / 2;
             origtarget = bnTarget;
             bnTarget = bnTarget * arith_uint256(mult * mult);
-            easy.SetCompact(KOMODO_MINDIFF_NBITS,&fNegative,&fOverflow);
+            easy.SetCompact(Params().GetConsensus().mindiff_nbits,&fNegative,&fOverflow);
             if ( bnTarget < origtarget || bnTarget > easy ) // deal with overflow
             {
                 bnTarget = easy;
@@ -1974,7 +1940,7 @@ int32_t komodo_checkPOW(int64_t stakeTxValue, int32_t slowflag,CBlock *pblock,in
     //if ( ASSETCHAINS_ADAPTIVEPOW > 0 )
     //    bnTarget = komodo_adaptivepow_target(height,bnTarget,pblock->nTime);
 
-    if ( (ASSETCHAINS_SYMBOL[0] != 0 || height > 792000) && bhash > bnTarget )
+    if ( (ASSETCHAINS_SYMBOL[0] != 0 || height > Params().NotaryLimitRepeatHeight()) && bhash > bnTarget )
     {
         failed = 1;
         if ( height > 0 && ASSETCHAINS_SYMBOL[0] == 0 ) // for the fast case

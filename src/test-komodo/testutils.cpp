@@ -19,11 +19,17 @@
 #include "primitives/transaction.h"
 #include "script/cc.h"
 #include "script/interpreter.h"
+#include "wallet/wallet.h"
 #include "komodo_extern_globals.h"
 #include "utilmoneystr.h"
-#include "testutils.h"
 #include "coincontrol.h"
 #include "cc/CCinclude.h"
+#include "testutils.h"
+
+void undo_init_notaries(); // test helper
+bool CalcPoW(CBlock *pblock); // generate PoW on a block
+void BitcoinMiner(CWallet *pwallet); // in miner.cpp
+void komodo_init(int32_t height); // in komodo_bitcoind.cpp
 
 std::string notaryPubkey = "0205a8ad0c1dbc515f149af377981aab58b836af008d4d7ab21bd76faf80550b47";
 std::string notarySecret = "UxFWWxsf1d7w7K5TvAWSkeX4H95XQKwdwGv49DXwWUTzPTTjHBbU";
@@ -79,13 +85,17 @@ void setConsoleDebugging(bool enable)
     fPrintToConsole = enable;
 }
 
-void setupChain()
+void setupChain(CBaseChainParams::Network network)
 {
-    SelectParams(CBaseChainParams::REGTEST);
+    SelectParams(network);
 
     // Settings to get block reward
     NOTARY_PUBKEY = notaryPubkey;
-    USE_EXTERNAL_PUBKEY = 1;
+    STAKED_NOTARY_ID = -1;
+    USE_EXTERNAL_PUBKEY = 0;
+    // dirty trick to release coinbase funds
+    ASSETCHAINS_TIMEUNLOCKFROM = 100;
+    ASSETCHAINS_TIMEUNLOCKTO = 100;
     mapArgs["-mineraddress"] = "bogus";
     // Global mock time
     nMockTime = GetTime();
@@ -102,11 +112,24 @@ void setupChain()
     InitBlockIndex();
 }
 
+void setupChain()
+{
+    setupChain(CBaseChainParams::REGTEST);
+}
+
+std::shared_ptr<CBlock> getBlock(const uint256& blockId)
+{
+    std::shared_ptr<CBlock> retVal = std::make_shared<CBlock>();
+    if (!ReadBlockFromDisk( *(retVal), mapBlockIndex[blockId], false))
+        throw;
+    return retVal;
+}
+
 /***
  * Generate a block
- * @param block a place to store the block (nullptr skips the disk read)
+ * @param block a place to store the block (can be nullptr)
  */
-void generateBlock(CBlock *block)
+void generateBlock(std::shared_ptr<CBlock> block)
 {
     SetMockTime(nMockTime+=100);  // CreateNewBlock can fail if not enough time passes
 
@@ -118,8 +141,7 @@ void generateBlock(CBlock *block)
         UniValue out = generate(params, false, CPubKey());
         uint256 blockId;
         blockId.SetHex(out[0].getValStr());
-        if (block) 
-            ASSERT_TRUE(ReadBlockFromDisk(*block, mapBlockIndex[blockId], false));
+        block = getBlock(blockId);
     } catch (const UniValue& e) {
         FAIL() << "failed to create block: " << e.write().data();
     }
@@ -142,6 +164,19 @@ bool acceptTx(const CTransaction tx, CValidationState &state)
     LOCK(cs_main);
     bool missingInputs = false;
     bool accepted = AcceptToMemoryPool(mempool, state, tx, false, &missingInputs, false, -1);
+    if (state.IsValid() && (!accepted || missingInputs))
+    {
+        std::string message;
+        if (!accepted)
+            message = "Not accepted";
+        if (missingInputs)
+        {
+            if (message.size() > 0)
+                message += " due to ";
+            message += "Missing Inputs";
+        }
+        state.DoS(100, false, 0U, message);
+    }
     return accepted && !missingInputs;
 }
 
@@ -180,9 +215,9 @@ std::vector<uint8_t> getSig(const CMutableTransaction mtx, CScript inputPubKey, 
 CTransaction getInputTx(CScript scriptPubKey)
 {
     // Get coinbase
-    CBlock block;
-    generateBlock(&block);
-    CTransaction coinbase = block.vtx[0];
+    std::shared_ptr<CBlock> block;
+    generateBlock(block);
+    CTransaction coinbase = block->vtx[0];
 
     // Create tx
     auto mtx = spendTx(coinbase);
@@ -201,22 +236,33 @@ CTransaction getInputTx(CScript scriptPubKey)
 /****
  * A class to provide a simple chain for tests
  */
-
-TestChain::TestChain()
+TestChain::TestChain(CBaseChainParams::Network desiredNetwork)
 {
     CleanGlobals();
     previousNetwork = Params().NetworkIDString();
     dataDir = GetTempPath() / strprintf("test_komodo_%li_%i", GetTime(), GetRand(100000));
+    ASSETCHAINS_STAKED = 0;
     if (ASSETCHAINS_SYMBOL[0])
         dataDir = dataDir / strprintf("_%s", ASSETCHAINS_SYMBOL);
     boost::filesystem::create_directories(dataDir);
     mapArgs["-datadir"] = dataDir.string();
 
-    setupChain();
+    setupChain(desiredNetwork);
     USE_EXTERNAL_PUBKEY = 0; // we want control of who mines the block
     CBitcoinSecret vchSecret;
     vchSecret.SetString(notarySecret); // this returns false due to network prefix mismatch but works anyway
     notaryKey = vchSecret.GetKey();
+    // set up the Pubkeys array
+    komodo_init(1);
+    // now add the notary to the Pubkeys array for era 0
+    knotary_entry *kp = (knotary_entry*)calloc(1, sizeof(knotary_entry));
+    int nextId = Pubkeys[0].numnotaries;
+    memcpy(kp->pubkey, &notaryKey.GetPubKey()[0],33);
+    kp->notaryid = nextId;
+    HASH_ADD_KEYPTR(hh,Pubkeys[0].Notaries,kp->pubkey,33,kp);
+    // fix the numnotaries for all arrays
+    for(int i = 0; i < 125; ++i)
+        Pubkeys[i].numnotaries++;
 }
 
 TestChain::~TestChain()
@@ -239,7 +285,7 @@ boost::filesystem::path TestChain::GetDataDir() { return dataDir; }
 void TestChain::CleanGlobals()
 {
     // hwmheight can get skewed if komodo_connectblock not called (which some tests do)
-    adjust_hwmheight(0);
+    undo_init_notaries();
     for(int i = 0; i < 33; ++i)
     {
         komodo_state s = KOMODO_STATES[i];
@@ -253,7 +299,7 @@ void TestChain::CleanGlobals()
  * @param height the height (0 indicates current height)
  * @returns the block index
  */
-CBlockIndex *TestChain::GetIndex(uint32_t height)
+CBlockIndex *TestChain::GetIndex(uint32_t height) const
 {
     if (height == 0)
         return chainActive.LastTip();
@@ -271,18 +317,95 @@ CCoinsViewCache *TestChain::GetCoinsViewCache()
     return pcoinsTip;
 }
 
+/****
+ * @brief find a block by its index
+ * @param idx the index
+ * @return the block
+ */
+std::shared_ptr<CBlock> TestChain::GetBlock(CBlockIndex* idx) const
+{
+    uint256 hash = idx->GetBlockHash();
+    for(auto itr = minedBlocks.rbegin(); itr != minedBlocks.rend(); ++itr)
+    {
+        if ( (*(itr))->GetHash() == hash)
+            return *itr;
+    }
+    return nullptr;
+}
+
 std::shared_ptr<CBlock> TestChain::generateBlock(std::shared_ptr<CWallet> wallet, CValidationState* state)
 {
     std::shared_ptr<CBlock> block;
     if (wallet == nullptr)
     {
-        CBlock blk;
-        ::generateBlock(&blk);
-        block = std::shared_ptr<CBlock>(new CBlock(blk) );
+        ::generateBlock(block);
     }
     else
         block = ::generateBlock(wallet.get(), state);
     return block;
+}
+
+class MockReserveKey : public CReserveKey
+{
+public:
+    MockReserveKey(TestWallet* wallet) : CReserveKey(wallet)
+    {
+        pubKey = wallet->GetPubKey();
+    }
+    ~MockReserveKey() {}
+    virtual bool GetReservedKey(CPubKey& pubKey) override
+    {
+        pubKey = this->pubKey;
+        return true;
+    }
+protected:
+    CPubKey pubKey;
+};
+
+/***
+ * @brief mine a block using a simple PoW algo (as RPC does)
+ * @param in the block to mine
+ * @returns the mined block
+ */
+std::shared_ptr<CBlock> TestChain::generateBlock(const CBlock& in)
+{
+    std::shared_ptr<CBlock> retVal = std::make_shared<CBlock>();
+    *(retVal) = in;
+    CalcPoW(retVal.get());
+    CValidationState state;
+    if (!ProcessNewBlock(1,chainActive.LastTip()->nHeight+1,state, NULL, retVal.get(), true, NULL))
+        throw JSONRPCError(RPC_INTERNAL_ERROR, "ProcessNewBlock, block not accepted");
+    minedBlocks.push_back(retVal);
+    return retVal;
+}
+
+/****
+ * @brief get a block that is ready to be mined
+ * @note The guts of this was taken from mining.cpp's generate() method
+ * @returns a block with no PoW
+ */
+CBlock TestChain::BuildBlock(std::shared_ptr<TestWallet> who)
+{
+    MockReserveKey reserveKey(who.get());
+    int nHeight = chainActive.Height();
+    unsigned int nExtraNonce = 0;
+    UniValue blockHashes(UniValue::VARR);
+    uint64_t lastTime = 0;
+    // Validation may fail if block generation is too fast
+    if (GetTime() == lastTime) MilliSleep(1001);
+    lastTime = GetTime();
+
+    std::unique_ptr<CBlockTemplate> pblocktemplate(
+            CreateNewBlockWithKey(reserveKey,nHeight,KOMODO_MAXGPUCOUNT));
+
+    if (!pblocktemplate.get())
+        throw JSONRPCError(RPC_INTERNAL_ERROR, "Wallet keypool empty");
+
+    CBlock *pblock = &pblocktemplate->block;
+    IncrementExtraNonce(pblock, chainActive.LastTip(), nExtraNonce);
+
+    CBlock retVal = *pblock;
+    return retVal;
 }
 
 bool TestChain::ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pindex, 
@@ -325,6 +448,7 @@ TestWallet::TestWallet(const std::string& name)
  * @param in a key that already exists
  * @param name a name for the wallet
  */
+
 TestWallet::TestWallet(const CKey& in, const std::string& name)
         : CWallet( name + ".dat"), key(in)
 {
@@ -338,7 +462,6 @@ TestWallet::TestWallet(const CKey& in, const std::string& name)
 TestWallet::~TestWallet()
 {
     UnregisterValidationInterface(this);
-    // TODO: remove file
 }
 
 /***
@@ -350,6 +473,18 @@ CPubKey TestWallet::GetPubKey() const { return key.GetPubKey(); }
  * @returns the private key
  */
 CKey TestWallet::GetPrivKey() const { return key; }
+
+CReserveKey TestWallet::GetReserveKey()
+{
+    return MockReserveKey(this);
+}
+
+void TestWallet::ReserveKeyFromKeyPool(int64_t& nIndex, CKeyPool& keypool)
+{
+    nIndex = 0;
+    keypool.vchPubKey = this->GetPubKey();
+}
+
 
 /***
  * Sign a typical transaction
@@ -385,7 +520,7 @@ std::vector<unsigned char> TestWallet::Sign(CC* cc, uint256 hash)
  */
 CTransaction TestWallet::Transfer(std::shared_ptr<TestWallet> to, CAmount amount, CAmount fee)
 {
-    TransactionInProcess tip = CreateSpendTransaction(to, amount, fee);
+    TransactionInProcess tip = CreateSpendTransaction(to, amount, fee, false);
     if (!CWallet::CommitTransaction( tip.transaction, tip.reserveKey))
         throw std::logic_error("Error: The transaction was rejected! This might happen if some of the coins in your wallet were already spent, such as if you used a copy of wallet.dat and coins were spent in the copy but not marked as spent here.");
     return tip.transaction;

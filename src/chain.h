@@ -26,6 +26,7 @@
 #include "pow.h"
 #include "tinyformat.h"
 #include "uint256.h"
+#include "chainparams.h"
 
 #include <vector>
 
@@ -36,8 +37,6 @@ static const int SAPLING_VALUE_VERSION = 1010100;
 extern char ASSETCHAINS_SYMBOL[65];
 extern uint64_t ASSETCHAINS_NOTARY_PAY[];
 extern int32_t ASSETCHAINS_STAKED;
-extern const uint32_t nStakedDecemberHardforkTimestamp; //December 2019 hardfork
-extern const int32_t nDecemberHardforkHeight;   //December 2019 hardfork
 extern int8_t is_STAKED(const char *chain_name);
 
 struct CDiskBlockPos
@@ -436,7 +435,7 @@ public:
         {
             READWRITE(nNotaryPay);
         }
-        if ( (s.GetType() & SER_DISK) && ASSETCHAINS_STAKED != 0 && (nTime > nStakedDecemberHardforkTimestamp || is_STAKED(ASSETCHAINS_SYMBOL) != 0) ) //December 2019 hardfork
+        if ( (s.GetType() & SER_DISK) && ASSETCHAINS_STAKED != 0 && (nTime > Params().StakedDecemberHardforkTimestamp() || is_STAKED(ASSETCHAINS_SYMBOL) != 0) ) //December 2019 hardfork
         {
             READWRITE(segid);
         }

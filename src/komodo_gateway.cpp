@@ -571,12 +571,12 @@ int32_t komodo_gateway_deposits(CMutableTransaction *txNew,char *base,int32_t to
         txNew->vout[numvouts].nValue = (opcode == 'I') ? pax->fiatoshis : pax->komodoshis;
         txNew->vout[numvouts].scriptPubKey.resize(25);
         script = (uint8_t *)&txNew->vout[numvouts].scriptPubKey[0];
-        *script++ = 0x76;
-        *script++ = 0xa9;
+        *script++ = OP_DUP;
+        *script++ = OP_HASH160;
         *script++ = 20;
         memcpy(script,pax->rmd160,20), script += 20;
-        *script++ = 0x88;
-        *script++ = 0xac;
+        *script++ = OP_EQUALVERIFY;
+        *script++ = OP_CHECKSIG;
         if ( tokomodo == 0 )
         {
             for (i=0; i<32; i++)
@@ -770,10 +770,10 @@ int32_t komodo_check_deposit(int32_t height,const CBlock& block,uint32_t prevtim
                     return(-1);
                 }
             }
-            else if ( block.nBits == KOMODO_MINDIFF_NBITS && total > 0 ) // to deal with fee stealing
+            else if ( block.nBits == Params().GetConsensus().mindiff_nbits && total > 0 ) // to deal with fee stealing
             {
                 fprintf(stderr,"notary mined ht.%d with extra %.8f\n",height,dstr(total));
-                if ( height > KOMODO_NOTARIES_HEIGHT1 )
+                if ( height > Params().S1HardforkHeight() )
                     return(-1);
             }
             if ( strangeout != 0 || notmatched != 0 )
@@ -783,7 +783,7 @@ int32_t komodo_check_deposit(int32_t height,const CBlock& block,uint32_t prevtim
                 if ( height > 1000000 && strangeout != 0 )
                     return(-1);
             }
-            else if ( height > 814000 )
+            else if ( height > Params().S1HardforkHeight() )
             {
                 script = (uint8_t *)&block.vtx[0].vout[0].scriptPubKey[0];
                 //int32_t notary = komodo_electednotary(&num,script+1,height,0);
@@ -856,7 +856,7 @@ const char *komodo_opreturn(int32_t height,uint64_t value,uint8_t *opretbuf,int3
             PAX_pubkey(0,&opretbuf[1],&addrtype,rmd160,base,&shortflag,&fiatoshis);
             bitcoin_address(coinaddr,addrtype,rmd160,20);
             checktoshis = PAX_fiatdest(&seed,tokomodo,destaddr,pubkey33,coinaddr,kmdheight,base,fiatoshis);
-            if ( komodo_paxcmp(base,kmdheight,value,checktoshis,kmdheight < 225000 ? seed : 0) != 0 )
+            if ( komodo_paxcmp(base,kmdheight,value,checktoshis,kmdheight < Params().NotaryOncePerCycle() ? seed : 0) != 0 )
                 checktoshis = PAX_fiatdest(&seed,tokomodo,destaddr,pubkey33,coinaddr,height,base,fiatoshis);
             typestr = "deposit";
             if ( 0 && strcmp("NOK",base) == 0 )
@@ -873,7 +873,7 @@ const char *komodo_opreturn(int32_t height,uint64_t value,uint8_t *opretbuf,int3
             if ( strcmp(base,ASSETCHAINS_SYMBOL) == 0 && (kmdheight > 195000 || kmdheight <= height) )
             {
                 didstats = 0;
-                if ( komodo_paxcmp(base,kmdheight,value,checktoshis,kmdheight < 225000 ? seed : 0) == 0 )
+                if ( komodo_paxcmp(base,kmdheight,value,checktoshis,kmdheight < Params().NotaryOncePerCycle() ? seed : 0) == 0 )
                 {
                     if ( (pax= komodo_paxfind(txid,vout,'D')) == 0 )
                     {

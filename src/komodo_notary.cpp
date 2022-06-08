@@ -15,8 +15,9 @@
 #include "komodo_notary.h"
 #include "komodo_extern_globals.h"
 #include "komodo.h" // komodo_stateupdate()
-#include "komodo_structs.h" // KOMODO_NOTARIES_HARDCODED
 #include "komodo_utils.h" // komodo_stateptr
+
+char NOTARY_ADDRESSES[NUM_KMD_SEASONS][64][64];
 
 const char *Notaries_genesis[][2] =
 {
@@ -57,13 +58,45 @@ const char *Notaries_genesis[][2] =
     { "titomane_SH", "035f49d7a308dd9a209e894321f010d21b7793461b0c89d6d9231a3fe5f68d9960" },
 };
 
+const uint32_t* kmd_season_timestamps()
+{
+    static uint32_t timestamps[NUM_KMD_SEASONS] = {0};
+    if (timestamps[0] == 0)
+    {
+        const auto& p = Params();
+        timestamps[0] = 1525132800;
+        timestamps[1] = 1563148800;
+        timestamps[2] = p.StakedDecemberHardforkTimestamp();
+        timestamps[3] = p.S4Timestamp();
+        timestamps[4] = p.S5Timestamp();
+        timestamps[5] = 1751328000;
+    }
+    return timestamps;
+}
+
+const int32_t* kmd_season_heights()
+{
+    static int32_t heights[NUM_KMD_SEASONS] = {0};
+    if (heights[0] == 0)
+    {
+        const auto& p = Params();
+        heights[0] = p.S1HardforkHeight();
+        heights[1] = 1444000;
+        heights[2] = p.DecemberHardforkHeight();
+        heights[3] = p.S4HardforkHeight();
+        heights[4] = p.S5HardforkHeight();
+        heights[5] = 7113400;
+    }
+    return heights;
+}
+
 int32_t getkmdseason(int32_t height)
 {
-    if ( height <= KMD_SEASON_HEIGHTS[0] )
+    if ( height <= kmd_season_heights()[0] )
         return(1);
     for (int32_t i = 1; i < NUM_KMD_SEASONS; i++)
     {
-        if ( height <= KMD_SEASON_HEIGHTS[i] && height > KMD_SEASON_HEIGHTS[i-1] )
+        if ( height <= kmd_season_heights()[i] && height > kmd_season_heights()[i-1] )
             return(i+1);
     }
     return(0);
@@ -71,11 +104,11 @@ int32_t getkmdseason(int32_t height)
 
 int32_t getacseason(uint32_t timestamp)
 {
-    if ( timestamp <= KMD_SEASON_TIMESTAMPS[0] )
+    if ( timestamp <= kmd_season_timestamps()[0] )
         return(1);
     for (int32_t i = 1; i < NUM_KMD_SEASONS; i++)
     {
-        if ( timestamp <= KMD_SEASON_TIMESTAMPS[i] && timestamp > KMD_SEASON_TIMESTAMPS[i-1] )
+        if ( timestamp <= kmd_season_timestamps()[i] && timestamp > kmd_season_timestamps()[i-1] )
             return(i+1);
     }
     return(0);
@@ -89,10 +122,11 @@ static int32_t hwmheight = 0; // komodo_notariesinit()
 static bool didinit = false; // komodo_init()
 
 /*****
- * 2 Helpers for unit tests that reset statics (among other things)
+ * 3 Helpers for unit tests that reset statics (among other things)
  * DO NOT USE for anything other than unit tests
  */
 void undo_init_STAKED(); // see notaries_staked.cpp
+void adjust_hwmheight(int32_t newHeight); // see komodo.cpp
 void undo_init_notaries()
 {
     undo_init_STAKED();
@@ -103,6 +137,7 @@ void undo_init_notaries()
         Pubkeys = nullptr;
     }
     hwmheight = 0;
+    adjust_hwmheight(0); // in komodo.cpp
     didinit = false;
 }
 
@@ -124,7 +159,7 @@ int32_t komodo_notaries(uint8_t pubkeys[64][33],int32_t height,uint32_t timestam
         if ( ASSETCHAINS_SYMBOL[0] == 0 )
         {
             // This is KMD, use block heights to determine the KMD notary season.. 
-            if ( height >= KOMODO_NOTARIES_HARDCODED )
+            if ( height >= Params().KomodoNotariesHardcoded() )
                 kmd_season = getkmdseason(height);
         }
         else 
@@ -189,6 +224,14 @@ int32_t komodo_notaries(uint8_t pubkeys[64][33],int32_t height,uint32_t timestam
     return(-1);
 }
 
+/****
+ * @brief retrieve information about a notary
+ * @param[out] numnotariesp number of notaries in the era
+ * @param[in] pubkey33 the public key of the notary to examine
+ * @param[in] height the chain height to examine
+ * @param[in] timestamp the chain timestamp to examine (some chains use time instead of height)
+ * @return -1 on error, otherwise the index of the found notary
+ */
 int32_t komodo_electednotary(int32_t *numnotariesp,uint8_t *pubkey33,int32_t height,uint32_t timestamp)
 {
     int32_t i,n; uint8_t pubkeys[64][33];
@@ -264,48 +307,62 @@ void komodo_notarysinit(int32_t origheight,uint8_t pubkeys[64][33],int32_t num)
         hwmheight = origheight;
 }
 
-int32_t komodo_chosennotary(int32_t *notaryidp,int32_t height,uint8_t *pubkey33,uint32_t timestamp)
+/***
+ * @brief Determine if a key should notarize at this height/timestamp
+ * @param[out] notaryidp the index id of the notary
+ * @param[in] height height to examine (if height used for notary elections)
+ * @param[in] pubkey33 the key to look for
+ * @param[in] timestamp the timestamp to examine (if timestamp used for notary elections)
+ * @returns -1 if not a notary, 0 if chosen notary, 1 if special notary
+ */
+int32_t komodo_chosennotary(int32_t *notaryidp, int32_t height, 
+        uint8_t *pubkey33, uint32_t timestamp)
 {
-    // -1 if not notary, 0 if notary, 1 if special notary
-    struct knotary_entry *kp; int32_t numnotaries=0,htind,modval = -1;
+    int32_t numnotaries=0;
+    int32_t modval = -1;
     *notaryidp = -1;
-    if ( height < 0 )//|| height >= KOMODO_MAXBLOCKS )
+
+    if ( height < 0 )
     {
         printf("komodo_chosennotary ht.%d illegal\n",height);
-        return(-1);
+        return -1;
     }
-    if ( height >= KOMODO_NOTARIES_HARDCODED || ASSETCHAINS_SYMBOL[0] != 0 )
+    if ( height >= Params().KomodoNotariesHardcoded() || ASSETCHAINS_SYMBOL[0] != 0 )
     {
-        if ( (*notaryidp= komodo_electednotary(&numnotaries,pubkey33,height,timestamp)) >= 0 && numnotaries != 0 )
+        if ( (*notaryidp= komodo_electednotary(&numnotaries,pubkey33,height,timestamp)) >= 0 
+                && numnotaries != 0 )
         {
             modval = ((height % numnotaries) == *notaryidp);
-            return(modval);
+            return modval;
         }
     }
+
     if ( height >= 250000 )
-        return(-1);
+        return -1;
     if ( Pubkeys == 0 )
         komodo_init(0);
-    htind = height / KOMODO_ELECTION_GAP;
+
+    int32_t htind = height / KOMODO_ELECTION_GAP;
+    knotary_entry *kp; 
+
     if ( htind >= KOMODO_MAXBLOCKS / KOMODO_ELECTION_GAP )
         htind = (KOMODO_MAXBLOCKS / KOMODO_ELECTION_GAP) - 1;
     {
         std::lock_guard<std::mutex> lock(komodo_mutex);
         HASH_FIND(hh,Pubkeys[htind].Notaries,pubkey33,33,kp);
     }
+
     if ( kp != 0 )
     {
         if ( (numnotaries= Pubkeys[htind].numnotaries) > 0 )
         {
             *notaryidp = kp->notaryid;
             modval = ((height % numnotaries) == kp->notaryid);
-            //printf("found notary.%d ht.%d modval.%d\n",kp->notaryid,height,modval);
-        } else printf("unexpected zero notaries at height.%d\n",height);
-    } //else printf("cant find kp at htind.%d ht.%d\n",htind,height);
-    //int32_t i; for (i=0; i<33; i++)
-    //    printf("%02x",pubkey33[i]);
-    //printf(" ht.%d notary.%d special.%d htind.%d num.%d\n",height,*notaryidp,modval,htind,numnotaries);
-    return(modval);
+        } 
+        else 
+            printf("unexpected zero notaries at height.%d\n",height);
+    }
+    return modval;
 }
 
 /******

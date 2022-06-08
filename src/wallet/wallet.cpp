@@ -976,6 +976,11 @@ void CWallet::ClearNoteWitnessCache()
     //fprintf(stderr,"Clear witness cache\n");
 }
 
+CReserveKey CWallet::GetReserveKey()
+{
+    return CReserveKey(this);
+}
+
 template<typename NoteDataMap>
 void CopyPreviousWitnesses(NoteDataMap& noteDataMap, int indexHeight, int64_t nWitnessCacheSize)
 {
@@ -996,7 +1001,7 @@ void CopyPreviousWitnesses(NoteDataMap& noteDataMap, int indexHeight, int64_t nW
             if (nd->witnesses.size() > 0) {
                 nd->witnesses.push_front(nd->witnesses.front());
             }
-            if (nd->witnesses.size() > WITNESS_CACHE_SIZE) {
+            if (nd->witnesses.size() > Params().GetConsensus().witness_cache_size) {
                 nd->witnesses.pop_back();
             }
         }
@@ -1073,7 +1078,7 @@ void CWallet::IncrementNoteWitnesses(const CBlockIndex* pindex,
        ::CopyPreviousWitnesses(wtxItem.second.mapSaplingNoteData, pindex->nHeight, nWitnessCacheSize);
     }
 
-    if (nWitnessCacheSize < WITNESS_CACHE_SIZE) {
+    if (nWitnessCacheSize < Params().GetConsensus().witness_cache_size) {
         nWitnessCacheSize += 1;
     }
 
@@ -1179,7 +1184,8 @@ bool DecrementNoteWitnesses(NoteDataMap& noteDataMap, int indexHeight, int64_t n
             assert((nWitnessCacheSize - 1) >= nd->witnesses.size());
         }
     }
-    assert(KOMODO_REWIND != 0 || nWitnessCacheSize > 0 || WITNESS_CACHE_SIZE != Params().CoinbaseMaturity()+10);
+    assert(KOMODO_REWIND != 0 || nWitnessCacheSize > 0 
+            || Params().GetConsensus().witness_cache_size != Params().GetConsensus().coinbase_maturity+10);
     return true;
 }
 
@@ -1193,7 +1199,7 @@ void CWallet::DecrementNoteWitnesses(const CBlockIndex* pindex)
         if (!::DecrementNoteWitnesses(wtxItem.second.mapSaplingNoteData, pindex->nHeight, nWitnessCacheSize))
             needsRescan = true;
     }
-    if ( WITNESS_CACHE_SIZE == Params().CoinbaseMaturity()+10 )
+    if ( Params().GetConsensus().witness_cache_size == Params().GetConsensus().coinbase_maturity+10 )
     {
         nWitnessCacheSize -= 1;
         // TODO: If nWitnessCache is zero, we need to regenerate the caches (#1302)
@@ -2250,6 +2256,13 @@ CAmount CWallet::GetDebit(const CTransaction& tx, const isminefilter& filter) co
     return nDebit;
 }
 
+/***
+ * Get amount for this vout if it is mine
+ * @param tx the transaction
+ * @param voutNum the vout
+ * @param isminefilter the filter
+ * @return the amount
+ */
 CAmount CWallet::GetCredit(const CTransaction& tx, int32_t voutNum, const isminefilter& filter) const
 {
     if (voutNum >= tx.vout.size() || !MoneyRange(tx.vout[voutNum].nValue))
@@ -2257,6 +2270,12 @@ CAmount CWallet::GetCredit(const CTransaction& tx, int32_t voutNum, const ismine
     return ((IsMine(tx.vout[voutNum]) & filter) ? tx.vout[voutNum].nValue : 0);
 }
 
+/****
+ * Get amount that belongs to me for this transaction
+ * @param tx the transaction
+ * @param filter the filter
+ * @return the amount
+ */
 CAmount CWallet::GetCredit(const CTransaction& tx, const isminefilter& filter) const
 {
     CAmount nCredit = 0;
@@ -4898,15 +4917,16 @@ int CMerkleTx::GetDepthInMainChain(const CBlockIndex* &pindexRet) const
 
 int CMerkleTx::GetBlocksToMaturity() const
 {
+    auto consensus = Params().GetConsensus();
     if ( ASSETCHAINS_SYMBOL[0] == 0 )
-        Params().ResetCoinbaseMaturity();
+        consensus.ResetCoinbaseMaturity();
     if (!IsCoinBase())
         return 0;
     int32_t depth = GetDepthInMainChain();
     int32_t ut = UnlockTime(0);
     int32_t toMaturity = (ut - chainActive.Height()) < 0 ? 0 : ut - chainActive.Height();
     //printf("depth.%i, unlockTime.%i, toMaturity.%i\n", depth, ut, toMaturity);
-    ut = (Params().CoinbaseMaturity() - depth) < 0 ? 0 : Params().CoinbaseMaturity() - depth;
+    ut = (consensus.coinbase_maturity - depth) < 0 ? 0 : consensus.coinbase_maturity - depth;
     return(ut < toMaturity ? toMaturity : ut);
 }
 

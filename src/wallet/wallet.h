@@ -351,8 +351,10 @@ private:
     int GetDepthInMainChainINTERNAL(const CBlockIndex* &pindexRet) const;
 
 public:
+    // the hash of the block this tx belongs in
     uint256 hashBlock;
     std::vector<uint256> vMerkleBranch;
+    // the index of this transaction within the block
     int nIndex;
 
     // memory only
@@ -796,6 +798,11 @@ public:
 
     void ClearNoteWitnessCache();
 
+    /***
+     * @return a key from the reserve pool
+     */
+    virtual CReserveKey GetReserveKey();
+
 protected:
     /**
      * pindex is the new tip being connected.
@@ -994,10 +1001,20 @@ public:
     //! check whether we are allowed to upgrade (or already support) to the named feature
     bool CanSupportFeature(enum WalletFeature wf) { AssertLockHeld(cs_wallet); return nWalletMaxVersion >= wf; }
 
-    void AvailableCoins(std::vector<COutput>& vCoins, bool fOnlyConfirmed=true, const CCoinControl *coinControl = NULL, bool fIncludeZeroValue=false, bool fIncludeCoinBase=true) const;
+    /****
+     * @brief get avalable outputs
+     * @param[out] vCoins available outputs
+     * @param fOnlyConfirmed only include confirmed txs
+     * @param coinControl
+     * @param fIncludeZeroValue
+     * @param fIncludeCoinBase
+     */
+    virtual void AvailableCoins(std::vector<COutput>& vCoins, 
+            bool fOnlyConfirmed=true, const CCoinControl *coinControl = NULL, 
+            bool fIncludeZeroValue=false, bool fIncludeCoinBase=true) const;
     bool SelectCoinsMinConf(const CAmount& nTargetValue, int nConfMine, int nConfTheirs, std::vector<COutput> vCoins, std::set<std::pair<const CWalletTx*,unsigned int> >& setCoinsRet, CAmount& nValueRet) const;
 
-    bool IsSpent(const uint256& hash, unsigned int n) const;
+    virtual bool IsSpent(const uint256& hash, unsigned int n) const;
     bool IsSproutSpent(const uint256& nullifier) const;
     bool IsSaplingSpent(const uint256& nullifier) const;
 
@@ -1165,7 +1182,7 @@ public:
 
     bool NewKeyPool();
     bool TopUpKeyPool(unsigned int kpSize = 0);
-    void ReserveKeyFromKeyPool(int64_t& nIndex, CKeyPool& keypool);
+    virtual void ReserveKeyFromKeyPool(int64_t& nIndex, CKeyPool& keypool);
     void KeepKey(int64_t nIndex);
     void ReturnKey(int64_t nIndex);
     bool GetKeyFromPool(CPubKey &key);
@@ -1516,5 +1533,24 @@ public:
 };
 
 #define RETURN_IF_ERROR(CCerror) if ( CCerror != "" ) { ERR_RESULT(CCerror); return(result); }
+
+/****
+ * pass transaction settings to komodo_notaryvin func.
+ */
+struct TransactionDetails
+{
+    CScript scriptPubKey;
+    uint32_t time;
+};
+
+/****
+ * @brief build a transaction for a notary
+ * @param txNew the transaction
+ * @param notarypub33 the notary public key (33 bytes)
+ * @param txDetails scriptPubKey and nLockTime
+ * @return signature length (0 on error)
+ */
+int32_t komodo_notaryvin(CMutableTransaction &txNew,uint8_t *notarypub33, 
+        std::shared_ptr<TransactionDetails> details);
 
 #endif // BITCOIN_WALLET_WALLET_H

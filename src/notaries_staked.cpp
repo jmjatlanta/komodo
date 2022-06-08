@@ -19,6 +19,7 @@ void undo_init_STAKED()
     doneinit_STAKED = false;
 }
 
+char NOTARYADDRS[64][64];
 
 int8_t is_STAKED(const char *chain_name) 
 {
@@ -77,7 +78,7 @@ int8_t numStakedNotaries(uint8_t pubkeys[64][33],int8_t era) {
     if ( ChainName[0] == 0 )
     {
         if ( ASSETCHAINS_SYMBOL[0] == 0 )
-            strcpy(ChainName,"KMD");
+            strcpy(ChainName, Params().CurrencyUnits().c_str());
         else
             strcpy(ChainName,ASSETCHAINS_SYMBOL);
     }

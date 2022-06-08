@@ -20,11 +20,12 @@
 #include "notaries_staked.h"
 #include "komodo_hardfork.h"
 
-#define KOMODO_MAINNET_START 178999
-#define KOMODO_NOTARIES_HEIGHT1 814000
-#define KOMODO_NOTARIES_HEIGHT2 2588672
+#define NUM_KMD_SEASONS 6
+#define NUM_KMD_NOTARIES 64
 
 #define CRYPTO777_PUBSECPSTR "020e46e79a2a8d12b9b5d12c7a91adb4e454edfae43c0a0cb805427d2ac7613fd9"
+
+extern char NOTARY_ADDRESSES[NUM_KMD_SEASONS][64][64];
 
 int32_t getkmdseason(int32_t height);
 
@@ -32,12 +33,28 @@ int32_t getacseason(uint32_t timestamp);
 
 int32_t komodo_notaries(uint8_t pubkeys[64][33],int32_t height,uint32_t timestamp);
 
+/****
+ * @brief retrieve information about a notary
+ * @param[out] numnotariesp number of notaries in the era
+ * @param[in] pubkey33 the public key of the notary to examine
+ * @param[in] height the chain height to examine
+ * @param[in] timestamp the chain timestamp to examine (some chains use time instead of height)
+ * @return -1 on error, otherwise the index of the found notary
+ */
 int32_t komodo_electednotary(int32_t *numnotariesp,uint8_t *pubkey33,int32_t height,uint32_t timestamp);
 
 int32_t komodo_ratify_threshold(int32_t height,uint64_t signedmask);
 
 void komodo_notarysinit(int32_t origheight,uint8_t pubkeys[64][33],int32_t num);
 
+/***
+ * @brief Determine if a key should notarize at this height/timestamp
+ * @param[out] notaryidp the index id of the notary
+ * @param[in] height height to examine (if height used for notary elections)
+ * @param[in] pubkey33 the key to look for
+ * @param[in] timestamp the timestamp to examine (if timestamp used for notary elections)
+ * @returns -1 if not a notary, 0 if chosen notary, 1 if special notary
+ */
 int32_t komodo_chosennotary(int32_t *notaryidp,int32_t height,uint8_t *pubkey33,uint32_t timestamp);
 
 /******
