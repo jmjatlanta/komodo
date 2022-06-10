@@ -53,6 +53,11 @@ const struct NUInfo NetworkUpgradeInfo[Consensus::MAX_NETWORK_UPGRADES] = {
         /*.nBranchId =*/ 0x76b809bb,
         /*.strName =*/ "Sapling",
         /*.strInfo =*/ "See https://z.cash/upgrade/sapling.html for details.",
+    },
+    {
+        /*.nBranchId =*/ 0x76b809bb,
+        /*.strName =*/ "HF22",
+        /*.strInfo =*/ "See https://github.com/KomodoPlatform/komodo/pull/543 for details.",
     }
 };
 
