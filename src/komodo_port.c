@@ -719,13 +719,6 @@ uint32_t calc_crc32(uint32_t crc,const void *buf,size_t size)
     return crc ^ ~0U;
 }
 
-void calc_rmd160_sha256(uint8_t rmd160[20],uint8_t *data,int32_t datalen)
-{
-    bits256 hash;
-    vcalc_sha256(0,hash.bytes,data,datalen);
-    calc_rmd160(0,rmd160,hash.bytes,sizeof(hash));
-}
-
 int32_t iguana_rwnum(int32_t rwflag,uint8_t *serialized,int32_t len,void *endianedp)
 {
     int32_t i; uint64_t x;

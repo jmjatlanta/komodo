@@ -33,8 +33,6 @@ extern CScript KOMODO_EARLYTXID_SCRIPTPUB;
 uint8_t DecodeMaramaraCoinbaseOpRet(const CScript scriptPubKey,CPubKey &pk,int32_t &height,int32_t &unlockht);
 uint32_t komodo_heightstamp(int32_t height);
 
-//#define issue_curl(cmdstr) bitcoind_RPC(0,(char *)"curl",(char *)"http://127.0.0.1:7776",0,0,(char *)(cmdstr))
-
 struct MemoryStruct { char *memory; size_t size; };
 struct return_string { char *ptr; size_t len; };
 

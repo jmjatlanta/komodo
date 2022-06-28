@@ -36,8 +36,6 @@ public:
     }
 };
 
-#define portable_mutex_lock pthread_mutex_lock
-#define portable_mutex_unlock pthread_mutex_unlock
 /***
  * Test the old way (KomodoPlatform/komodo tag 0.7.0) of doing things, to assure backwards compatibility
  */
@@ -71,7 +69,7 @@ namespace old_space {
         }
         if ( 0 && ASSETCHAINS_SYMBOL[0] != 0 )
             fprintf(stderr,"[%s] komodo_notarized_update nHeight.%d notarized_height.%d\n",ASSETCHAINS_SYMBOL,nHeight,notarized_height);
-        portable_mutex_lock(&komodo_mutex);
+        pthread_mutex_lock(&komodo_mutex);
         sp->NPOINTS = (struct notarized_checkpoint *)realloc(sp->NPOINTS,(sp->NUM_NPOINTS+1) * sizeof(*sp->NPOINTS));
         np = &sp->NPOINTS[sp->NUM_NPOINTS++];
         memset(np,0,sizeof(*np));
@@ -81,7 +79,7 @@ namespace old_space {
         sp->NOTARIZED_DESTTXID = np->notarized_desttxid = notarized_desttxid;
         sp->MoM = np->MoM = MoM;
         sp->MoMdepth = np->MoMdepth = MoMdepth;
-        portable_mutex_unlock(&komodo_mutex);
+        pthread_mutex_unlock(&komodo_mutex);
     }
 
     struct notarized_checkpoint *komodo_npptr_for_height(int32_t height, int *idx)

@@ -13,7 +13,9 @@
  *                                                                            *
  ******************************************************************************/
 #pragma once
+
 #include "komodo_defs.h"
+#include "mini-gmp.h"
 #include "hex.h"
 #include "key_io.h"
 #include "cc/CCinclude.h"
@@ -27,18 +29,6 @@
 
 #define SATOSHIDEN ((uint64_t)100000000L)
 #define dstr(x) ((double)(x) / SATOSHIDEN)
-#define portable_mutex_t pthread_mutex_t
-#define portable_mutex_init(ptr) pthread_mutex_init(ptr,NULL)
-#define portable_mutex_lock pthread_mutex_lock
-#define portable_mutex_unlock pthread_mutex_unlock
-
-#include "mini-gmp.h"
-
-#define CRYPTO777_PUBSECPSTR "020e46e79a2a8d12b9b5d12c7a91adb4e454edfae43c0a0cb805427d2ac7613fd9"
-#define CRYPTO777_KMDADDR "RXL3YXG2ceaB6C5hfJcN4fvmLH2C34knhA"
-#define CRYPTO777_RMD160STR "f1dce4182fce875748c4986b240ff7d7bc3fffb0"
-
-#define KOMODO_PUBTYPE 60
 
 struct rmd160_vstate { uint64_t length; uint8_t buf[64]; uint32_t curlen, state[5]; };
 

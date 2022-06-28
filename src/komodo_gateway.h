@@ -73,10 +73,6 @@ int32_t komodo_parsestatefiledata(struct komodo_state *sp,uint8_t *filedata,long
 
 void komodo_stateind_set(struct komodo_state *sp,uint32_t *inds,int32_t n,uint8_t *filedata,long datalen,char *symbol,char *dest);
 
-void *OS_loadfile(char *fname,uint8_t **bufp,long *lenp,long *allocsizep);
-
-uint8_t *OS_fileptr(long *allocsizep,const char *fname);
-
 long komodo_stateind_validate(struct komodo_state *sp,char *indfname,uint8_t *filedata,long datalen,uint32_t *prevpos100p,uint32_t *indcounterp,char *symbol,char *dest);
 
 long komodo_indfile_update(FILE *indfp,uint32_t *prevpos100p,long lastfpos,long newfpos,uint8_t func,uint32_t *indcounterp);
@@ -93,8 +89,6 @@ extern std::vector<uint8_t> Mineropret; // opreturn data set by the data gatheri
 #define KOMODO_LOCALPRICE_CACHESIZE 13
 #define KOMODO_MAXPRICES 2048
 #define PRICES_SMOOTHWIDTH 1
-
-#define issue_curl(cmdstr) bitcoind_RPC(0,(char *)"CBCOINBASE",cmdstr,0,0,0)
 
 int32_t komodo_cbopretsize(uint64_t flags);
 
@@ -141,18 +135,6 @@ void *loadfile(char *fname,uint8_t **bufp,long *lenp,long *allocsizep);
 void *filestr(long *allocsizep,char *_fname);
 
 cJSON *send_curl(char *url,char *fname);
-
-// get_urljson just returns the JSON returned by the URL using issue_curl
-
-
-/*
-const char *Techstocks[] =
-{ "AAPL","ADBE","ADSK","AKAM","AMD","AMZN","ATVI","BB","CDW","CRM","CSCO","CYBR","DBX","EA","FB","GDDY","GOOG","GRMN","GSAT","HPQ","IBM","INFY","INTC","INTU","JNPR","MSFT","MSI","MU","MXL","NATI","NCR","NFLX","NTAP","NVDA","ORCL","PANW","PYPL","QCOM","RHT","S","SHOP","SNAP","SPOT","SYMC","SYNA","T","TRIP","TWTR","TXN","VMW","VOD","VRSN","VZ","WDC","XRX","YELP","YNDX","ZEN"
-};
-const char *Metals[] = { "XAU", "XAG", "XPT", "XPD", };
-
-const char *Markets[] = { "DJIA", "SPX", "NDX", "VIX" };
-*/
 
 cJSON *get_urljson(char *url);
 

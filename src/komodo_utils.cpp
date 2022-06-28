@@ -908,7 +908,6 @@ char *parse_conf_line(char *line,char *field)
         line++;
     while ( line[strlen(line)-1] == '\r' || line[strlen(line)-1] == '\n' || line[strlen(line)-1] == ' ' )
         line[strlen(line)-1] = 0;
-    //printf("LINE.(%s)\n",line);
     _stripwhite(line,0);
     return(clonestr(line));
 }

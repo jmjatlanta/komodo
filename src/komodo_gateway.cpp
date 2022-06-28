@@ -1277,8 +1277,7 @@ void *OS_loadfile(const char *fname,uint8_t **bufp,long *lenp,long *allocsizep)
         }
         fclose(fp);
         *lenp = filesize;
-        //printf("loaded.(%s)\n",buf);
-    } //else printf("OS_loadfile couldnt load.(%s)\n",fname);
+    }
     return(buf);
 }
 
@@ -1495,7 +1494,6 @@ void komodo_passport_iteration()
                 else if ( (fp= fopen(fname,"rb")) != 0 && sp != 0 )
                 {
                     fseek(fp,0,SEEK_END);
-                    //fprintf(stderr,"couldnt OS_fileptr(%s), freading %ldKB\n",fname,ftell(fp)/1024);
                     if ( ftell(fp) > lastpos[baseid] )
                     {
                         if ( ASSETCHAINS_SYMBOL[0] != 0 )
@@ -1949,8 +1947,7 @@ void *loadfile(char *fname,uint8_t **bufp,long *lenp,long *allocsizep)
         }
         fclose(fp);
         *lenp = filesize;
-        //printf("loaded.(%s)\n",buf);
-    } //else printf("OS_loadfile couldnt load.(%s)\n",fname);
+    }
     return(buf);
 }
 
@@ -1980,24 +1977,13 @@ cJSON *send_curl(char *url,char *fname)
     return(json);
 }
 
-// get_urljson just returns the JSON returned by the URL using issue_curl
-
-
-/*
-const char *Techstocks[] =
-{ "AAPL","ADBE","ADSK","AKAM","AMD","AMZN","ATVI","BB","CDW","CRM","CSCO","CYBR","DBX","EA","FB","GDDY","GOOG","GRMN","GSAT","HPQ","IBM","INFY","INTC","INTU","JNPR","MSFT","MSI","MU","MXL","NATI","NCR","NFLX","NTAP","NVDA","ORCL","PANW","PYPL","QCOM","RHT","S","SHOP","SNAP","SPOT","SYMC","SYNA","T","TRIP","TWTR","TXN","VMW","VOD","VRSN","VZ","WDC","XRX","YELP","YNDX","ZEN"
-};
-const char *Metals[] = { "XAU", "XAG", "XPT", "XPD", };
-
-const char *Markets[] = { "DJIA", "SPX", "NDX", "VIX" };
-*/
+#define issue_curl(cmdstr) bitcoind_RPC(0,(char *)"CBCOINBASE",cmdstr,0,0,0)
 
 cJSON *get_urljson(char *url)
 {
     char *jsonstr; cJSON *json = 0;
     if ( (jsonstr= issue_curl(url)) != 0 )
     {
-        //fprintf(stderr,"(%s) -> (%s)\n",url,jsonstr);
         json = cJSON_Parse(jsonstr);
         free(jsonstr);
     }
