@@ -59,7 +59,6 @@ static bool fDaemon;
 #include "komodo_defs.h"
 extern char ASSETCHAINS_SYMBOL[KOMODO_ASSETCHAIN_MAXLEN];
 extern int32_t ASSETCHAINS_BLOCKTIME;
-extern uint64_t ASSETCHAINS_CBOPRET;
 void komodo_passport_iteration();
 uint64_t komodo_interestsum();
 int32_t komodo_longestchain();

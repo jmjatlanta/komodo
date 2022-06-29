@@ -2162,8 +2162,6 @@ void komodo_cbopretupdate(int32_t forceflag)
     now = (uint32_t)time(NULL);
     if ( (ASSETCHAINS_CBOPRET & 1) != 0 )
     {
-//if ( komodo_nextheight() > 333 ) // for debug only!
-//    ASSETCHAINS_CBOPRET = 7;
         size = komodo_cbopretsize(ASSETCHAINS_CBOPRET);
         if ( Mineropret.size() < size )
             Mineropret.resize(size);
