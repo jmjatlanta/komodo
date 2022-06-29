@@ -28,7 +28,6 @@
 #endif // TESTMODE
 int32_t komodo_dpowconfs(int32_t height,int32_t numconfs);
 struct komodo_state *komodo_stateptr(char *symbol,char *dest);
-extern uint32_t KOMODO_DPOWCONFS;
 
 void endiancpy(uint8_t *dest,uint8_t *src,int32_t len)
 {

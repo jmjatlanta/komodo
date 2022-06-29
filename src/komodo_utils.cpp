@@ -749,23 +749,15 @@ int32_t bitcoin_addr2rmd160(uint8_t *addrtypep,uint8_t rmd160[20],char *coinaddr
 
 char *bitcoin_address(char *coinaddr,uint8_t addrtype,uint8_t *pubkey_or_rmd160,int32_t len)
 {
-    int32_t i; uint8_t data[25]; bits256 hash;// char checkaddr[65];
+    int32_t i; uint8_t data[25]; bits256 hash;
     if ( len != 20 )
         calc_rmd160_sha256(data+1,pubkey_or_rmd160,len);
     else memcpy(data+1,pubkey_or_rmd160,20);
-    //btc_convrmd160(checkaddr,addrtype,data+1);
     data[0] = addrtype;
     hash = bits256_doublesha256(0,data,21);
     for (i=0; i<4; i++)
         data[21+i] = hash.bytes[31-i];
-    if ( (coinaddr= bitcoin_base58encode(coinaddr,data,25)) != 0 )
-    {
-        //uint8_t checktype,rmd160[20];
-        //bitcoin_addr2rmd160(&checktype,rmd160,coinaddr);
-        //if ( strcmp(checkaddr,coinaddr) != 0 )
-        //    printf("checkaddr.(%s) vs coinaddr.(%s) %02x vs [%02x] memcmp.%d\n",checkaddr,coinaddr,addrtype,checktype,memcmp(rmd160,data+1,20));
-    }
-    return(coinaddr);
+    return bitcoin_base58encode(coinaddr, data, 25);
 }
 
 int32_t komodo_is_issuer()
@@ -1013,7 +1005,8 @@ void komodo_statefname(char *fname,char *symbol,char *str)
         else
         {
             if ( strcmp(symbol,"REGTEST") != 0 )
-                printf("unexpected fname.(%s) vs %s [%s] n.%d len.%d (%s)\n",fname,symbol,ASSETCHAINS_SYMBOL,n,len,&fname[len - n]);
+                printf("unexpected fname.(%s) vs %s [%s] n.%d len.%d (%s)\n",
+                        fname,symbol,ASSETCHAINS_SYMBOL,n,len,&fname[len - n]);
             return;
         }
     }
@@ -1028,7 +1021,6 @@ void komodo_statefname(char *fname,char *symbol,char *str)
     if ( symbol != 0 && symbol[0] != 0 && strcmp("KMD",symbol) != 0 )
     {
         if(!mapArgs.count("-datadir")) strcat(fname,symbol);
-        //printf("statefname.(%s) -> (%s)\n",symbol,fname);
 #ifdef _WIN32
         strcat(fname,"\\");
 #else
@@ -1036,7 +1028,6 @@ void komodo_statefname(char *fname,char *symbol,char *str)
 #endif
     }
     strcat(fname,str);
-    //printf("test.(%s) -> [%s] statename.(%s) %s\n",test,ASSETCHAINS_SYMBOL,symbol,fname);
 }
 
 void komodo_configfile(char *symbol,uint16_t rpcport)
@@ -1222,16 +1213,6 @@ int32_t komodo_whoami(char *pubkeystr,int32_t height,uint32_t timestamp)
     return(notaryid);
 }
 
-char *argv0suffix[] =
-{
-    (char *)"mnzd", (char *)"mnz-cli", (char *)"mnzd.exe", (char *)"mnz-cli.exe", (char *)"btchd", (char *)"btch-cli", (char *)"btchd.exe", (char *)"btch-cli.exe"
-};
-
-char *argv0names[] =
-{
-    (char *)"MNZ", (char *)"MNZ", (char *)"MNZ", (char *)"MNZ", (char *)"BTCH", (char *)"BTCH", (char *)"BTCH", (char *)"BTCH"
-};
-
 uint64_t komodo_max_money()
 {
     return komodo_current_supply(10000000);
@@ -1336,7 +1317,13 @@ extern int64_t MAX_MONEY;
 void komodo_cbopretupdate(int32_t forceflag);
 void SplitStr(const std::string& strVal, std::vector<std::string> &outVals);
 
-int8_t equihash_params_possible(uint64_t n, uint64_t k)
+/**
+ * @brief determine if the given N and K are valid
+ * @param n N
+ * @param k K
+ * @return true if the input values are valid
+ */
+bool equihash_params_possible(uint64_t n, uint64_t k)
 {
     /* To add more of these you also need to edit:
     * equihash.cpp very end of file with the tempate to point to the new param numbers 
@@ -1350,12 +1337,12 @@ int8_t equihash_params_possible(uint64_t n, uint64_t k)
     * Alternatively change ASSETCHAINS_N and ASSETCHAINS_K in komodo_nk.h for fast testing.
     */
     if ( k == 9 && (n == 200 || n == 210) )
-        return(0);
+        return true;
     if ( k == 5 && (n == 150 || n == 144 || n == 96 || n == 48) )
-        return(0);
+        return true;
     if ( k == ASSETCHAINS_K && n == ASSETCHAINS_N)
-        return(0);
-    return(-1);
+        return true;
+    return false;
 }
 
 /***
@@ -1416,32 +1403,714 @@ void set_kmd_user_password_port(const std::string& ltc_config_filename)
         }
 }
 
-void komodo_args(char *argv0)
+/***
+ * @brief handle all the globals related to the -ac_import command line parameter
+ */
+void process_selfimport()
 {
-    std::string name; // -ac_name
+    ASSETCHAINS_SELFIMPORT = GetArg("-ac_import",""); // BEAM, CODA, PUBKEY, GATEWAY
+    if ( ASSETCHAINS_SELFIMPORT == "PUBKEY" )
+    {
+        if ( strlen(ASSETCHAINS_OVERRIDE_PUBKEY.c_str()) != 66 )
+        {
+            fprintf(stderr,"invalid -ac_pubkey for -ac_import=PUBKEY\n");
+            StartShutdown();
+        }
+    }
+    else if ( ASSETCHAINS_SELFIMPORT == "BEAM" )
+    {
+        if (ASSETCHAINS_BEAMPORT == 0)
+        {
+            fprintf(stderr,"missing -ac_beam for BEAM rpcport\n");
+            StartShutdown();
+        }
+    }
+    else if ( ASSETCHAINS_SELFIMPORT == "CODA" )
+    {
+        if (ASSETCHAINS_CODAPORT == 0)
+        {
+            fprintf(stderr,"missing -ac_coda for CODA rpcport\n");
+            StartShutdown();
+        }
+    }
+    else if ( ASSETCHAINS_SELFIMPORT == "PEGSCC")
+    {
+        Split(GetArg("-ac_pegsccparams",""), sizeof(ASSETCHAINS_PEGSCCPARAMS)/sizeof(*ASSETCHAINS_PEGSCCPARAMS), 
+                ASSETCHAINS_PEGSCCPARAMS, 0);
+        if (ASSETCHAINS_ENDSUBSIDY[0]!=1 || ASSETCHAINS_COMMISSION!=0)
+        {
+            fprintf(stderr,"when using import for pegsCC these must be set: -ac_end=1 -ac_perc=0\n");
+            StartShutdown();
+        }
+    }
+    // else it can be gateway coin
+    else if (!ASSETCHAINS_SELFIMPORT.empty() && (ASSETCHAINS_ENDSUBSIDY[0]!=1 || ASSETCHAINS_SUPPLY>0 
+            || ASSETCHAINS_COMMISSION!=0))
+    {
+        fprintf(stderr,"when using gateway import these must be set: -ac_end=1 -ac_supply=0 -ac_perc=0\n");
+        StartShutdown();
+    }
+}
+
+/***
+ * @brief some specific chains set a few globals and set which CCs are available
+ * @param symbol the chain name
+ */
+void set_chain_specific_settings(const std::string& symbol)
+{
+    if ( symbol == "PIRATE" && ASSETCHAINS_HALVING[0] == 77777 )
+    {
+        ASSETCHAINS_HALVING[0] *= 5;
+        fprintf(stderr,"PIRATE halving changed to %d %.1f days ASSETCHAINS_LASTERA.%llu\n",
+                (int32_t)ASSETCHAINS_HALVING[0],(double)ASSETCHAINS_HALVING[0]/1440,(long long)ASSETCHAINS_LASTERA);
+    }
+    else if ( ASSETCHAINS_PRIVATE != 0 )
+    {
+        fprintf(stderr,"-ac_private for a non-PIRATE chain is not supported. The only reason to have an -ac_private chain is for total privacy and that is best achieved with the largest anon set. PIRATE has that and it is recommended to just use PIRATE\n");
+        StartShutdown();
+    }
+    // Set cc enables for all existing ac_cc chains here. 
+    if ( symbol == "AXO" || symbol == "DION" || symbol == "EQL"
+            || symbol == "ILN" || symbol == "OUR" || symbol == "ZEXO")
+    {
+        // No CCs used on these chains.
+        CCDISABLEALL;
+    }
+    if ( symbol == "CCL" )
+    {
+        // No CCs used on this chain yet. 
+        CCDISABLEALL;
+        CCENABLE(EVAL_TOKENS);
+        CCENABLE(EVAL_HEIR);
+    }
+    if ( symbol == "COQUI" )
+    {
+        CCDISABLEALL;
+        CCENABLE(EVAL_DICE);
+        CCENABLE(EVAL_CHANNELS);
+        CCENABLE(EVAL_ORACLES);
+        CCENABLE(EVAL_ASSETS);
+        CCENABLE(EVAL_TOKENS);
+    }
+    if ( symbol == "SEC" )
+    {
+        CCDISABLEALL;
+        CCENABLE(EVAL_ASSETS);
+        CCENABLE(EVAL_TOKENS);
+        CCENABLE(EVAL_ORACLES);
+    }
+    if ( symbol == "KMDICE" )
+    {
+        CCDISABLEALL;
+        CCENABLE(EVAL_FAUCET);
+        CCENABLE(EVAL_DICE);
+        CCENABLE(EVAL_ORACLES);
+    }
+    if ( symbol.empty() || symbol == "SUPERNET" || symbol == "DEX" || symbol == "COQUI"
+            || symbol == "PIRATE" || symbol == "KMDICE" )
+        KOMODO_EXTRASATOSHI = 1;
+}
+
+/**
+ * @brief set ASSETCHAINS_SYMBOL based on executable name and --ac_name 
+ * @param argv0 the executable name
+ */
+void set_assetchain_symbol(const char* argv0)
+{
+    char *argv0suffix[] = { (char *)"mnzd", (char *)"mnz-cli", (char *)"mnzd.exe", (char *)"mnz-cli.exe", 
+            (char *)"btchd", (char *)"btch-cli", (char *)"btchd.exe", (char *)"btch-cli.exe" };
+    char *argv0names[] = { (char *)"MNZ", (char *)"MNZ", (char *)"MNZ", (char *)"MNZ", 
+            (char *)"BTCH", (char *)"BTCH", (char *)"BTCH", (char *)"BTCH" };
+
+    std::string name = GetArg("-ac_name","");
+    if ( argv0 != nullptr )
+    {
+        // look at the executable name to see if it influences the chain name
+        int32_t len = (int32_t)strlen(argv0);
+        for (unsigned long i=0; i<sizeof(argv0suffix)/sizeof(*argv0suffix); i++)
+        {
+            int32_t n = (int32_t)strlen(argv0suffix[i]);
+            if ( strcmp(&argv0[len - n],argv0suffix[i]) == 0 )
+            {
+                name = argv0names[i];
+                break;
+            }
+        }
+    }
+    strncpy(ASSETCHAINS_SYMBOL,name.c_str(),sizeof(ASSETCHAINS_SYMBOL)-1);
+    ASSETCHAINS_SYMBOL[sizeof(ASSETCHAINS_SYMBOL)-1] = 0;
+
+    /* VRSC chain is incompatible with Komodo daemon */
+    assert(strcmp(ASSETCHAINS_SYMBOL, "VRSC") != 0);
+    if ( strcmp(ASSETCHAINS_SYMBOL,"KMD") == 0 )
+    {
+        fprintf(stderr,"cant have assetchain named KMD\n");
+        StartShutdown();
+    }
+}
+
+/***
+ * @brief set the algorithm globals based on the command line parameters
+ * @note ASSETCHAINS_NK array must already be set
+ */
+void set_algo_globals()
+{
+    std::string selectedAlgo = GetArg("-ac_algo", std::string(ASSETCHAINS_ALGORITHMS[0]));
+    uint32_t i;
+    for ( i = 0; i < ASSETCHAINS_NUMALGOS; i++ )
+    {
+        if (std::string(ASSETCHAINS_ALGORITHMS[i]) == selectedAlgo)
+        {
+            ASSETCHAINS_ALGO = i;
+            STAKING_MIN_DIFF = ASSETCHAINS_MINDIFF[i];
+            // only worth mentioning if it's not equihash
+            if (ASSETCHAINS_ALGO != ASSETCHAINS_EQUIHASH)
+                printf("ASSETCHAINS_ALGO, algorithm set to %s\n", selectedAlgo.c_str());
+            break;
+        }
+    }
+    if (i == ASSETCHAINS_NUMALGOS) // shouldn't this come before the NK check above? - JMJ
+    {
+        printf("ASSETCHAINS_ALGO, %s not supported. using equihash\n", selectedAlgo.c_str());
+    }
+    if ( ASSETCHAINS_ALGO == ASSETCHAINS_EQUIHASH && ASSETCHAINS_NK[0] != 0 
+            && ASSETCHAINS_NK[1] != 0 )
+    {
+        if ( !equihash_params_possible(ASSETCHAINS_NK[0], ASSETCHAINS_NK[1]) ) 
+        {
+            printf("equihash values N.%li and K.%li are not currently available\n", 
+                    ASSETCHAINS_NK[0], ASSETCHAINS_NK[1]);
+            exit(0);
+        } 
+        else 
+            printf("ASSETCHAINS_ALGO, algorithm set to equihash with N.%li and K.%li\n", 
+                    ASSETCHAINS_NK[0], ASSETCHAINS_NK[1]);
+    }
+}
+
+/***
+ * @brief set the globals that are specific to an asset chain
+ * @note the "KMD" chain will not call this, but all -ac_name chains will
+ */
+void set_assetchain_globals()
+{
+    uint16_t numCCEnabled = 0; // keep track of # CCs enabled
     uint8_t disablebits[32];
     uint8_t *extraptr=0;
     FILE *fp; 
-    uint16_t nonz=0; // keep track of # CCs enabled
 
-    const std::string ntz_dest_path = GetArg("-notary", "");
+    memset(disablebits,0,sizeof(disablebits)); // everything enabled
+
+    uint64_t ccEnablesHeight[512]; // i == ecode, i+1 == height
+    memset(ccEnablesHeight, 0, sizeof(ccEnablesHeight));
+    Split(GetArg("-ac_ccactivateht",""), sizeof(ccEnablesHeight)/sizeof(*ccEnablesHeight), ccEnablesHeight, 0);
+    // fill map with all eval codes and activation height of 0.
+    for ( int i = 0; i < 256; i++ )
+        mapHeightEvalActivate[i] = 0;
+    for ( int i = 0; i < 512; i++ )
+    {
+        int32_t ecode = ccEnablesHeight[i];
+        int32_t ht = ccEnablesHeight[i+1];
+        if ( i > 1 && ccEnablesHeight[i-2] == ecode )
+            break;
+        if ( ecode > 255 || ecode < 0 )
+            fprintf(stderr, "ac_ccactivateht: invalid evalcode.%i must be between 0 and 256.\n", ecode);
+        else if ( ht > 0 )
+        {
+            // update global map. 
+            mapHeightEvalActivate[ecode] = ht;
+            fprintf(stderr, "ac_ccactivateht: ecode.%i activates at height.%i\n", ecode, mapHeightEvalActivate[ecode]);
+        }
+        i++;
+    }
+
+    set_algo_globals();
+
+    ASSETCHAINS_LASTERA = GetArg("-ac_eras", 1);
+    if ( ASSETCHAINS_LASTERA < 1 || ASSETCHAINS_LASTERA > ASSETCHAINS_MAX_ERAS )
+    {
+        ASSETCHAINS_LASTERA = 1;
+        printf("ASSETCHAINS_LASTERA, if specified, must be between 1 and %u. ASSETCHAINS_LASTERA set to %lu\n", 
+                ASSETCHAINS_MAX_ERAS, ASSETCHAINS_LASTERA);
+    }
+    ASSETCHAINS_LASTERA -= 1;
+
+    ASSETCHAINS_TIMELOCKGTE = (uint64_t)GetArg("-ac_timelockgte", _ASSETCHAINS_TIMELOCKOFF);
+    ASSETCHAINS_TIMEUNLOCKFROM = GetArg("-ac_timeunlockfrom", 0);
+    ASSETCHAINS_TIMEUNLOCKTO = GetArg("-ac_timeunlockto", 0);
+    if ( ASSETCHAINS_TIMEUNLOCKFROM > ASSETCHAINS_TIMEUNLOCKTO )
+    {
+        printf("ASSETCHAINS_TIMELOCKGTE - must specify valid ac_timeunlockfrom and ac_timeunlockto\n");
+        ASSETCHAINS_TIMELOCKGTE = _ASSETCHAINS_TIMELOCKOFF;
+        ASSETCHAINS_TIMEUNLOCKFROM = ASSETCHAINS_TIMEUNLOCKTO = 0;
+    }
+
+    Split(GetArg("-ac_end",""), sizeof(ASSETCHAINS_ENDSUBSIDY)/sizeof(*ASSETCHAINS_ENDSUBSIDY),
+            ASSETCHAINS_ENDSUBSIDY, 0);
+    Split(GetArg("-ac_reward",""), sizeof(ASSETCHAINS_REWARD)/sizeof(*ASSETCHAINS_REWARD),
+            ASSETCHAINS_REWARD, 0);
+    Split(GetArg("-ac_halving",""), sizeof(ASSETCHAINS_HALVING)/sizeof(*ASSETCHAINS_HALVING),
+            ASSETCHAINS_HALVING, 0);
+    Split(GetArg("-ac_decay",""), sizeof(ASSETCHAINS_DECAY)/sizeof(*ASSETCHAINS_DECAY),
+            ASSETCHAINS_DECAY, 0);
+    Split(GetArg("-ac_notarypay",""), sizeof(ASSETCHAINS_NOTARY_PAY)/sizeof(*ASSETCHAINS_NOTARY_PAY),
+            ASSETCHAINS_NOTARY_PAY, 0);
+
+    for ( int i = 0; i < ASSETCHAINS_MAX_ERAS; i++ )
+    {
+        if ( ASSETCHAINS_DECAY[i] == 100000000 && ASSETCHAINS_ENDSUBSIDY == 0 )
+        {
+            ASSETCHAINS_DECAY[i] = 0;
+            printf("ERA%u: ASSETCHAINS_DECAY of 100000000 means linear and that needs ASSETCHAINS_ENDSUBSIDY\n",
+                    i);
+        }
+        else if ( ASSETCHAINS_DECAY[i] > 100000000 )
+        {
+            ASSETCHAINS_DECAY[i] = 0;
+            printf("ERA%u: ASSETCHAINS_DECAY cant be more than 100000000\n", i);
+        }
+    }
+
+    MAX_BLOCK_SIGOPS = 60000;
+    ASSETCHAINS_TXPOW = GetArg("-ac_txpow",0) & 3;
+    ASSETCHAINS_FOUNDERS = GetArg("-ac_founders",0);
+    ASSETCHAINS_FOUNDERS_REWARD = GetArg("-ac_founders_reward",0);
+    ASSETCHAINS_SUPPLY = GetArg("-ac_supply",10);
+    if ( ASSETCHAINS_SUPPLY > (uint64_t)90*1000*1000000 )
+    {
+        fprintf(stderr,"-ac_supply must be less than 90 billion\n");
+        StartShutdown();
+    }
+    fprintf(stderr,"ASSETCHAINS_SUPPLY %llu\n",(long long)ASSETCHAINS_SUPPLY);
+    
+    ASSETCHAINS_COMMISSION = GetArg("-ac_perc",0);
+    ASSETCHAINS_OVERRIDE_PUBKEY = GetArg("-ac_pubkey","");
+    ASSETCHAINS_SCRIPTPUB = GetArg("-ac_script","");
+    ASSETCHAINS_BEAMPORT = GetArg("-ac_beam",0);
+    ASSETCHAINS_CODAPORT = GetArg("-ac_coda",0);
+    ASSETCHAINS_CBOPRET = GetArg("-ac_cbopret",0);
+    ASSETCHAINS_CBMATURITY = GetArg("-ac_cbmaturity",0);
+    ASSETCHAINS_ADAPTIVEPOW = GetArg("-ac_adaptivepow",0);
+    if ( ASSETCHAINS_CBOPRET != 0 )
+    {
+        SplitStr(GetArg("-ac_prices",""),  ASSETCHAINS_PRICES);
+        if ( ASSETCHAINS_PRICES.size() > 0 )
+            ASSETCHAINS_CBOPRET |= 4;
+        SplitStr(GetArg("-ac_stocks",""),  ASSETCHAINS_STOCKS);
+        if ( ASSETCHAINS_STOCKS.size() > 0 )
+            ASSETCHAINS_CBOPRET |= 8;
+        for (size_t i=0; i<ASSETCHAINS_PRICES.size(); i++)
+            fprintf(stderr,"%s ",ASSETCHAINS_PRICES[i].c_str());
+        fprintf(stderr,"%d -ac_prices\n",(int32_t)ASSETCHAINS_PRICES.size());
+        for (size_t i=0; i<ASSETCHAINS_STOCKS.size(); i++)
+            fprintf(stderr,"%s ",ASSETCHAINS_STOCKS[i].c_str());
+        fprintf(stderr,"%d -ac_stocks\n",(int32_t)ASSETCHAINS_STOCKS.size());
+    }
+    const std::string hexstr = GetArg("-ac_mineropret","");
+    if ( hexstr.size() != 0 )
+    {
+        Mineropret.resize(hexstr.size()/2);
+        decode_hex(Mineropret.data(),hexstr.size()/2,(char *)hexstr.c_str());
+        for (size_t i=0; i<Mineropret.size(); i++)
+            fprintf(stderr,"%02x",Mineropret[i]);
+        fprintf(stderr," Mineropret\n");
+    }
+    if ( ASSETCHAINS_COMMISSION != 0 && ASSETCHAINS_FOUNDERS_REWARD != 0 )
+    {
+        fprintf(stderr,"cannot use founders reward and commission on the same chain.\n");
+        StartShutdown();
+    }
+    if ( ASSETCHAINS_CC != 0 )
+    {
+        uint8_t prevCCi = 0;
+        ASSETCHAINS_CCLIB = GetArg("-ac_cclib","");
+        uint64_t ccenables[256];
+        memset(ccenables, 0, sizeof(ccenables) );
+        Split(GetArg("-ac_ccenable",""), sizeof(ccenables)/sizeof(*ccenables),  ccenables, 0);
+        for (uint16_t i=0; i<256; i++)
+        {
+            if ( ccenables[i] != prevCCi && ccenables[i] != 0 )
+            {
+                numCCEnabled++;
+                prevCCi = ccenables[i];
+                fprintf(stderr,"%d ",(uint8_t)(ccenables[i] & 0xff));
+            }
+        }
+        fprintf(stderr,"nonz.%d ccenables[]\n",numCCEnabled);
+        if ( numCCEnabled > 0 )
+        {
+            // disable all CCs
+            for (uint16_t i=0; i<256; i++)
+            {
+                ASSETCHAINS_CCDISABLES[i] = 1;
+                SETBIT(disablebits,i);
+            }
+            // enable chosen CCs
+            for (uint16_t i=0; i<numCCEnabled; i++)
+            {
+                CLEARBIT(disablebits,(ccenables[i] & 0xff));
+                ASSETCHAINS_CCDISABLES[ccenables[i] & 0xff] = 0;
+            }
+            CLEARBIT(disablebits,0); // always enable contract 0. Why is this here? -JMJ
+        }
+    }
+    if ( ASSETCHAINS_BEAMPORT != 0 )
+    {
+        fprintf(stderr,"can only have one of -ac_beam or -ac_coda\n");
+        StartShutdown();
+    }
+
+    process_selfimport();
+
+    if ( (ASSETCHAINS_STAKED= GetArg("-ac_staked",0)) > 100 )
+        ASSETCHAINS_STAKED = 100;
+
+    ASSETCHAINS_SAPLING = GetArg("-ac_sapling", -1);
+    if (ASSETCHAINS_SAPLING == -1)
+    {
+        ASSETCHAINS_OVERWINTER = GetArg("-ac_overwinter", -1);
+    }
+    else
+    {
+        ASSETCHAINS_OVERWINTER = GetArg("-ac_overwinter", ASSETCHAINS_SAPLING);
+    }
+    if ( ASSETCHAINS_OVERRIDE_PUBKEY.size() == 66 || ASSETCHAINS_SCRIPTPUB.size() > 1 )
+    {
+        if ( ASSETCHAINS_SUPPLY > 10000000000 )
+        {
+            printf("ac_pubkey or ac_script wont work with ac_supply over 10 billion\n");
+            StartShutdown();
+        }
+        if ( ASSETCHAINS_NOTARY_PAY[0] != 0 )
+        {
+            printf("Assetchains NOTARY PAY cannot be used with ac_pubkey or ac_script.\n");
+            StartShutdown();
+        }
+        if ( ASSETCHAINS_OVERRIDE_PUBKEY.size() == 66 )
+        {
+            decode_hex(ASSETCHAINS_OVERRIDE_PUBKEY33,33,(char *)ASSETCHAINS_OVERRIDE_PUBKEY.c_str());
+            calc_rmd160_sha256(ASSETCHAINS_OVERRIDE_PUBKEYHASH,ASSETCHAINS_OVERRIDE_PUBKEY33,33);
+        }
+        if ( ASSETCHAINS_COMMISSION == 0 && ASSETCHAINS_FOUNDERS != 0 )
+        {
+            if ( ASSETCHAINS_FOUNDERS_REWARD == 0 )
+            {
+                ASSETCHAINS_COMMISSION = 53846154; // maps to 35%
+                printf("ASSETCHAINS_COMMISSION defaulted to 35%% when founders reward active\n");
+            }
+            else
+            {
+                printf("ASSETCHAINS_FOUNDERS_REWARD set to %ld\n", ASSETCHAINS_FOUNDERS_REWARD);
+            }
+        }
+    }
+    else
+    {
+        if ( ASSETCHAINS_COMMISSION != 0 )
+        {
+            ASSETCHAINS_COMMISSION = 0;
+            printf("ASSETCHAINS_COMMISSION needs an ASSETCHAINS_OVERRIDE_PUBKEY and cant be more than 100000000 (100%%)\n");
+        }
+        if ( ASSETCHAINS_FOUNDERS != 0 )
+        {
+            ASSETCHAINS_FOUNDERS = 0;
+            printf("ASSETCHAINS_FOUNDERS needs an ASSETCHAINS_OVERRIDE_PUBKEY or ASSETCHAINS_SCRIPTPUB\n");
+        }
+    }
+    int32_t extralen = 0;
+    if ( ASSETCHAINS_ENDSUBSIDY[0] != 0 || ASSETCHAINS_REWARD[0] != 0 
+            || ASSETCHAINS_HALVING[0] != 0 || ASSETCHAINS_DECAY[0] != 0 
+            || ASSETCHAINS_COMMISSION != 0 || ASSETCHAINS_PUBLIC != 0 
+            || ASSETCHAINS_PRIVATE != 0 || ASSETCHAINS_TXPOW != 0 
+            || ASSETCHAINS_FOUNDERS != 0 || ASSETCHAINS_SCRIPTPUB.size() > 1 
+            || ASSETCHAINS_SELFIMPORT.size() > 0 || ASSETCHAINS_OVERRIDE_PUBKEY33[0] != 0 
+            || ASSETCHAINS_TIMELOCKGTE != _ASSETCHAINS_TIMELOCKOFF
+            || ASSETCHAINS_ALGO != ASSETCHAINS_EQUIHASH || ASSETCHAINS_LASTERA > 0 
+            || ASSETCHAINS_BEAMPORT != 0 || ASSETCHAINS_CODAPORT != 0 
+            || numCCEnabled > 0 || ASSETCHAINS_CCLIB.size() > 0 
+            || ASSETCHAINS_FOUNDERS_REWARD != 0 || ASSETCHAINS_NOTARY_PAY[0] != 0 
+            || ASSETCHAINS_BLOCKTIME != 60 || ASSETCHAINS_CBOPRET != 0 
+            || Mineropret.size() != 0 || (ASSETCHAINS_NK[0] != 0 && ASSETCHAINS_NK[1] != 0) 
+            || KOMODO_SNAPSHOT_INTERVAL != 0 || ASSETCHAINS_EARLYTXIDCONTRACT != 0 
+            || ASSETCHAINS_CBMATURITY != 0 || ASSETCHAINS_ADAPTIVEPOW != 0 )
+    {
+        uint8_t extrabuf[32756];
+        fprintf(stderr,"perc %.4f%% ac_pub=[%02x%02x%02x...] acsize.%d\n",
+                dstr(ASSETCHAINS_COMMISSION)*100,ASSETCHAINS_OVERRIDE_PUBKEY33[0],
+                ASSETCHAINS_OVERRIDE_PUBKEY33[1],ASSETCHAINS_OVERRIDE_PUBKEY33[2],
+                (int32_t)ASSETCHAINS_SCRIPTPUB.size());
+        extraptr = extrabuf;
+        memcpy(extraptr,ASSETCHAINS_OVERRIDE_PUBKEY33,33), extralen = 33;
+
+        // if we have one era, this should create the same data structure as it used to, same if we increase _MAX_ERAS
+        for ( int i = 0; i <= ASSETCHAINS_LASTERA; i++ )
+        {
+            printf("ERA%u: end.%llu reward.%llu halving.%llu decay.%llu notarypay.%llu\n", i,
+                    (long long)ASSETCHAINS_ENDSUBSIDY[i],
+                    (long long)ASSETCHAINS_REWARD[i],
+                    (long long)ASSETCHAINS_HALVING[i],
+                    (long long)ASSETCHAINS_DECAY[i],
+                    (long long)ASSETCHAINS_NOTARY_PAY[i]);
+
+            // TODO: Verify that we don't overrun extrabuf here, which is a 256 byte buffer
+            extralen += iguana_rwnum(1,&extraptr[extralen],
+                    sizeof(ASSETCHAINS_ENDSUBSIDY[i]),(void *)&ASSETCHAINS_ENDSUBSIDY[i]);
+            extralen += iguana_rwnum(1,&extraptr[extralen],
+                    sizeof(ASSETCHAINS_REWARD[i]),(void *)&ASSETCHAINS_REWARD[i]);
+            extralen += iguana_rwnum(1,&extraptr[extralen],
+                    sizeof(ASSETCHAINS_HALVING[i]),(void *)&ASSETCHAINS_HALVING[i]);
+            extralen += iguana_rwnum(1,&extraptr[extralen],
+                    sizeof(ASSETCHAINS_DECAY[i]),(void *)&ASSETCHAINS_DECAY[i]);
+            if ( ASSETCHAINS_NOTARY_PAY[0] != 0 )
+                extralen += iguana_rwnum(1,&extraptr[extralen],sizeof(ASSETCHAINS_NOTARY_PAY[i]),
+                        (void *)&ASSETCHAINS_NOTARY_PAY[i]);
+        }
+
+        if (ASSETCHAINS_LASTERA > 0)
+        {
+            extralen += iguana_rwnum(1,&extraptr[extralen],sizeof(ASSETCHAINS_LASTERA),
+                    (void *)&ASSETCHAINS_LASTERA);
+        }
+
+        // hash in lock above for time locked coinbase transactions above a certain reward 
+        // value only if the lock above param was specified, otherwise, for compatibility, 
+        // do nothing
+        if ( ASSETCHAINS_TIMELOCKGTE != _ASSETCHAINS_TIMELOCKOFF )
+        {
+            extralen += iguana_rwnum(1,&extraptr[extralen],sizeof(ASSETCHAINS_TIMELOCKGTE),
+                    (void *)&ASSETCHAINS_TIMELOCKGTE);
+            extralen += iguana_rwnum(1,&extraptr[extralen],sizeof(ASSETCHAINS_TIMEUNLOCKFROM),
+                    (void *)&ASSETCHAINS_TIMEUNLOCKFROM);
+            extralen += iguana_rwnum(1,&extraptr[extralen],sizeof(ASSETCHAINS_TIMEUNLOCKTO),
+                    (void *)&ASSETCHAINS_TIMEUNLOCKTO);
+        }
+
+        if ( ASSETCHAINS_ALGO != ASSETCHAINS_EQUIHASH )
+        {
+            extralen += iguana_rwnum(1,&extraptr[extralen],sizeof(ASSETCHAINS_ALGO),
+                    (void *)&ASSETCHAINS_ALGO);
+        }
+
+        uint64_t val = ASSETCHAINS_COMMISSION | (((int64_t)ASSETCHAINS_STAKED & 0xff) << 32) 
+                | (((uint64_t)ASSETCHAINS_CC & 0xffff) << 40) | ((ASSETCHAINS_PUBLIC != 0) << 7) | ((ASSETCHAINS_PRIVATE != 0) << 6) | ASSETCHAINS_TXPOW;
+        extralen += iguana_rwnum(1,&extraptr[extralen],sizeof(val),(void *)&val);
+        
+        if ( ASSETCHAINS_FOUNDERS != 0 )
+        {
+            uint8_t tmp = 1;
+            extralen += iguana_rwnum(1,&extraptr[extralen],sizeof(tmp),(void *)&tmp);
+            if ( ASSETCHAINS_FOUNDERS > 1 )
+                extralen += iguana_rwnum(1,&extraptr[extralen],sizeof(ASSETCHAINS_FOUNDERS),
+                        (void *)&ASSETCHAINS_FOUNDERS);
+            if ( ASSETCHAINS_FOUNDERS_REWARD != 0 )
+            {
+                fprintf(stderr, "set founders reward.%lld\n",
+                        (long long)ASSETCHAINS_FOUNDERS_REWARD);
+                extralen += iguana_rwnum(1,&extraptr[extralen],sizeof(ASSETCHAINS_FOUNDERS_REWARD),
+                        (void *)&ASSETCHAINS_FOUNDERS_REWARD);
+            }
+        }
+        if ( ASSETCHAINS_SCRIPTPUB.size() > 1 )
+        {
+            decode_hex(&extraptr[extralen],ASSETCHAINS_SCRIPTPUB.size()/2,
+                    (char *)ASSETCHAINS_SCRIPTPUB.c_str());
+            extralen += ASSETCHAINS_SCRIPTPUB.size()/2;
+            fprintf(stderr,"append ac_script %s\n",ASSETCHAINS_SCRIPTPUB.c_str());
+        }
+        if ( ASSETCHAINS_SELFIMPORT.size() > 0 )
+        {
+            memcpy(&extraptr[extralen],(char *)ASSETCHAINS_SELFIMPORT.c_str(),
+                    ASSETCHAINS_SELFIMPORT.size());
+            for (size_t i=0; i<ASSETCHAINS_SELFIMPORT.size(); i++)
+                fprintf(stderr,"%c",extraptr[extralen+i]);
+            fprintf(stderr," selfimport\n");
+            extralen += ASSETCHAINS_SELFIMPORT.size();
+        }
+        if ( ASSETCHAINS_BEAMPORT != 0 )
+            extraptr[extralen++] = 'b';
+        if ( ASSETCHAINS_CODAPORT != 0 )
+            extraptr[extralen++] = 'c';
+        fprintf(stderr,"extralen.%d before disable bits\n",extralen);
+        if ( numCCEnabled > 0 )
+        {
+            memcpy(&extraptr[extralen],disablebits,sizeof(disablebits));
+            extralen += sizeof(disablebits);
+        }
+        if ( ASSETCHAINS_CCLIB.size() > 1 )
+        {
+            for (size_t i=0; i<ASSETCHAINS_CCLIB.size(); i++)
+            {
+                extraptr[extralen++] = ASSETCHAINS_CCLIB[i];
+                fprintf(stderr,"%c",ASSETCHAINS_CCLIB[i]);
+            }
+            fprintf(stderr," <- CCLIB name\n");
+        }
+        if ( ASSETCHAINS_BLOCKTIME != 60 )
+            extralen += iguana_rwnum(1,&extraptr[extralen],sizeof(ASSETCHAINS_BLOCKTIME),
+                    (void *)&ASSETCHAINS_BLOCKTIME);
+        if ( Mineropret.size() != 0 )
+        {
+            for (size_t i=0; i<Mineropret.size(); i++)
+                extraptr[extralen++] = Mineropret[i];
+        }
+        if ( ASSETCHAINS_CBOPRET != 0 )
+        {
+            extralen += iguana_rwnum(1,&extraptr[extralen],sizeof(ASSETCHAINS_CBOPRET),
+                    (void *)&ASSETCHAINS_CBOPRET);
+            if ( ASSETCHAINS_PRICES.size() != 0 )
+            {
+                for (size_t i=0; i<ASSETCHAINS_PRICES.size(); i++)
+                {
+                    std::string symbol = ASSETCHAINS_PRICES[i];
+                    memcpy(&extraptr[extralen],(char *)symbol.c_str(),symbol.size());
+                    extralen += symbol.size();
+                }
+            }
+            if ( ASSETCHAINS_STOCKS.size() != 0 )
+            {
+                for (size_t i=0; i<ASSETCHAINS_STOCKS.size(); i++)
+                {
+                    std::string symbol = ASSETCHAINS_STOCKS[i];
+                    memcpy(&extraptr[extralen],(char *)symbol.c_str(),symbol.size());
+                    extralen += symbol.size();
+                }
+            }
+            komodo_cbopretupdate(1); // will set Mineropret
+            fprintf(stderr,"This blockchain uses data produced from CoinDesk Bitcoin Price Index\n");
+        }
+        if ( ASSETCHAINS_NK[0] != 0 && ASSETCHAINS_NK[1] != 0 )
+        {
+            extralen += iguana_rwnum(1,&extraptr[extralen],sizeof(ASSETCHAINS_NK[0]),
+                    (void *)&ASSETCHAINS_NK[0]);
+            extralen += iguana_rwnum(1,&extraptr[extralen],sizeof(ASSETCHAINS_NK[1]),
+                    (void *)&ASSETCHAINS_NK[1]);
+        }
+        if ( KOMODO_SNAPSHOT_INTERVAL != 0 )
+        {
+            extralen += iguana_rwnum(1,&extraptr[extralen],sizeof(KOMODO_SNAPSHOT_INTERVAL),
+                    (void *)&KOMODO_SNAPSHOT_INTERVAL);
+        }
+        if ( ASSETCHAINS_EARLYTXIDCONTRACT != 0 )
+        {
+            extralen += iguana_rwnum(1,&extraptr[extralen],sizeof(ASSETCHAINS_EARLYTXIDCONTRACT),
+                    (void *)&ASSETCHAINS_EARLYTXIDCONTRACT);
+        }
+        if ( ASSETCHAINS_CBMATURITY != 0 )
+        {
+            extralen += iguana_rwnum(1,&extraptr[extralen],sizeof(ASSETCHAINS_CBMATURITY),
+                    (void *)&ASSETCHAINS_CBMATURITY);
+        }
+        if ( ASSETCHAINS_ADAPTIVEPOW != 0 )
+            extraptr[extralen++] = ASSETCHAINS_ADAPTIVEPOW;
+    }
+    
+    const std::string addn = GetArg("-seednode","");
+    if ( addn.size() > 0 )
+        ASSETCHAINS_SEED = 1;
+
+    MAX_MONEY = komodo_max_money();
+
+    int32_t baseid = komodo_baseid(ASSETCHAINS_SYMBOL);
+    if ( baseid >= 0 && baseid < 32 )
+    {
+        printf("baseid.%d MAX_MONEY.%s %.8f\n",baseid,ASSETCHAINS_SYMBOL,
+                (double)MAX_MONEY/SATOSHIDEN);
+    }
+
+    if ( ASSETCHAINS_CC >= KOMODO_FIRSTFUNGIBLEID && MAX_MONEY < 1000000LL*SATOSHIDEN )
+        MAX_MONEY = 1000000LL*SATOSHIDEN;
+    if ( KOMODO_BIT63SET(MAX_MONEY) != 0 )
+        MAX_MONEY = KOMODO_MAXNVALUE;
+    fprintf(stderr,"MAX_MONEY %llu %.8f\n",(long long)MAX_MONEY,(double)MAX_MONEY/SATOSHIDEN);
+    uint16_t tmpport = komodo_port(ASSETCHAINS_SYMBOL,ASSETCHAINS_SUPPLY,
+            &ASSETCHAINS_MAGIC,extraptr,extralen);
+    if ( GetArg("-port",0) != 0 )
+    {
+        ASSETCHAINS_P2PPORT = GetArg("-port",0);
+        fprintf(stderr,"set p2pport.%u\n",ASSETCHAINS_P2PPORT);
+    } 
+    else 
+        ASSETCHAINS_P2PPORT = tmpport;
+
+    char* dirname = nullptr;
+    while ( (dirname= (char *)GetDataDir(false).string().c_str()) == 0 || dirname[0] == 0 )
+    {
+        fprintf(stderr,"waiting for datadir (%s)\n",dirname);
+#ifndef _WIN32
+        sleep(3);
+#else
+        boost::this_thread::sleep(boost::posix_time::milliseconds(3000));
+#endif
+    }
+    extern int COINBASE_MATURITY;
+    uint16_t port = komodo_userpass(ASSETCHAINS_USERPASS,ASSETCHAINS_SYMBOL);
+    if ( port != 0 )
+        ASSETCHAINS_RPCPORT = port;
+    else 
+        komodo_configfile(ASSETCHAINS_SYMBOL,ASSETCHAINS_P2PPORT + 1);
+
+    if (ASSETCHAINS_CBMATURITY != 0)
+        COINBASE_MATURITY = ASSETCHAINS_CBMATURITY;
+    else if (ASSETCHAINS_LASTERA == 0 || is_STAKED(ASSETCHAINS_SYMBOL) != 0)
+        COINBASE_MATURITY = 1;
+    if (COINBASE_MATURITY < 1)
+    {
+        fprintf(stderr,"ac_cbmaturity must be >0, shutting down\n");
+        StartShutdown();
+    }
+    if ( ASSETCHAINS_RPCPORT == 0 )
+        ASSETCHAINS_RPCPORT = ASSETCHAINS_P2PPORT + 1;
+
+    uint8_t magic[4];
+    iguana_rwnum(1,magic,sizeof(ASSETCHAINS_MAGIC),(void *)&ASSETCHAINS_MAGIC);
+    char magicstr[9];
+    for (uint16_t i=0; i<4; i++)
+        sprintf(&magicstr[i<<1],"%02x",magic[i]);
+    magicstr[8] = 0;
+#ifndef FROM_CLI
+    char fname[512];
+    sprintf(fname,"%s_7776",ASSETCHAINS_SYMBOL);
+    if ( (fp= fopen(fname,"wb")) != 0 )
+    {
+        int8_t notarypay = 0;
+        if ( ASSETCHAINS_NOTARY_PAY[0] != 0 )
+            notarypay = 1;
+        char *iguanafmtstr = (char *)"curl --url \"http://127.0.0.1:7776\" --data \"{\\\"conf\\\":\\\"%s.conf\\\",\\\"path\\\":\\\"${HOME#\"/\"}/.komodo/%s\\\",\\\"unitval\\\":\\\"20\\\",\\\"zcash\\\":1,\\\"RELAY\\\":-1,\\\"VALIDATE\\\":0,\\\"prefetchlag\\\":-1,\\\"poll\\\":100,\\\"active\\\":1,\\\"agent\\\":\\\"iguana\\\",\\\"method\\\":\\\"addcoin\\\",\\\"startpend\\\":4,\\\"endpend\\\":4,\\\"services\\\":129,\\\"maxpeers\\\":8,\\\"newcoin\\\":\\\"%s\\\",\\\"name\\\":\\\"%s\\\",\\\"hasheaders\\\":1,\\\"useaddmultisig\\\":0,\\\"netmagic\\\":\\\"%s\\\",\\\"p2p\\\":%u,\\\"rpc\\\":%u,\\\"pubval\\\":60,\\\"p2shval\\\":85,\\\"wifval\\\":188,\\\"txfee_satoshis\\\":\\\"10000\\\",\\\"isPoS\\\":0,\\\"minoutput\\\":10000,\\\"minconfirms\\\":2,\\\"genesishash\\\":\\\"027e3758c3a65b12aa1046462b486d0a63bfa1beae327897f56c5cfb7daaae71\\\",\\\"protover\\\":170002,\\\"genesisblock\\\":\\\"0100000000000000000000000000000000000000000000000000000000000000000000003ba3edfd7a7b12b27ac72c3e67768f617fc81bc3888a51323a9fb8aa4b1e5e4a000000000000000000000000000000000000000000000000000000000000000029ab5f490f0f0f200b00000000000000000000000000000000000000000000000000000000000000fd4005000d5ba7cda5d473947263bf194285317179d2b0d307119c2e7cc4bd8ac456f0774bd52b0cd9249be9d40718b6397a4c7bbd8f2b3272fed2823cd2af4bd1632200ba4bf796727d6347b225f670f292343274cc35099466f5fb5f0cd1c105121b28213d15db2ed7bdba490b4cedc69742a57b7c25af24485e523aadbb77a0144fc76f79ef73bd8530d42b9f3b9bed1c135ad1fe152923fafe98f95f76f1615e64c4abb1137f4c31b218ba2782bc15534788dda2cc08a0ee2987c8b27ff41bd4e31cd5fb5643dfe862c9a02ca9f90c8c51a6671d681d04ad47e4b53b1518d4befafefe8cadfb912f3d03051b1efbf1dfe37b56e93a741d8dfd80d576ca250bee55fab1311fc7b3255977558cdda6f7d6f875306e43a14413facdaed2f46093e0ef1e8f8a963e1632dcbeebd8e49fd16b57d49b08f9762de89157c65233f60c8e38a1f503a48c555f8ec45dedecd574a37601323c27be597b956343107f8bd80f3a925afaf30811df83c402116bb9c1e5231c70fff899a7c82f73c902ba54da53cc459b7bf1113db65cc8f6914d3618560ea69abd13658fa7b6af92d374d6eca9529f8bd565166e4fcbf2a8dfb3c9b69539d4d2ee2e9321b85b331925df195915f2757637c2805e1d4131e1ad9ef9bc1bb1c732d8dba4738716d351ab30c996c8657bab39567ee3b29c6d054b711495c0d52e1cd5d8e55b4f0f0325b97369280755b46a02afd54be4ddd9f77c22272b8bbb17ff5118fedbae2564524e797bd28b5f74f7079d532ccc059807989f94d267f47e724b3f1ecfe00ec9e6541c961080d8891251b84b4480bc292f6a180bea089fef5bbda56e1e41390d7c0e85ba0ef530f7177413481a226465a36ef6afe1e2bca69d2078712b3912bba1a99b1fbff0d355d6ffe726d2bb6fbc103c4ac5756e5bee6e47e17424ebcbf1b63d8cb90ce2e40198b4f4198689daea254307e52a25562f4c1455340f0ffeb10f9d8e914775e37d0edca019fb1b9c6ef81255ed86bc51c5391e0591480f66e2d88c5f4fd7277697968656a9b113ab97f874fdd5f2465e5559533e01ba13ef4a8f7a21d02c30c8ded68e8c54603ab9c8084ef6d9eb4e92c75b078539e2ae786ebab6dab73a09e0aa9ac575bcefb29e930ae656e58bcb513f7e3c17e079dce4f05b5dbc18c2a872b22509740ebe6a3903e00ad1abc55076441862643f93606e3dc35e8d9f2caef3ee6be14d513b2e062b21d0061de3bd56881713a1a5c17f5ace05e1ec09da53f99442df175a49bd154aa96e4949decd52fed79ccf7ccbce32941419c314e374e4a396ac553e17b5340336a1a25c22f9e42a243ba5404450b650acfc826a6e432971ace776e15719515e1634ceb9a4a35061b668c74998d3dfb5827f6238ec015377e6f9c94f38108768cf6e5c8b132e0303fb5a200368f845ad9d46343035a6ff94031df8d8309415bb3f6cd5ede9c135fdabcc030599858d803c0f85be7661c88984d88faa3d26fb0e9aac0056a53f1b5d0baed713c853c4a2726869a0a124a8a5bbc0fc0ef80c8ae4cb53636aa02503b86a1eb9836fcc259823e2692d921d88e1ffc1e6cb2bde43939ceb3f32a611686f539f8f7c9f0bf00381f743607d40960f06d347d1cd8ac8a51969c25e37150efdf7aa4c2037a2fd0516fb444525ab157a0ed0a7412b2fa69b217fe397263153782c0f64351fbdf2678fa0dc8569912dcd8e3ccad38f34f23bbbce14c6a26ac24911b308b82c7e43062d180baeac4ba7153858365c72c63dcf5f6a5b08070b730adb017aeae925b7d0439979e2679f45ed2f25a7edcfd2fb77a8794630285ccb0a071f5cce410b46dbf9750b0354aae8b65574501cc69efb5b6a43444074fee116641bb29da56c2b4a7f456991fc92b2\\\",\\\"debug\\\":0,\\\"seedipaddr\\\":\\\"%s\\\",\\\"sapling\\\":1,\\\"notarypay\\\":%i}\"";
+        fprintf(fp,iguanafmtstr,ASSETCHAINS_SYMBOL,ASSETCHAINS_SYMBOL,ASSETCHAINS_SYMBOL,ASSETCHAINS_SYMBOL,
+                magicstr,ASSETCHAINS_P2PPORT,ASSETCHAINS_RPCPORT,"78.47.196.146",notarypay);
+        fclose(fp);
+    } 
+    else 
+        printf("error creating (%s)\n",fname);
+#endif
+    if ( ASSETCHAINS_CC < 2 )
+    {
+        if ( KOMODO_CCACTIVATE != 0 )
+        {
+            ASSETCHAINS_CC = 2;
+            fprintf(stderr,"smart utxo CC contracts will activate at height.%d\n",KOMODO_CCACTIVATE);
+        }
+        else if ( ccEnablesHeight[0] != 0 )
+        {
+            ASSETCHAINS_CC = 2;
+            fprintf(stderr,"smart utxo CC contract %d will activate at height.%d\n",
+                    (int32_t)ccEnablesHeight[0],(int32_t)ccEnablesHeight[1]);
+        }
+    }
+}
+
+/**
+ * @brief Set up the globals relating to notary stuff based on command line params
+ * @return the config filename of the parent chain
+ */
+std::string set_notary_globals()
+{
+    const std::string ntz_dest_path = GetArg("-notary", ""); // name of config file of "parent" chain
     IS_KOMODO_NOTARY = ntz_dest_path == "" ? 0 : 1;
 
-
     STAKED_NOTARY_ID = GetArg("-stakednotary", -1);
-    KOMODO_NSPV = GetArg("-nSPV",0);
-    memset(disablebits,0,sizeof(disablebits)); // everything enabled
-    if ( GetBoolArg("-gen", false) != 0 )
-    {
-        KOMODO_MININGTHREADS = GetArg("-genproclimit",-1);
-    }
-    IS_MODE_EXCHANGEWALLET = GetBoolArg("-exchange", false);
-    DONATION_PUBKEY = GetArg("-donation", "");
     NOTARY_PUBKEY = GetArg("-pubkey", "");
-    IS_KOMODO_DEALERNODE = GetArg("-dealer",0);
-    IS_KOMODO_TESTNODE = GetArg("-testnode",0);
-    ASSETCHAINS_STAKED_SPLIT_PERCENTAGE = GetArg("-splitperc",0);
-    if ( strlen(NOTARY_PUBKEY.c_str()) == 66 )
+    if ( NOTARY_PUBKEY.size() == 66 )
     {
         decode_hex(NOTARY_PUBKEY33,33,(char *)NOTARY_PUBKEY.c_str());
         USE_EXTERNAL_PUBKEY = 1;
@@ -1468,21 +2137,28 @@ void komodo_args(char *argv0)
         fprintf(stderr, "Cannot be STAKED and KMD notary at the same time!\n");
         StartShutdown();
     }
-	name = GetArg("-ac_name","");
-    if ( argv0 != 0 )
+    return ntz_dest_path;
+}
+
+/***
+ * @brief called by AppInit
+ * @param argv0 argv[0]
+ */
+void komodo_args(char *argv0)
+{
+    std::string ntz_dest_path = set_notary_globals();
+
+    KOMODO_NSPV = GetArg("-nSPV",0);
+    if ( GetBoolArg("-gen", false) != 0 )
     {
-        int32_t len = (int32_t)strlen(argv0);
-        for (unsigned long i=0; i<sizeof(argv0suffix)/sizeof(*argv0suffix); i++)
-        {
-            int32_t n = (int32_t)strlen(argv0suffix[i]);
-            if ( strcmp(&argv0[len - n],argv0suffix[i]) == 0 )
-            {
-                //printf("ARGV0.(%s) -> matches suffix (%s) -> ac_name.(%s)\n",argv0,argv0suffix[i],argv0names[i]);
-                name = argv0names[i];
-                break;
-            }
-        }
+        KOMODO_MININGTHREADS = GetArg("-genproclimit",-1);
     }
+    IS_MODE_EXCHANGEWALLET = GetBoolArg("-exchange", false);
+    DONATION_PUBKEY = GetArg("-donation", "");
+    IS_KOMODO_DEALERNODE = GetArg("-dealer",0);
+    IS_KOMODO_TESTNODE = GetArg("-testnode",0);
+    ASSETCHAINS_STAKED_SPLIT_PERCENTAGE = GetArg("-splitperc",0);
+    set_assetchain_symbol(argv0);
     KOMODO_STOPAT = GetArg("-stopat",0);
     MAX_REORG_LENGTH = GetArg("-maxreorg",MAX_REORG_LENGTH);
     WITNESS_CACHE_SIZE = MAX_REORG_LENGTH+10;
@@ -1494,646 +2170,26 @@ void komodo_args(char *argv0)
     KOMODO_SNAPSHOT_INTERVAL = GetArg("-ac_snapshot",0);
     Split(GetArg("-ac_nk",""), sizeof(ASSETCHAINS_NK)/sizeof(*ASSETCHAINS_NK), ASSETCHAINS_NK, 0);
     
-    // -ac_ccactivateht=evalcode,height,evalcode,height,evalcode,height....
-    uint64_t ccEnablesHeight[512];
-    memset(ccEnablesHeight, 0, sizeof(ccEnablesHeight));
-    Split(GetArg("-ac_ccactivateht",""), sizeof(ccEnablesHeight)/sizeof(*ccEnablesHeight), ccEnablesHeight, 0);
-    // fill map with all eval codes and activation height of 0.
-    for ( int i = 0; i < 256; i++ )
-        mapHeightEvalActivate[i] = 0;
-    for ( int i = 0; i < 512; i++ )
-    {
-        int32_t ecode = ccEnablesHeight[i];
-        int32_t ht = ccEnablesHeight[i+1];
-        if ( i > 1 && ccEnablesHeight[i-2] == ecode )
-            break;
-        if ( ecode > 255 || ecode < 0 )
-            fprintf(stderr, "ac_ccactivateht: invalid evalcode.%i must be between 0 and 256.\n", ecode);
-        else if ( ht > 0 )
-        {
-            // update global map. 
-            mapHeightEvalActivate[ecode] = ht;
-            fprintf(stderr, "ac_ccactivateht: ecode.%i activates at height.%i\n", ecode, mapHeightEvalActivate[ecode]);
-        }
-        i++;
-    }
-    
     if ( (KOMODO_REWIND= GetArg("-rewind",0)) != 0 )
     {
         printf("KOMODO_REWIND %d\n",KOMODO_REWIND);
     }
     KOMODO_EARLYTXID = Parseuint256(GetArg("-earlytxid","0").c_str());    
     ASSETCHAINS_EARLYTXIDCONTRACT = GetArg("-ac_earlytxidcontract",0);
-    if ( name.c_str()[0] != 0 )
+    if ( ASSETCHAINS_SYMBOL[0] != 0 )
     {
-        std::string selectedAlgo = GetArg("-ac_algo", std::string(ASSETCHAINS_ALGORITHMS[0]));
-
-        uint32_t i;
-        for ( i = 0; i < ASSETCHAINS_NUMALGOS; i++ )
-        {
-            if (std::string(ASSETCHAINS_ALGORITHMS[i]) == selectedAlgo)
-            {
-                ASSETCHAINS_ALGO = i;
-                STAKING_MIN_DIFF = ASSETCHAINS_MINDIFF[i];
-                // only worth mentioning if it's not equihash
-                if (ASSETCHAINS_ALGO != ASSETCHAINS_EQUIHASH)
-                    printf("ASSETCHAINS_ALGO, algorithm set to %s\n", selectedAlgo.c_str());
-                break;
-            }
-        }
-        if ( ASSETCHAINS_ALGO == ASSETCHAINS_EQUIHASH && ASSETCHAINS_NK[0] != 0 && ASSETCHAINS_NK[1] != 0 )
-        {
-            if ( equihash_params_possible(ASSETCHAINS_NK[0], ASSETCHAINS_NK[1]) == -1 ) 
-            {
-                printf("equihash values N.%li and K.%li are not currently available\n", ASSETCHAINS_NK[0], ASSETCHAINS_NK[1]);
-                exit(0);
-            } else printf("ASSETCHAINS_ALGO, algorithm set to equihash with N.%li and K.%li\n", ASSETCHAINS_NK[0], ASSETCHAINS_NK[1]);
-        }
-        if (i == ASSETCHAINS_NUMALGOS)
-        {
-            printf("ASSETCHAINS_ALGO, %s not supported. using equihash\n", selectedAlgo.c_str());
-        }
-
-        ASSETCHAINS_LASTERA = GetArg("-ac_eras", 1);
-        if ( ASSETCHAINS_LASTERA < 1 || ASSETCHAINS_LASTERA > ASSETCHAINS_MAX_ERAS )
-        {
-            ASSETCHAINS_LASTERA = 1;
-            printf("ASSETCHAINS_LASTERA, if specified, must be between 1 and %u. ASSETCHAINS_LASTERA set to %lu\n", ASSETCHAINS_MAX_ERAS, ASSETCHAINS_LASTERA);
-        }
-        ASSETCHAINS_LASTERA -= 1;
-
-        ASSETCHAINS_TIMELOCKGTE = (uint64_t)GetArg("-ac_timelockgte", _ASSETCHAINS_TIMELOCKOFF);
-        ASSETCHAINS_TIMEUNLOCKFROM = GetArg("-ac_timeunlockfrom", 0);
-        ASSETCHAINS_TIMEUNLOCKTO = GetArg("-ac_timeunlockto", 0);
-        if ( ASSETCHAINS_TIMEUNLOCKFROM > ASSETCHAINS_TIMEUNLOCKTO )
-        {
-            printf("ASSETCHAINS_TIMELOCKGTE - must specify valid ac_timeunlockfrom and ac_timeunlockto\n");
-            ASSETCHAINS_TIMELOCKGTE = _ASSETCHAINS_TIMELOCKOFF;
-            ASSETCHAINS_TIMEUNLOCKFROM = ASSETCHAINS_TIMEUNLOCKTO = 0;
-        }
-
-        Split(GetArg("-ac_end",""), sizeof(ASSETCHAINS_ENDSUBSIDY)/sizeof(*ASSETCHAINS_ENDSUBSIDY),  ASSETCHAINS_ENDSUBSIDY, 0);
-        Split(GetArg("-ac_reward",""), sizeof(ASSETCHAINS_REWARD)/sizeof(*ASSETCHAINS_REWARD),  ASSETCHAINS_REWARD, 0);
-        Split(GetArg("-ac_halving",""), sizeof(ASSETCHAINS_HALVING)/sizeof(*ASSETCHAINS_HALVING),  ASSETCHAINS_HALVING, 0);
-        Split(GetArg("-ac_decay",""), sizeof(ASSETCHAINS_DECAY)/sizeof(*ASSETCHAINS_DECAY),  ASSETCHAINS_DECAY, 0);
-        Split(GetArg("-ac_notarypay",""), sizeof(ASSETCHAINS_NOTARY_PAY)/sizeof(*ASSETCHAINS_NOTARY_PAY),  ASSETCHAINS_NOTARY_PAY, 0);
-
-        for ( int i = 0; i < ASSETCHAINS_MAX_ERAS; i++ )
-        {
-            if ( ASSETCHAINS_DECAY[i] == 100000000 && ASSETCHAINS_ENDSUBSIDY == 0 )
-            {
-                ASSETCHAINS_DECAY[i] = 0;
-                printf("ERA%u: ASSETCHAINS_DECAY of 100000000 means linear and that needs ASSETCHAINS_ENDSUBSIDY\n", i);
-            }
-            else if ( ASSETCHAINS_DECAY[i] > 100000000 )
-            {
-                ASSETCHAINS_DECAY[i] = 0;
-                printf("ERA%u: ASSETCHAINS_DECAY cant be more than 100000000\n", i);
-            }
-        }
-
-        MAX_BLOCK_SIGOPS = 60000;
-        ASSETCHAINS_TXPOW = GetArg("-ac_txpow",0) & 3;
-        ASSETCHAINS_FOUNDERS = GetArg("-ac_founders",0);// & 1;
-		ASSETCHAINS_FOUNDERS_REWARD = GetArg("-ac_founders_reward",0);
-        ASSETCHAINS_SUPPLY = GetArg("-ac_supply",10);
-        if ( ASSETCHAINS_SUPPLY > (uint64_t)90*1000*1000000 )
-        {
-            fprintf(stderr,"-ac_supply must be less than 90 billion\n");
-            StartShutdown();
-        }
-        fprintf(stderr,"ASSETCHAINS_SUPPLY %llu\n",(long long)ASSETCHAINS_SUPPLY);
-        
-        ASSETCHAINS_COMMISSION = GetArg("-ac_perc",0);
-        ASSETCHAINS_OVERRIDE_PUBKEY = GetArg("-ac_pubkey","");
-        ASSETCHAINS_SCRIPTPUB = GetArg("-ac_script","");
-        ASSETCHAINS_BEAMPORT = GetArg("-ac_beam",0);
-        ASSETCHAINS_CODAPORT = GetArg("-ac_coda",0);
-        ASSETCHAINS_CBOPRET = GetArg("-ac_cbopret",0);
-        ASSETCHAINS_CBMATURITY = GetArg("-ac_cbmaturity",0);
-        ASSETCHAINS_ADAPTIVEPOW = GetArg("-ac_adaptivepow",0);
-        //fprintf(stderr,"ASSETCHAINS_CBOPRET.%llx\n",(long long)ASSETCHAINS_CBOPRET);
-        if ( ASSETCHAINS_CBOPRET != 0 )
-        {
-            SplitStr(GetArg("-ac_prices",""),  ASSETCHAINS_PRICES);
-            if ( ASSETCHAINS_PRICES.size() > 0 )
-                ASSETCHAINS_CBOPRET |= 4;
-            SplitStr(GetArg("-ac_stocks",""),  ASSETCHAINS_STOCKS);
-            if ( ASSETCHAINS_STOCKS.size() > 0 )
-                ASSETCHAINS_CBOPRET |= 8;
-            for (size_t i=0; i<ASSETCHAINS_PRICES.size(); i++)
-                fprintf(stderr,"%s ",ASSETCHAINS_PRICES[i].c_str());
-            fprintf(stderr,"%d -ac_prices\n",(int32_t)ASSETCHAINS_PRICES.size());
-            for (size_t i=0; i<ASSETCHAINS_STOCKS.size(); i++)
-                fprintf(stderr,"%s ",ASSETCHAINS_STOCKS[i].c_str());
-            fprintf(stderr,"%d -ac_stocks\n",(int32_t)ASSETCHAINS_STOCKS.size());
-        }
-        const std::string hexstr = GetArg("-ac_mineropret","");
-        if ( hexstr.size() != 0 )
-        {
-            Mineropret.resize(hexstr.size()/2);
-            decode_hex(Mineropret.data(),hexstr.size()/2,(char *)hexstr.c_str());
-            for (size_t i=0; i<Mineropret.size(); i++)
-                fprintf(stderr,"%02x",Mineropret[i]);
-            fprintf(stderr," Mineropret\n");
-        }
-        if ( ASSETCHAINS_COMMISSION != 0 && ASSETCHAINS_FOUNDERS_REWARD != 0 )
-        {
-            fprintf(stderr,"cannot use founders reward and commission on the same chain.\n");
-            StartShutdown();
-        }
-        if ( ASSETCHAINS_CC != 0 )
-        {
-            uint8_t prevCCi = 0;
-            ASSETCHAINS_CCLIB = GetArg("-ac_cclib","");
-            uint64_t ccenables[256];
-            memset(ccenables, 0, sizeof(ccenables) );
-            Split(GetArg("-ac_ccenable",""), sizeof(ccenables)/sizeof(*ccenables),  ccenables, 0);
-            for (uint16_t i=0; i<256; i++)
-            {
-                if ( ccenables[i] != prevCCi && ccenables[i] != 0 )
-                {
-                    nonz++;
-                    prevCCi = ccenables[i];
-                    fprintf(stderr,"%d ",(uint8_t)(ccenables[i] & 0xff));
-                }
-            }
-            fprintf(stderr,"nonz.%d ccenables[]\n",nonz);
-            if ( nonz > 0 )
-            {
-                // disable all CCs
-                for (uint16_t i=0; i<256; i++)
-                {
-                    ASSETCHAINS_CCDISABLES[i] = 1;
-                    SETBIT(disablebits,i);
-                }
-                // enable chosen CCs
-                for (uint16_t i=0; i<nonz; i++)
-                {
-                    CLEARBIT(disablebits,(ccenables[i] & 0xff));
-                    ASSETCHAINS_CCDISABLES[ccenables[i] & 0xff] = 0;
-                }
-                CLEARBIT(disablebits,0); // always enable contract 0. Why is this here? -JMJ
-            }
-        }
-        if ( ASSETCHAINS_BEAMPORT != 0 )
-        {
-            fprintf(stderr,"can only have one of -ac_beam or -ac_coda\n");
-            StartShutdown();
-        }
-        ASSETCHAINS_SELFIMPORT = GetArg("-ac_import",""); // BEAM, CODA, PUBKEY, GATEWAY
-        if ( ASSETCHAINS_SELFIMPORT == "PUBKEY" )
-        {
-            if ( strlen(ASSETCHAINS_OVERRIDE_PUBKEY.c_str()) != 66 )
-            {
-                fprintf(stderr,"invalid -ac_pubkey for -ac_import=PUBKEY\n");
-                StartShutdown();
-            }
-        }
-        else if ( ASSETCHAINS_SELFIMPORT == "BEAM" )
-        {
-            if (ASSETCHAINS_BEAMPORT == 0)
-            {
-                fprintf(stderr,"missing -ac_beam for BEAM rpcport\n");
-                StartShutdown();
-            }
-        }
-        else if ( ASSETCHAINS_SELFIMPORT == "CODA" )
-        {
-            if (ASSETCHAINS_CODAPORT == 0)
-            {
-                fprintf(stderr,"missing -ac_coda for CODA rpcport\n");
-                StartShutdown();
-            }
-        }
-        else if ( ASSETCHAINS_SELFIMPORT == "PEGSCC")
-        {
-            Split(GetArg("-ac_pegsccparams",""), sizeof(ASSETCHAINS_PEGSCCPARAMS)/sizeof(*ASSETCHAINS_PEGSCCPARAMS), ASSETCHAINS_PEGSCCPARAMS, 0);
-            if (ASSETCHAINS_ENDSUBSIDY[0]!=1 || ASSETCHAINS_COMMISSION!=0)
-            {
-                fprintf(stderr,"when using import for pegsCC these must be set: -ac_end=1 -ac_perc=0\n");
-                StartShutdown();
-            }
-        }
-        // else it can be gateway coin
-        else if (!ASSETCHAINS_SELFIMPORT.empty() && (ASSETCHAINS_ENDSUBSIDY[0]!=1 || ASSETCHAINS_SUPPLY>0 || ASSETCHAINS_COMMISSION!=0))
-        {
-            fprintf(stderr,"when using gateway import these must be set: -ac_end=1 -ac_supply=0 -ac_perc=0\n");
-            StartShutdown();
-        }
-        
-
-        if ( (ASSETCHAINS_STAKED= GetArg("-ac_staked",0)) > 100 )
-            ASSETCHAINS_STAKED = 100;
-
-        ASSETCHAINS_SAPLING = GetArg("-ac_sapling", -1);
-        if (ASSETCHAINS_SAPLING == -1)
-        {
-            ASSETCHAINS_OVERWINTER = GetArg("-ac_overwinter", -1);
-        }
-        else
-        {
-            ASSETCHAINS_OVERWINTER = GetArg("-ac_overwinter", ASSETCHAINS_SAPLING);
-        }
-        if ( strlen(ASSETCHAINS_OVERRIDE_PUBKEY.c_str()) == 66 || ASSETCHAINS_SCRIPTPUB.size() > 1 )
-        {
-            if ( ASSETCHAINS_SUPPLY > 10000000000 )
-            {
-                printf("ac_pubkey or ac_script wont work with ac_supply over 10 billion\n");
-                StartShutdown();
-            }
-            if ( ASSETCHAINS_NOTARY_PAY[0] != 0 )
-            {
-                printf("Assetchains NOTARY PAY cannot be used with ac_pubkey or ac_script.\n");
-                StartShutdown();
-            }
-            if ( strlen(ASSETCHAINS_OVERRIDE_PUBKEY.c_str()) == 66 )
-            {
-                decode_hex(ASSETCHAINS_OVERRIDE_PUBKEY33,33,(char *)ASSETCHAINS_OVERRIDE_PUBKEY.c_str());
-                calc_rmd160_sha256(ASSETCHAINS_OVERRIDE_PUBKEYHASH,ASSETCHAINS_OVERRIDE_PUBKEY33,33);
-            }
-            if ( ASSETCHAINS_COMMISSION == 0 && ASSETCHAINS_FOUNDERS != 0 )
-            {
-                if ( ASSETCHAINS_FOUNDERS_REWARD == 0 )
-                {
-                    ASSETCHAINS_COMMISSION = 53846154; // maps to 35%
-                    printf("ASSETCHAINS_COMMISSION defaulted to 35%% when founders reward active\n");
-                }
-                else
-                {
-                    printf("ASSETCHAINS_FOUNDERS_REWARD set to %ld\n", ASSETCHAINS_FOUNDERS_REWARD);
-                }
-                /*else if ( ASSETCHAINS_SELFIMPORT.size() == 0 )
-                {
-                    //ASSETCHAINS_OVERRIDE_PUBKEY.clear();
-                    printf("-ac_perc must be set with -ac_pubkey\n");
-                }*/
-            }
-        }
-        else
-        {
-            if ( ASSETCHAINS_COMMISSION != 0 )
-            {
-                ASSETCHAINS_COMMISSION = 0;
-                printf("ASSETCHAINS_COMMISSION needs an ASSETCHAINS_OVERRIDE_PUBKEY and cant be more than 100000000 (100%%)\n");
-            }
-            if ( ASSETCHAINS_FOUNDERS != 0 )
-            {
-                ASSETCHAINS_FOUNDERS = 0;
-                printf("ASSETCHAINS_FOUNDERS needs an ASSETCHAINS_OVERRIDE_PUBKEY or ASSETCHAINS_SCRIPTPUB\n");
-            }
-        }
-        int32_t extralen = 0;
-        if ( ASSETCHAINS_ENDSUBSIDY[0] != 0 || ASSETCHAINS_REWARD[0] != 0 
-                || ASSETCHAINS_HALVING[0] != 0 || ASSETCHAINS_DECAY[0] != 0 
-                || ASSETCHAINS_COMMISSION != 0 || ASSETCHAINS_PUBLIC != 0 
-                || ASSETCHAINS_PRIVATE != 0 || ASSETCHAINS_TXPOW != 0 
-                || ASSETCHAINS_FOUNDERS != 0 || ASSETCHAINS_SCRIPTPUB.size() > 1 
-                || ASSETCHAINS_SELFIMPORT.size() > 0 || ASSETCHAINS_OVERRIDE_PUBKEY33[0] != 0 
-                || ASSETCHAINS_TIMELOCKGTE != _ASSETCHAINS_TIMELOCKOFF
-                || ASSETCHAINS_ALGO != ASSETCHAINS_EQUIHASH || ASSETCHAINS_LASTERA > 0 
-                || ASSETCHAINS_BEAMPORT != 0 || ASSETCHAINS_CODAPORT != 0 
-                || nonz > 0 || ASSETCHAINS_CCLIB.size() > 0 
-                || ASSETCHAINS_FOUNDERS_REWARD != 0 || ASSETCHAINS_NOTARY_PAY[0] != 0 
-                || ASSETCHAINS_BLOCKTIME != 60 || ASSETCHAINS_CBOPRET != 0 
-                || Mineropret.size() != 0 || (ASSETCHAINS_NK[0] != 0 && ASSETCHAINS_NK[1] != 0) 
-                || KOMODO_SNAPSHOT_INTERVAL != 0 || ASSETCHAINS_EARLYTXIDCONTRACT != 0 
-                || ASSETCHAINS_CBMATURITY != 0 || ASSETCHAINS_ADAPTIVEPOW != 0 )
-        {
-            uint8_t extrabuf[32756];
-            fprintf(stderr,"perc %.4f%% ac_pub=[%02x%02x%02x...] acsize.%d\n",dstr(ASSETCHAINS_COMMISSION)*100,ASSETCHAINS_OVERRIDE_PUBKEY33[0],ASSETCHAINS_OVERRIDE_PUBKEY33[1],ASSETCHAINS_OVERRIDE_PUBKEY33[2],(int32_t)ASSETCHAINS_SCRIPTPUB.size());
-            extraptr = extrabuf;
-            memcpy(extraptr,ASSETCHAINS_OVERRIDE_PUBKEY33,33), extralen = 33;
-
-            // if we have one era, this should create the same data structure as it used to, same if we increase _MAX_ERAS
-            for ( int i = 0; i <= ASSETCHAINS_LASTERA; i++ )
-            {
-                printf("ERA%u: end.%llu reward.%llu halving.%llu decay.%llu notarypay.%llu\n", i,
-                       (long long)ASSETCHAINS_ENDSUBSIDY[i],
-                       (long long)ASSETCHAINS_REWARD[i],
-                       (long long)ASSETCHAINS_HALVING[i],
-                       (long long)ASSETCHAINS_DECAY[i],
-                       (long long)ASSETCHAINS_NOTARY_PAY[i]);
-
-                // TODO: Verify that we don't overrun extrabuf here, which is a 256 byte buffer
-                extralen += iguana_rwnum(1,&extraptr[extralen],sizeof(ASSETCHAINS_ENDSUBSIDY[i]),(void *)&ASSETCHAINS_ENDSUBSIDY[i]);
-                extralen += iguana_rwnum(1,&extraptr[extralen],sizeof(ASSETCHAINS_REWARD[i]),(void *)&ASSETCHAINS_REWARD[i]);
-                extralen += iguana_rwnum(1,&extraptr[extralen],sizeof(ASSETCHAINS_HALVING[i]),(void *)&ASSETCHAINS_HALVING[i]);
-                extralen += iguana_rwnum(1,&extraptr[extralen],sizeof(ASSETCHAINS_DECAY[i]),(void *)&ASSETCHAINS_DECAY[i]);
-                if ( ASSETCHAINS_NOTARY_PAY[0] != 0 )
-                    extralen += iguana_rwnum(1,&extraptr[extralen],sizeof(ASSETCHAINS_NOTARY_PAY[i]),(void *)&ASSETCHAINS_NOTARY_PAY[i]);
-            }
-
-            if (ASSETCHAINS_LASTERA > 0)
-            {
-                extralen += iguana_rwnum(1,&extraptr[extralen],sizeof(ASSETCHAINS_LASTERA),(void *)&ASSETCHAINS_LASTERA);
-            }
-
-            // hash in lock above for time locked coinbase transactions above a certain reward value only if the lock above
-            // param was specified, otherwise, for compatibility, do nothing
-            if ( ASSETCHAINS_TIMELOCKGTE != _ASSETCHAINS_TIMELOCKOFF )
-            {
-                extralen += iguana_rwnum(1,&extraptr[extralen],sizeof(ASSETCHAINS_TIMELOCKGTE),(void *)&ASSETCHAINS_TIMELOCKGTE);
-                extralen += iguana_rwnum(1,&extraptr[extralen],sizeof(ASSETCHAINS_TIMEUNLOCKFROM),(void *)&ASSETCHAINS_TIMEUNLOCKFROM);
-                extralen += iguana_rwnum(1,&extraptr[extralen],sizeof(ASSETCHAINS_TIMEUNLOCKTO),(void *)&ASSETCHAINS_TIMEUNLOCKTO);
-            }
-
-            if ( ASSETCHAINS_ALGO != ASSETCHAINS_EQUIHASH )
-            {
-                extralen += iguana_rwnum(1,&extraptr[extralen],sizeof(ASSETCHAINS_ALGO),(void *)&ASSETCHAINS_ALGO);
-            }
-
-            uint64_t val = ASSETCHAINS_COMMISSION | (((int64_t)ASSETCHAINS_STAKED & 0xff) << 32) | (((uint64_t)ASSETCHAINS_CC & 0xffff) << 40) | ((ASSETCHAINS_PUBLIC != 0) << 7) | ((ASSETCHAINS_PRIVATE != 0) << 6) | ASSETCHAINS_TXPOW;
-            extralen += iguana_rwnum(1,&extraptr[extralen],sizeof(val),(void *)&val);
-            
-            if ( ASSETCHAINS_FOUNDERS != 0 )
-            {
-                uint8_t tmp = 1;
-                extralen += iguana_rwnum(1,&extraptr[extralen],sizeof(tmp),(void *)&tmp);
-                if ( ASSETCHAINS_FOUNDERS > 1 )
-                    extralen += iguana_rwnum(1,&extraptr[extralen],sizeof(ASSETCHAINS_FOUNDERS),(void *)&ASSETCHAINS_FOUNDERS);
-                if ( ASSETCHAINS_FOUNDERS_REWARD != 0 )
-                {
-                    fprintf(stderr, "set founders reward.%lld\n",(long long)ASSETCHAINS_FOUNDERS_REWARD);
-                    extralen += iguana_rwnum(1,&extraptr[extralen],sizeof(ASSETCHAINS_FOUNDERS_REWARD),(void *)&ASSETCHAINS_FOUNDERS_REWARD);
-                }
-            }
-            if ( ASSETCHAINS_SCRIPTPUB.size() > 1 )
-            {
-                decode_hex(&extraptr[extralen],ASSETCHAINS_SCRIPTPUB.size()/2,(char *)ASSETCHAINS_SCRIPTPUB.c_str());
-                extralen += ASSETCHAINS_SCRIPTPUB.size()/2;
-                fprintf(stderr,"append ac_script %s\n",ASSETCHAINS_SCRIPTPUB.c_str());
-            }
-            if ( ASSETCHAINS_SELFIMPORT.size() > 0 )
-            {
-                memcpy(&extraptr[extralen],(char *)ASSETCHAINS_SELFIMPORT.c_str(),ASSETCHAINS_SELFIMPORT.size());
-                for (size_t i=0; i<ASSETCHAINS_SELFIMPORT.size(); i++)
-                    fprintf(stderr,"%c",extraptr[extralen+i]);
-                fprintf(stderr," selfimport\n");
-                extralen += ASSETCHAINS_SELFIMPORT.size();
-            }
-            if ( ASSETCHAINS_BEAMPORT != 0 )
-                extraptr[extralen++] = 'b';
-            if ( ASSETCHAINS_CODAPORT != 0 )
-                extraptr[extralen++] = 'c';
-            fprintf(stderr,"extralen.%d before disable bits\n",extralen);
-            if ( nonz > 0 )
-            {
-                memcpy(&extraptr[extralen],disablebits,sizeof(disablebits));
-                extralen += sizeof(disablebits);
-            }
-            if ( ASSETCHAINS_CCLIB.size() > 1 )
-            {
-                for (size_t i=0; i<ASSETCHAINS_CCLIB.size(); i++)
-                {
-                    extraptr[extralen++] = ASSETCHAINS_CCLIB[i];
-                    fprintf(stderr,"%c",ASSETCHAINS_CCLIB[i]);
-                }
-                fprintf(stderr," <- CCLIB name\n");
-            }
-            if ( ASSETCHAINS_BLOCKTIME != 60 )
-                extralen += iguana_rwnum(1,&extraptr[extralen],sizeof(ASSETCHAINS_BLOCKTIME),(void *)&ASSETCHAINS_BLOCKTIME);
-            if ( Mineropret.size() != 0 )
-            {
-                for (size_t i=0; i<Mineropret.size(); i++)
-                    extraptr[extralen++] = Mineropret[i];
-            }
-            if ( ASSETCHAINS_CBOPRET != 0 )
-            {
-                extralen += iguana_rwnum(1,&extraptr[extralen],sizeof(ASSETCHAINS_CBOPRET),(void *)&ASSETCHAINS_CBOPRET);
-                if ( ASSETCHAINS_PRICES.size() != 0 )
-                {
-                    for (size_t i=0; i<ASSETCHAINS_PRICES.size(); i++)
-                    {
-                        std::string symbol = ASSETCHAINS_PRICES[i];
-                        memcpy(&extraptr[extralen],(char *)symbol.c_str(),symbol.size());
-                        extralen += symbol.size();
-                    }
-                }
-                if ( ASSETCHAINS_STOCKS.size() != 0 )
-                {
-                    for (size_t i=0; i<ASSETCHAINS_STOCKS.size(); i++)
-                    {
-                        std::string symbol = ASSETCHAINS_STOCKS[i];
-                        memcpy(&extraptr[extralen],(char *)symbol.c_str(),symbol.size());
-                        extralen += symbol.size();
-                    }
-                }
-                komodo_cbopretupdate(1); // will set Mineropret
-                fprintf(stderr,"This blockchain uses data produced from CoinDesk Bitcoin Price Index\n");
-            }
-            if ( ASSETCHAINS_NK[0] != 0 && ASSETCHAINS_NK[1] != 0 )
-            {
-                extralen += iguana_rwnum(1,&extraptr[extralen],sizeof(ASSETCHAINS_NK[0]),(void *)&ASSETCHAINS_NK[0]);
-                extralen += iguana_rwnum(1,&extraptr[extralen],sizeof(ASSETCHAINS_NK[1]),(void *)&ASSETCHAINS_NK[1]);
-            }
-            if ( KOMODO_SNAPSHOT_INTERVAL != 0 )
-            {
-                extralen += iguana_rwnum(1,&extraptr[extralen],sizeof(KOMODO_SNAPSHOT_INTERVAL),(void *)&KOMODO_SNAPSHOT_INTERVAL);
-            }
-            if ( ASSETCHAINS_EARLYTXIDCONTRACT != 0 )
-            {
-                extralen += iguana_rwnum(1,&extraptr[extralen],sizeof(ASSETCHAINS_EARLYTXIDCONTRACT),(void *)&ASSETCHAINS_EARLYTXIDCONTRACT);
-            }
-            if ( ASSETCHAINS_CBMATURITY != 0 )
-            {
-                extralen += iguana_rwnum(1,&extraptr[extralen],sizeof(ASSETCHAINS_CBMATURITY),(void *)&ASSETCHAINS_CBMATURITY);
-            }
-            if ( ASSETCHAINS_ADAPTIVEPOW != 0 )
-                extraptr[extralen++] = ASSETCHAINS_ADAPTIVEPOW;
-        }
-        
-        const std::string addn = GetArg("-seednode","");
-        if ( addn.size() > 0 )
-            ASSETCHAINS_SEED = 1;
-
-        strncpy(ASSETCHAINS_SYMBOL,name.c_str(),sizeof(ASSETCHAINS_SYMBOL)-1);
-
-        /* VRSC chain is incompatible with Komodo daemon */
-        assert(strcmp(ASSETCHAINS_SYMBOL, "VRSC") != 0);
-
-        MAX_MONEY = komodo_max_money();
-
-        int32_t baseid = komodo_baseid(ASSETCHAINS_SYMBOL);
-        if ( baseid >= 0 && baseid < 32 )
-        {
-            printf("baseid.%d MAX_MONEY.%s %.8f\n",baseid,ASSETCHAINS_SYMBOL,(double)MAX_MONEY/SATOSHIDEN);
-        }
-
-        if ( ASSETCHAINS_CC >= KOMODO_FIRSTFUNGIBLEID && MAX_MONEY < 1000000LL*SATOSHIDEN )
-            MAX_MONEY = 1000000LL*SATOSHIDEN;
-        if ( KOMODO_BIT63SET(MAX_MONEY) != 0 )
-            MAX_MONEY = KOMODO_MAXNVALUE;
-        fprintf(stderr,"MAX_MONEY %llu %.8f\n",(long long)MAX_MONEY,(double)MAX_MONEY/SATOSHIDEN);
-        uint16_t tmpport = komodo_port(ASSETCHAINS_SYMBOL,ASSETCHAINS_SUPPLY,
-                &ASSETCHAINS_MAGIC,extraptr,extralen);
-        if ( GetArg("-port",0) != 0 )
-        {
-            ASSETCHAINS_P2PPORT = GetArg("-port",0);
-            fprintf(stderr,"set p2pport.%u\n",ASSETCHAINS_P2PPORT);
-        } 
-        else 
-            ASSETCHAINS_P2PPORT = tmpport;
-
-        char* dirname = nullptr;
-        while ( (dirname= (char *)GetDataDir(false).string().c_str()) == 0 || dirname[0] == 0 )
-        {
-            fprintf(stderr,"waiting for datadir (%s)\n",dirname);
-#ifndef _WIN32
-            sleep(3);
-#else
-            boost::this_thread::sleep(boost::posix_time::milliseconds(3000));
-#endif
-        }
-        if ( ASSETCHAINS_SYMBOL[0] != 0 )
-        {
-            int32_t komodo_baseid(char *origbase);
-            extern int COINBASE_MATURITY;
-            if ( strcmp(ASSETCHAINS_SYMBOL,"KMD") == 0 )
-            {
-                fprintf(stderr,"cant have assetchain named KMD\n");
-                StartShutdown();
-            }
-            uint16_t port = komodo_userpass(ASSETCHAINS_USERPASS,ASSETCHAINS_SYMBOL);
-            if ( port != 0 )
-                ASSETCHAINS_RPCPORT = port;
-            else 
-                komodo_configfile(ASSETCHAINS_SYMBOL,ASSETCHAINS_P2PPORT + 1);
-
-            if (ASSETCHAINS_CBMATURITY != 0)
-                COINBASE_MATURITY = ASSETCHAINS_CBMATURITY;
-            else if (ASSETCHAINS_LASTERA == 0 || is_STAKED(ASSETCHAINS_SYMBOL) != 0)
-                COINBASE_MATURITY = 1;
-            if (COINBASE_MATURITY < 1)
-            {
-                fprintf(stderr,"ac_cbmaturity must be >0, shutting down\n");
-                StartShutdown();
-            }
-        }
-        if ( ASSETCHAINS_RPCPORT == 0 )
-            ASSETCHAINS_RPCPORT = ASSETCHAINS_P2PPORT + 1;
-
-        uint8_t magic[4];
-        iguana_rwnum(1,magic,sizeof(ASSETCHAINS_MAGIC),(void *)&ASSETCHAINS_MAGIC);
-        char magicstr[9];
-        for (uint16_t i=0; i<4; i++)
-            sprintf(&magicstr[i<<1],"%02x",magic[i]);
-        magicstr[8] = 0;
-#ifndef FROM_CLI
-        char fname[512];
-        sprintf(fname,"%s_7776",ASSETCHAINS_SYMBOL);
-        if ( (fp= fopen(fname,"wb")) != 0 )
-        {
-            int8_t notarypay = 0;
-            if ( ASSETCHAINS_NOTARY_PAY[0] != 0 )
-                notarypay = 1;
-            char *iguanafmtstr = (char *)"curl --url \"http://127.0.0.1:7776\" --data \"{\\\"conf\\\":\\\"%s.conf\\\",\\\"path\\\":\\\"${HOME#\"/\"}/.komodo/%s\\\",\\\"unitval\\\":\\\"20\\\",\\\"zcash\\\":1,\\\"RELAY\\\":-1,\\\"VALIDATE\\\":0,\\\"prefetchlag\\\":-1,\\\"poll\\\":100,\\\"active\\\":1,\\\"agent\\\":\\\"iguana\\\",\\\"method\\\":\\\"addcoin\\\",\\\"startpend\\\":4,\\\"endpend\\\":4,\\\"services\\\":129,\\\"maxpeers\\\":8,\\\"newcoin\\\":\\\"%s\\\",\\\"name\\\":\\\"%s\\\",\\\"hasheaders\\\":1,\\\"useaddmultisig\\\":0,\\\"netmagic\\\":\\\"%s\\\",\\\"p2p\\\":%u,\\\"rpc\\\":%u,\\\"pubval\\\":60,\\\"p2shval\\\":85,\\\"wifval\\\":188,\\\"txfee_satoshis\\\":\\\"10000\\\",\\\"isPoS\\\":0,\\\"minoutput\\\":10000,\\\"minconfirms\\\":2,\\\"genesishash\\\":\\\"027e3758c3a65b12aa1046462b486d0a63bfa1beae327897f56c5cfb7daaae71\\\",\\\"protover\\\":170002,\\\"genesisblock\\\":\\\"0100000000000000000000000000000000000000000000000000000000000000000000003ba3edfd7a7b12b27ac72c3e67768f617fc81bc3888a51323a9fb8aa4b1e5e4a000000000000000000000000000000000000000000000000000000000000000029ab5f490f0f0f200b00000000000000000000000000000000000000000000000000000000000000fd4005000d5ba7cda5d473947263bf194285317179d2b0d307119c2e7cc4bd8ac456f0774bd52b0cd9249be9d40718b6397a4c7bbd8f2b3272fed2823cd2af4bd1632200ba4bf796727d6347b225f670f292343274cc35099466f5fb5f0cd1c105121b28213d15db2ed7bdba490b4cedc69742a57b7c25af24485e523aadbb77a0144fc76f79ef73bd8530d42b9f3b9bed1c135ad1fe152923fafe98f95f76f1615e64c4abb1137f4c31b218ba2782bc15534788dda2cc08a0ee2987c8b27ff41bd4e31cd5fb5643dfe862c9a02ca9f90c8c51a6671d681d04ad47e4b53b1518d4befafefe8cadfb912f3d03051b1efbf1dfe37b56e93a741d8dfd80d576ca250bee55fab1311fc7b3255977558cdda6f7d6f875306e43a14413facdaed2f46093e0ef1e8f8a963e1632dcbeebd8e49fd16b57d49b08f9762de89157c65233f60c8e38a1f503a48c555f8ec45dedecd574a37601323c27be597b956343107f8bd80f3a925afaf30811df83c402116bb9c1e5231c70fff899a7c82f73c902ba54da53cc459b7bf1113db65cc8f6914d3618560ea69abd13658fa7b6af92d374d6eca9529f8bd565166e4fcbf2a8dfb3c9b69539d4d2ee2e9321b85b331925df195915f2757637c2805e1d4131e1ad9ef9bc1bb1c732d8dba4738716d351ab30c996c8657bab39567ee3b29c6d054b711495c0d52e1cd5d8e55b4f0f0325b97369280755b46a02afd54be4ddd9f77c22272b8bbb17ff5118fedbae2564524e797bd28b5f74f7079d532ccc059807989f94d267f47e724b3f1ecfe00ec9e6541c961080d8891251b84b4480bc292f6a180bea089fef5bbda56e1e41390d7c0e85ba0ef530f7177413481a226465a36ef6afe1e2bca69d2078712b3912bba1a99b1fbff0d355d6ffe726d2bb6fbc103c4ac5756e5bee6e47e17424ebcbf1b63d8cb90ce2e40198b4f4198689daea254307e52a25562f4c1455340f0ffeb10f9d8e914775e37d0edca019fb1b9c6ef81255ed86bc51c5391e0591480f66e2d88c5f4fd7277697968656a9b113ab97f874fdd5f2465e5559533e01ba13ef4a8f7a21d02c30c8ded68e8c54603ab9c8084ef6d9eb4e92c75b078539e2ae786ebab6dab73a09e0aa9ac575bcefb29e930ae656e58bcb513f7e3c17e079dce4f05b5dbc18c2a872b22509740ebe6a3903e00ad1abc55076441862643f93606e3dc35e8d9f2caef3ee6be14d513b2e062b21d0061de3bd56881713a1a5c17f5ace05e1ec09da53f99442df175a49bd154aa96e4949decd52fed79ccf7ccbce32941419c314e374e4a396ac553e17b5340336a1a25c22f9e42a243ba5404450b650acfc826a6e432971ace776e15719515e1634ceb9a4a35061b668c74998d3dfb5827f6238ec015377e6f9c94f38108768cf6e5c8b132e0303fb5a200368f845ad9d46343035a6ff94031df8d8309415bb3f6cd5ede9c135fdabcc030599858d803c0f85be7661c88984d88faa3d26fb0e9aac0056a53f1b5d0baed713c853c4a2726869a0a124a8a5bbc0fc0ef80c8ae4cb53636aa02503b86a1eb9836fcc259823e2692d921d88e1ffc1e6cb2bde43939ceb3f32a611686f539f8f7c9f0bf00381f743607d40960f06d347d1cd8ac8a51969c25e37150efdf7aa4c2037a2fd0516fb444525ab157a0ed0a7412b2fa69b217fe397263153782c0f64351fbdf2678fa0dc8569912dcd8e3ccad38f34f23bbbce14c6a26ac24911b308b82c7e43062d180baeac4ba7153858365c72c63dcf5f6a5b08070b730adb017aeae925b7d0439979e2679f45ed2f25a7edcfd2fb77a8794630285ccb0a071f5cce410b46dbf9750b0354aae8b65574501cc69efb5b6a43444074fee116641bb29da56c2b4a7f456991fc92b2\\\",\\\"debug\\\":0,\\\"seedipaddr\\\":\\\"%s\\\",\\\"sapling\\\":1,\\\"notarypay\\\":%i}\"";
-            fprintf(fp,iguanafmtstr,name.c_str(),name.c_str(),name.c_str(),name.c_str(),magicstr,ASSETCHAINS_P2PPORT,ASSETCHAINS_RPCPORT,"78.47.196.146",notarypay);
-            fclose(fp);
-        } 
-        else 
-            printf("error creating (%s)\n",fname);
-#endif
-        if ( ASSETCHAINS_CC < 2 )
-        {
-            if ( KOMODO_CCACTIVATE != 0 )
-            {
-                ASSETCHAINS_CC = 2;
-                fprintf(stderr,"smart utxo CC contracts will activate at height.%d\n",KOMODO_CCACTIVATE);
-            }
-            else if ( ccEnablesHeight[0] != 0 )
-            {
-                ASSETCHAINS_CC = 2;
-                fprintf(stderr,"smart utxo CC contract %d will activate at height.%d\n",(int32_t)ccEnablesHeight[0],(int32_t)ccEnablesHeight[1]);
-            }
-        }
+        set_assetchain_globals();
+        BITCOIND_RPCPORT = GetArg("-rpcport", ASSETCHAINS_RPCPORT);
+        set_chain_specific_settings(ASSETCHAINS_SYMBOL);
     }
     else
     {
-        // -ac_name not passed, we are on the KMD chain
+        // we are on the KMD chain
         set_kmd_user_password_port(ntz_dest_path);
+        BITCOIND_RPCPORT = GetArg("-rpcport", BaseParams().RPCPort());
     }
-    int32_t dpowconfs = KOMODO_DPOWCONFS;
-    if ( ASSETCHAINS_SYMBOL[0] != 0 )
-    {
-        BITCOIND_RPCPORT = GetArg("-rpcport", ASSETCHAINS_RPCPORT);
-        if ( strcmp("PIRATE",ASSETCHAINS_SYMBOL) == 0 && ASSETCHAINS_HALVING[0] == 77777 )
-        {
-            ASSETCHAINS_HALVING[0] *= 5;
-            fprintf(stderr,"PIRATE halving changed to %d %.1f days ASSETCHAINS_LASTERA.%llu\n",(int32_t)ASSETCHAINS_HALVING[0],(double)ASSETCHAINS_HALVING[0]/1440,(long long)ASSETCHAINS_LASTERA);
-        }
-        else if ( ASSETCHAINS_PRIVATE != 0 )
-        {
-            fprintf(stderr,"-ac_private for a non-PIRATE chain is not supported. The only reason to have an -ac_private chain is for total privacy and that is best achieved with the largest anon set. PIRATE has that and it is recommended to just use PIRATE\n");
-            StartShutdown();
-        }
-        // Set cc enables for all existing ac_cc chains here. 
-        if ( strcmp("AXO",ASSETCHAINS_SYMBOL) == 0 )
-        {
-            // No CCs used on this chain yet.
-            CCDISABLEALL;
-        }
-        if ( strcmp("CCL",ASSETCHAINS_SYMBOL) == 0 )
-        {
-            // No CCs used on this chain yet. 
-            CCDISABLEALL;
-            CCENABLE(EVAL_TOKENS);
-            CCENABLE(EVAL_HEIR);
-        }
-        if ( strcmp("COQUI",ASSETCHAINS_SYMBOL) == 0 )
-        {
-            CCDISABLEALL;
-            CCENABLE(EVAL_DICE);
-            CCENABLE(EVAL_CHANNELS);
-            CCENABLE(EVAL_ORACLES);
-            CCENABLE(EVAL_ASSETS);
-            CCENABLE(EVAL_TOKENS);
-        }
-        if ( strcmp("DION",ASSETCHAINS_SYMBOL) == 0 )
-        {
-            // No CCs used on this chain yet. 
-            CCDISABLEALL;
-        }
-        
-        if ( strcmp("EQL",ASSETCHAINS_SYMBOL) == 0 )
-        {
-            // No CCs used on this chain yet. 
-            CCDISABLEALL;
-        }
-        if ( strcmp("ILN",ASSETCHAINS_SYMBOL) == 0 )
-        {
-            // No CCs used on this chain yet. 
-            CCDISABLEALL;
-        }
-        if ( strcmp("OUR",ASSETCHAINS_SYMBOL) == 0 )
-        {
-            // No CCs used on this chain yet. 
-            CCDISABLEALL;
-        }
-        if ( strcmp("ZEXO",ASSETCHAINS_SYMBOL) == 0 )
-        {
-            // No CCs used on this chain yet. 
-            CCDISABLEALL;
-        }
-        if ( strcmp("SEC",ASSETCHAINS_SYMBOL) == 0 )
-        {
-            CCDISABLEALL;
-            CCENABLE(EVAL_ASSETS);
-            CCENABLE(EVAL_TOKENS);
-            CCENABLE(EVAL_ORACLES);
-        }
-        if ( strcmp("KMDICE",ASSETCHAINS_SYMBOL) == 0 )
-        {
-            CCDISABLEALL;
-            CCENABLE(EVAL_FAUCET);
-            CCENABLE(EVAL_DICE);
-            CCENABLE(EVAL_ORACLES);
-        }
-    } else BITCOIND_RPCPORT = GetArg("-rpcport", BaseParams().RPCPort());
-    KOMODO_DPOWCONFS = GetArg("-dpowconfs",dpowconfs);
-    if ( ASSETCHAINS_SYMBOL[0] == 0 || strcmp(ASSETCHAINS_SYMBOL,"SUPERNET") == 0 || strcmp(ASSETCHAINS_SYMBOL,"DEX") == 0 || strcmp(ASSETCHAINS_SYMBOL,"COQUI") == 0 || strcmp(ASSETCHAINS_SYMBOL,"PIRATE") == 0 || strcmp(ASSETCHAINS_SYMBOL,"KMDICE") == 0 )
-        KOMODO_EXTRASATOSHI = 1;
-}
+    KOMODO_DPOWCONFS = GetArg("-dpowconfs", true);
+} // end of komodo_args(char*)
 
 void komodo_nameset(char *symbol,char *dest,char *source)
 {

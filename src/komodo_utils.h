@@ -84,8 +84,6 @@ int32_t komodo_whoami(char *pubkeystr,int32_t height,uint32_t timestamp);
 
 uint64_t komodo_ac_block_subsidy(int nHeight);
 
-void komodo_args(char *argv0);
-
 void komodo_nameset(char *symbol,char *dest,char *source);
 
 struct komodo_state *komodo_stateptrget(char *base);
