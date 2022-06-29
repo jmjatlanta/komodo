@@ -66,7 +66,7 @@ extern int32_t KOMODO_LOADINGBLOCKS; // not actually in komodo_globals.h, but us
 extern uint32_t *PVALS;
 extern uint32_t ASSETCHAINS_CC;
 extern uint32_t KOMODO_STOPAT;
-extern uint32_t KOMODO_DPOWCONFS;
+extern bool KOMODO_DPOWCONFS;
 extern uint32_t STAKING_MIN_DIFF;
 extern uint32_t ASSETCHAIN_INIT;
 extern uint32_t ASSETCHAINS_NUMALGOS;

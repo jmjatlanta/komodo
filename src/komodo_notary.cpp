@@ -351,19 +351,20 @@ int32_t komodo_dpowconfs(int32_t txheight,int32_t numconfs)
     char dest[KOMODO_ASSETCHAIN_MAXLEN];
     komodo_state *sp;
 
-    if ( KOMODO_DPOWCONFS != 0 && txheight > 0 && numconfs > 0 && (sp= komodo_stateptr(symbol,dest)) != nullptr )
+    if ( KOMODO_DPOWCONFS && txheight > 0 && numconfs > 0 
+            && (sp= komodo_stateptr(symbol,dest)) != nullptr )
     {
         if ( sp->LastNotarizedHeight() > 0 )
         {
             hadnotarization = 1;
             if ( txheight < sp->LastNotarizedHeight() )
-                return(numconfs);
-            else return(1);
+                return numconfs;
+            return 1;
         }
         else if ( hadnotarization != 0 )
-            return(1);
+            return 1;
     }
-    return(numconfs);
+    return numconfs;
 }
 
 int32_t komodo_MoMdata(int32_t *notarized_htp,uint256 *MoMp,uint256 *kmdtxidp,int32_t height,uint256 *MoMoMp,int32_t *MoMoMoffsetp,int32_t *MoMoMdepthp,int32_t *kmdstartip,int32_t *kmdendip)

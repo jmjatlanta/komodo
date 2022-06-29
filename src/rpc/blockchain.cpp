@@ -1173,42 +1173,6 @@ UniValue paxprice(const UniValue& params, bool fHelp, const CPubKey& mypk)
     }
     return ret;
 }
-// fills pricedata with raw price, correlated and smoothed values for numblock
-/*int32_t prices_extract(int64_t *pricedata,int32_t firstheight,int32_t numblocks,int32_t ind)
-{
-    int32_t height,i,n,width,numpricefeeds = -1; uint64_t seed,ignore,rngval; uint32_t rawprices[1440*6],*ptr; int64_t *tmpbuf;
-    width = numblocks+PRICES_DAYWINDOW*2+PRICES_SMOOTHWIDTH;    // need 2*PRICES_DAYWINDOW previous raw price points to calc PRICES_DAYWINDOW correlated points to calc, in turn, smoothed point
-    komodo_heightpricebits(&seed,rawprices,firstheight + numblocks - 1);
-    if ( firstheight < width )
-        return(-1);
-    for (i=0; i<width; i++)
-    {
-        if ( (n= komodo_heightpricebits(&ignore,rawprices,firstheight + numblocks - 1 - i)) < 0 )  // stores raw prices in backward order 
-            return(-1);
-        if ( numpricefeeds < 0 )
-            numpricefeeds = n;
-        if ( n != numpricefeeds )
-            return(-2);
-        ptr = (uint32_t *)&pricedata[i*3];
-        ptr[0] = rawprices[ind];
-        ptr[1] = rawprices[0]; // timestamp
-    }
-    rngval = seed;
-    for (i=0; i<numblocks+PRICES_DAYWINDOW+PRICES_SMOOTHWIDTH; i++) // calculates +PRICES_DAYWINDOW more correlated values
-    {
-        rngval = (rngval*11109 + 13849);
-        ptr = (uint32_t *)&pricedata[i*3];
-        // takes previous PRICES_DAYWINDOW raw prices and calculates correlated price value
-        if ( (pricedata[i*3+1]= komodo_pricecorrelated(rngval,ind,(uint32_t *)&pricedata[i*3],6,0,PRICES_SMOOTHWIDTH)) < 0 ) // skip is 6 == sizeof(int64_t)/sizeof(int32_t)*3 
-            return(-3);
-    }
-    tmpbuf = (int64_t *)calloc(sizeof(int64_t),2*PRICES_DAYWINDOW);
-    for (i=0; i<numblocks; i++)
-        // takes previous PRICES_DAYWINDOW correlated price values and calculates smoothed value
-        pricedata[i*3+2] = komodo_priceave(tmpbuf,&pricedata[i*3+1],3); 
-    free(tmpbuf);
-    return(0);
-}*/
 
 UniValue prices(const UniValue& params, bool fHelp, const CPubKey& mypk)
 {

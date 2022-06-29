@@ -66,7 +66,6 @@ uint64_t acct777_sign(struct acct777_sig *sig,bits256 privkey,bits256 otherpubke
 uint64_t acct777_validate(struct acct777_sig *sig,bits256 privkey,bits256 pubkey);
 uint64_t acct777_signtx(struct acct777_sig *sig,bits256 privkey,uint32_t timestamp,uint8_t *data,int32_t datalen);
 uint64_t acct777_swaptx(bits256 privkey,struct acct777_sig *sig,uint32_t timestamp,uint8_t *data,int32_t datalen);
-void calc_hmac_sha256(uint8_t *mac,int32_t maclen,uint8_t *key,int32_t key_size,uint8_t *message,int32_t len);
 
 #include "../includes/tweetnacl.h"
 int32_t _SuperNET_cipher(uint8_t nonce[crypto_box_NONCEBYTES],uint8_t *cipher,uint8_t *message,int32_t len,bits256 destpub,bits256 srcpriv,uint8_t *buf);

@@ -59,7 +59,6 @@ static bool fDaemon;
 #include "komodo_defs.h"
 extern char ASSETCHAINS_SYMBOL[KOMODO_ASSETCHAIN_MAXLEN];
 extern int32_t ASSETCHAINS_BLOCKTIME;
-extern uint64_t ASSETCHAINS_CBOPRET;
 void komodo_passport_iteration();
 uint64_t komodo_interestsum();
 int32_t komodo_longestchain();
@@ -76,21 +75,8 @@ void WaitForShutdown(boost::thread_group* threadGroup)
         fprintf(stderr,"error: earlytx must be before block height %d or tx does not exist\n",KOMODO_EARLYTXID_HEIGHT);
         StartShutdown();
     }
-    /*if ( ASSETCHAINS_STAKED == 0 && ASSETCHAINS_ADAPTIVEPOW == 0 && (pindex= komodo_chainactive(1)) != 0 )
-    {
-        if ( pindex->nTime > ADAPTIVEPOW_CHANGETO_DEFAULTON )
-        {
-            ASSETCHAINS_ADAPTIVEPOW = 1;
-            fprintf(stderr,"default activate adaptivepow\n");
-        } else fprintf(stderr,"height1 time %u vs %u\n",pindex->nTime,ADAPTIVEPOW_CHANGETO_DEFAULTON);
-    } //else fprintf(stderr,"cant find height 1\n");*/
     if ( ASSETCHAINS_CBOPRET != 0 )
         komodo_pricesinit();
-    /*
-        komodo_passport_iteration and komodo_cbopretupdate moved to a separate thread
-        ThreadUpdateKomodoInternals fired every second (see init.cpp), original wait
-        for shutdown loop restored.
-    */
     while (!fShutdown)
     {
         MilliSleep(200);

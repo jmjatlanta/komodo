@@ -82,7 +82,7 @@ using namespace std;
 #define TMPFILE_START 100000000
 CCriticalSection cs_main;
 extern uint8_t NOTARY_PUBKEY33[33];
-extern int32_t KOMODO_LOADINGBLOCKS,KOMODO_LONGESTCHAIN,KOMODO_INSYNC,KOMODO_CONNECTING,KOMODO_EXTRASATOSHI;
+extern int32_t KOMODO_LOADINGBLOCKS,KOMODO_LONGESTCHAIN,KOMODO_INSYNC,KOMODO_CONNECTING;
 int32_t KOMODO_NEWBLOCKS;
 int32_t komodo_block2pubkey33(uint8_t *pubkey33,CBlock *block);
 //void komodo_broadcast(CBlock *pblock,int32_t limit);
@@ -4277,11 +4277,6 @@ bool static ConnectTip(CValidationState &state, CBlockIndex *pindexNew, CBlock *
             if (state.IsInvalid())
             {
                 InvalidBlockFound(pindexNew, state);
-                /*if ( ASSETCHAINS_CBOPRET != 0 )
-                {
-                    pindexNew->nStatus &= ~BLOCK_FAILED_MASK;
-                    fprintf(stderr,"reconsiderblock %d\n",(int32_t)pindexNew->nHeight);
-                }*/
             }
             return error("ConnectTip(): ConnectBlock %s failed", pindexNew->GetBlockHash().ToString());
         }

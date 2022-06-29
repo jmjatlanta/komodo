@@ -31,20 +31,6 @@ void myprintf(const char* format, ...)
    va_end( marker );
 }
 
-long _stripwhite(char *buf,int accept)
-{
-    int32_t i,j,c;
-    if ( buf == 0 || buf[0] == 0 )
-        return(0);
-    for (i=j=0; buf[i]!=0; i++)
-    {
-        buf[j] = c = buf[i];
-        if ( c == accept || (c != ' ' && c != '\n' && c != '\r' && c != '\t' && c != '\b') )
-            j++;
-    }
-    buf[j] = 0;
-    return(j);
-}
 
 char *clonestr(char *str)
 {
@@ -163,8 +149,7 @@ void *loadfile(char *fname,uint8_t **bufp,long *lenp,long *allocsizep)
         }
         fclose(fp);
         *lenp = filesize;
-        //myprintf("loaded.(%s)\n",buf);
-    } //else myprintf("OS_loadfile couldnt load.(%s)\n",fname);
+    }
     return(buf);
 }
 

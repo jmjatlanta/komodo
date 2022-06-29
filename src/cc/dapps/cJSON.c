@@ -868,20 +868,11 @@ char *jstri(cJSON *json,int32_t i) { return(cJSON_str(cJSON_GetArrayItem(json,i)
 char *jprint(cJSON *json,int32_t freeflag)
 {
     char *str;
-    /*static portable_mutex_t mutex; static int32_t initflag;
-    if ( initflag == 0 )
-    {
-        portable_mutex_init(&mutex);
-        initflag = 1;
-    }*/
     if ( json == 0 )
         return(clonestr((char *)"{}"));
-    //portable_mutex_lock(&mutex);
-    //usleep(5000);
     str = cJSON_Print(json), _stripwhite(str,' ');
     if ( freeflag != 0 )
         free_json(json);
-    //portable_mutex_unlock(&mutex);
     return(str);
 }
 

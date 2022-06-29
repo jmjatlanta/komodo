@@ -175,8 +175,7 @@ void *OS_loadfile(char *fname,uint8_t **bufp,long *lenp,long *allocsizep)
         }
         fclose(fp);
         *lenp = filesize;
-        //printf("loaded.(%s)\n",buf);
-    } //else printf("OS_loadfile couldnt load.(%s)\n",fname);
+    }
     return(buf);
 }
 
