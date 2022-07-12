@@ -230,6 +230,119 @@ bool RewardsExactAmounts(struct CCcontract_info *cp,Eval *eval,const CTransactio
     else return(true);
 }
 
+bool RewardsValidate(struct CCcontract_info *cp,Eval* eval,const CTransaction &tx, uint32_t nIn)
+{
+    uint256 txid,fundingtxid,hashBlock,vinfundingtxid; uint64_t vinsbits,sbits,APR,minseconds,maxseconds,mindeposit,amount,reward,txfee=10000; int32_t numvins,numvouts,preventCCvins,preventCCvouts,i; uint8_t funcid; CScript scriptPubKey; CTransaction fundingTx,vinTx;
+    int64_t dummy;
+    numvins = tx.vin.size();
+    numvouts = tx.vout.size();
+    preventCCvins = preventCCvouts = -1;
+    if ( numvouts < 1 )
+        return eval->Invalid("no vouts");
+    else
+    {
+        txid = tx.GetHash();
+        if ( (funcid= DecodeRewardsOpRet(txid,tx.vout[numvouts-1].scriptPubKey,sbits,fundingtxid)) != 0 )
+        {
+            if ( eval->GetTxUnconfirmed(fundingtxid,fundingTx,hashBlock) == 0 )
+                return eval->Invalid("cant find fundingtxid");
+            else if ( fundingTx.vout.size() > 0 && DecodeRewardsFundingOpRet(fundingTx.vout[fundingTx.vout.size()-1].scriptPubKey,sbits,APR,minseconds,maxseconds,mindeposit) != 'F' )
+                return eval->Invalid("fundingTx not valid");
+            if ( APR > REWARDSCC_MAXAPR )
+                return eval->Invalid("excessive APR");
+            switch ( funcid )
+            {
+                case 'F':
+                    //vins.*: normal inputs
+                    //vout.0: CC vout for funding
+                    //vout.1: normal marker vout for easy searching
+                    //vout.2: normal change
+                    //vout.n-1: opreturn 'F' sbits APR minseconds maxseconds mindeposit
+                    return eval->Invalid("unexpected RewardsValidate for createfunding");
+                    break;
+                case 'A':
+                    //vins.*: normal inputs
+                    //vout.0: CC vout for funding
+                    //vout.1: normal change
+                    //vout.n-1: opreturn 'A' sbits fundingtxid
+                    return eval->Invalid("unexpected RewardsValidate for addfunding");
+                    break;
+                case 'L':
+                    //vins.*: normal inputs
+                    //vout.0: CC vout for locked funds
+                    //vout.1: normal output to unlock address
+                    //vout.2: change
+                    //vout.n-1: opreturn 'L' sbits fundingtxid
+                    return eval->Invalid("unexpected RewardsValidate for lock");
+                    break;
+                case 'U':
+                    //vin.0: locked funds CC vout.0 from lock
+                    //vin.1+: funding CC vout.0 from 'F' and 'A' and 'U'
+                    //vout.0: funding CC change or recover normal payout
+                    //vout.1: normal output to unlock address
+                    //vout.n-1: opreturn 'U' sbits fundingtxid
+                    if ( fundingtxid == tx.vin[0].prevout.hash )
+                        return eval->Invalid("cant unlock fundingtxid");
+                    else if ( eval->GetTxUnconfirmed(tx.vin[0].prevout.hash,vinTx,hashBlock) == 0 )
+                        return eval->Invalid("always should find vin.0, but didnt");
+                    else if ( DecodeRewardsOpRet(tx.vin[0].prevout.hash,vinTx.vout[vinTx.vout.size()-1].scriptPubKey,vinsbits,vinfundingtxid) != 'L' )
+                        return eval->Invalid("can only unlock locktxid");
+                    else if ( fundingtxid != vinfundingtxid )
+                        return eval->Invalid("mismatched vinfundingtxid");
+                    for (i=0; i<numvins; i++)
+                    {
+                        if ( cp->ismyvin(tx.vin[i].scriptSig) == 0 )
+                            return eval->Invalid("unexpected normal vin for unlock");
+                    }
+                    if ( !CheckTxFee(tx, txfee, chainActive.LastTip()->nHeight, chainActive.LastTip()->nTime, dummy) )
+                        return eval->Invalid("txfee is too high");
+                    amount = vinTx.vout[0].nValue;
+                    reward = RewardsCalc((int64_t)amount,tx.vin[0].prevout.hash,(int64_t)APR,(int64_t)minseconds,(int64_t)maxseconds,GetLatestTimestamp(eval->GetCurrentHeight()));
+                    if ( reward == 0 )
+                        return eval->Invalid("no eligible rewards");
+                    if ( numvins == 1 && tx.vout[0].scriptPubKey.IsPayToCryptoCondition() == 0 )
+                    {
+                        if ( tx.vout[1].nValue != 10000 )
+                            return eval->Invalid("wrong marker vout value");
+                        else if ( tx.vout[1].scriptPubKey != tx.vout[0].scriptPubKey )
+                            return eval->Invalid("unlock recover tx vout.1 mismatched scriptPubKey");
+                        else if ( tx.vout[0].scriptPubKey != vinTx.vout[1].scriptPubKey )
+                            return eval->Invalid("unlock recover tx vout.0 mismatched scriptPubKey");
+                        else if ( tx.vout[0].nValue > vinTx.vout[0].nValue )
+                            return eval->Invalid("unlock recover tx vout.0 mismatched amounts");
+                        else if ( tx.vout[2].nValue > 0 )
+                            return eval->Invalid("unlock recover tx vout.1 nonz amount");
+                        else return(true);
+                    }
+                    if ( vinTx.vout[0].scriptPubKey.IsPayToCryptoCondition() == 0 )
+                        return eval->Invalid("unlock tx vout.0 is normal output");
+                    else if ( numvouts != 3 )
+                        return eval->Invalid("unlock tx wrong number of vouts");
+                    else if ( tx.vout[0].scriptPubKey.IsPayToCryptoCondition() == 0 )
+                        return eval->Invalid("unlock tx vout.0 is normal output");
+                    else if ( tx.vout[1].scriptPubKey.IsPayToCryptoCondition() != 0 )
+                        return eval->Invalid("unlock tx vout.1 is CC output");
+                    else if ( tx.vout[1].scriptPubKey != vinTx.vout[1].scriptPubKey )
+                        return eval->Invalid("unlock tx vout.1 mismatched scriptPubKey");
+                    if ( RewardsExactAmounts(cp,eval,tx,txfee+tx.vout[1].nValue,sbits,fundingtxid) == 0 )
+                        return false;
+                    else if ( tx.vout[1].nValue > amount+reward )
+                        return eval->Invalid("unlock tx vout.1 isnt amount+reward");
+                    else if ( tx.vout[2].nValue > 0 )
+                        return eval->Invalid("unlock tx vout.2 isnt 0");
+                    preventCCvouts = 1;
+                    break;
+                default:
+                    fprintf(stderr,"illegal rewards funcid.(%c)\n",funcid);
+                    return eval->Invalid("unexpected rewards funcid");
+                    break;
+            }
+        } else return eval->Invalid("unexpected rewards missing funcid");
+        return(PreventCC(eval,tx,preventCCvins,numvins,preventCCvouts,numvouts));
+    }
+    return(true);
+}
+
 static uint64_t myIs_unlockedtx_inmempool(uint256 &txid,int32_t &vout,uint64_t refsbits,uint256 reffundingtxid,uint64_t needed)
 {
     uint8_t funcid; uint64_t sbits,nValue; uint256 fundingtxid; char str[65];
@@ -719,7 +832,7 @@ bool CCRewardsContract_info::validate(Eval* eval, const CTransaction &tx, uint32
                         if ( ismyvin(tx.vin[i].scriptSig) == 0 )
                             return eval->Invalid("unexpected normal vin for unlock");
                     }
-                    if ( !CheckTxFee(tx, txfee, chainActive.LastTip()->GetHeight(), chainActive.LastTip()->nTime, dummy) )
+                    if ( !CheckTxFee(tx, txfee, chainActive.Tip()->nHeight, chainActive.LastTip()->nTime, dummy) )
                         return eval->Invalid("txfee is too high");
                     amount = vinTx.vout[0].nValue;
                     reward = RewardsCalc((int64_t)amount,tx.vin[0].prevout.hash,(int64_t)APR,(int64_t)minseconds,(int64_t)maxseconds,GetLatestTimestamp(eval->GetCurrentHeight()));
