@@ -2498,9 +2498,9 @@ int32_t komodo_staked(CMutableTransaction &txNew,uint32_t nBits,uint32_t *blockt
         txNew.vout[0].nValue = *utxovaluep - txfee;
         txNew.nLockTime = earliest;
         txNew.nExpiryHeight = nHeight;
-        int32_t newStakerActive = komodo_newStakerActive(nHeight, earliest);
+        bool newStakerActive = komodo_newStakerActive(nHeight, earliest);
         uint64_t tocoinbase = 0;
-        if ( newStakerActive != 0 )
+        if ( newStakerActive )
         {
             if ( cbPerc > 0 && cbPerc <= 100 )
             {
@@ -2520,7 +2520,7 @@ int32_t komodo_staked(CMutableTransaction &txNew,uint32_t nBits,uint32_t *blockt
         siglen = sigdata.scriptSig.size();
         for (int32_t i=0; i<siglen; i++)
             utxosig[i] = ptr[i];
-        *utxovaluep = newStakerActive != 0 ? tocoinbase : txNew.vout[0].nValue+txfee;
+        *utxovaluep = newStakerActive ? tocoinbase : txNew.vout[0].nValue+txfee;
         if (!signSuccess)
             fprintf(stderr,"failed to create signature\n");
         else
