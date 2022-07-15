@@ -5492,90 +5492,79 @@ UniValue z_listoperationids(const UniValue& params, bool fHelp, const CPubKey& m
 #include "script/sign.h"
 extern std::string NOTARY_PUBKEY;
 
-/****
- * @brief build a transaction for a notary
- * @param txNew the transaction
- * @param notarypub33 the notary public key (33 bytes)
- * @param txDetails scriptPubKey and nLockTime
- * @return signature length (0 on error)
+/**
+ * @brief Search for 10k sat. P2PK notary utxos and make proof tx (txNew) from it for further include in block.
+ * opretIn should be empty script before december hardfork, and contains prepared opret script after.
+ *
+ * @param txNew - out: signed notary proof tx
+ * @param notarypub33 - notary node compressed pubkey to search 10k sat. P2PK utxos in the wallet (wallet should be unlocked)
+ * @param opretIn - after nDecemberHardforkHeight, prepared in advance opret script, before nDecemberHardforkHeight should be empty script
+ * @param nLockTimeIn - nLockTime that will be set for notary proof tx in-case of after nDecemberHardforkHeight
+ * @return int32_t - signature length of vin[0] in resulted notary proof tx, actually > 0 if txNew is correct, and 0 in-case of any error
  */
-int32_t komodo_notaryvin(CMutableTransaction &txNew,uint8_t *notarypub33, 
-        std::shared_ptr<TransactionDetails> txDetails)
+int32_t komodo_notaryvin(CMutableTransaction &txNew, uint8_t *notarypub33, const CScript &opretIn, uint32_t nLockTimeIn)
 {
-    if (!EnsureWalletIsAvailable(0))
-        return 0;
-    assert(pwalletMain != NULL);
+    int32_t siglen = 0;
 
-    // skip outputs where nDepth is outside of this range
-    int32_t nMinDepth = 0;
-    int32_t nMaxDepth = 9999999; 
+    vector<COutput> vecOutputs;
+    bool signSuccess;
+    SignatureData sigdata;
+
+    /* nMinDepth = 1 - don't allow to spend unconfirmed 10k sat. utxos, bcz we don't ensure that they would be
+       included in the same block.
+    */
+
+    const int nMinDepth = 1, nMaxDepth = 9999999;
+    bool fAfterDecemberHardfork = opretIn.size() > 0;
+    if (!(notarypub33[0] == 0x02 || notarypub33[0] == 0x03)) return 0; // invalid compressed public key
 
     auto consensusBranchId = CurrentEpochBranchId(chainActive.Height() + 1, Params().GetConsensus());
 
-    const CKeyStore& keystore = *pwalletMain;
+    if (!pwalletMain) return 0;
+    assert(pwalletMain != nullptr);
+
+    if (pwalletMain->IsLocked()) return 0;
+
+    const CKeyStore &keystore = *pwalletMain;
     LOCK2(cs_main, pwalletMain->cs_wallet);
-    uint64_t utxovalue = 0;
-    uint256 utxotxid; 
-    uint32_t utxovout;
-    uint8_t utxosig[128] = {0};
 
-    int32_t siglen=0;
-    // go through wallet's available outputs, looking for 
-    // one with 10000 satoshis and that can be signed
-    std::vector<COutput> vecOutputs; 
+    const CScript targetP2PKScript = CScript() << std::vector<unsigned char>(notarypub33, notarypub33 + 33) << OP_CHECKSIG;
+
     pwalletMain->AvailableCoins(vecOutputs, false, NULL, true);
-    for(const COutput& out : vecOutputs)
-    {
-        // depth check
-        if ( out.nDepth < nMinDepth || out.nDepth > nMaxDepth )
-            continue;
-        // amount check
-        CAmount nValue = out.tx->vout[out.i].nValue;
-        if ( nValue != 10000 )
-            continue;
-        // script check
-        const CScript& pk = out.tx->vout[out.i].scriptPubKey;
-        CTxDestination address;
-        ExtractDestination(out.tx->vout[out.i].scriptPubKey, address);
-        uint8_t *script = (uint8_t *)&out.tx->vout[out.i].scriptPubKey[0];
-        if ( out.tx->vout[out.i].scriptPubKey.size() != 35 || script[0] != 33 
-                || script[34] != OP_CHECKSIG || memcmp(notarypub33,script+1,33) != 0 )
-        {
-            continue;
-        }
 
-        // now build transaction
-        utxovalue = (uint64_t)nValue;
-        utxotxid = out.tx->GetHash();
-        utxovout = out.i;
-        CScript best_scriptPubKey = out.tx->vout[out.i].scriptPubKey;
+    for (const COutput& out : vecOutputs)
+    {
+        if (out.nDepth < nMinDepth || out.nDepth > nMaxDepth)
+            continue;
+
+        CAmount nValue = out.tx->vout[out.i].nValue;
+        const CScript &pk = out.tx->vout[out.i].scriptPubKey;
+
+        if (nValue != 10000 || !pk.IsPayToPublicKey() || pk != targetP2PKScript)
+            continue;
 
         txNew.vin.resize(1);
-        txNew.vout.resize((txDetails != nullptr)+1);
-        uint64_t txfee = utxovalue / 2;
-        txNew.vin[0].prevout.hash = utxotxid;
-        txNew.vin[0].prevout.n = utxovout;
-        txNew.vout[0].nValue = utxovalue - txfee; // half of the nValue of input goes to CRYPTO777
+        txNew.vout.resize(static_cast<size_t>(fAfterDecemberHardfork) + 1);
+
+        txNew.vin[0].prevout.hash = out.tx->GetHash();
+        txNew.vin[0].prevout.n = out.i;
+        txNew.vout[0].nValue = nValue / 2; // 5000 sat. goes to this proof tx, and 5000 sat. will be a fee
         txNew.vout[0].scriptPubKey = CScript() << ParseHex(CRYPTO777_PUBSECPSTR) << OP_CHECKSIG;
-        if ( txDetails != nullptr )
+
+        if (fAfterDecemberHardfork)
         {
-            // tack on additional vout
             txNew.vout[1].nValue = 0;
-            txNew.vout[1].scriptPubKey = txDetails->scriptPubKey;
-            txNew.nLockTime = txDetails->time;
+            txNew.vout[1].scriptPubKey = opretIn;
+            txNew.nLockTime = nLockTimeIn;
         }
         CTransaction txNewConst(txNew);
-        SignatureData sigdata;
-        if (!ProduceSignature(TransactionSignatureCreator( &keystore, &txNewConst, 
-                0, utxovalue, SIGHASH_ALL), best_scriptPubKey, sigdata, consensusBranchId))
-            fprintf(stderr,"notaryvin failed to create signature\n");
+        signSuccess = ProduceSignature(TransactionSignatureCreator(&keystore, &txNewConst, 0, nValue, SIGHASH_ALL), pk, sigdata, consensusBranchId);
+        if (!signSuccess)
+            LogPrintf("notaryvin failed to create signature (tried to spend %s -> notaryvin)\n", out.ToString());
         else
         {
-            UpdateTransaction(txNew,0,sigdata);
-            uint8_t *ptr = (uint8_t *)&sigdata.scriptSig[0];
+            UpdateTransaction(txNew, 0, sigdata);
             siglen = sigdata.scriptSig.size();
-            for (int32_t i=0; i<siglen; i++)
-                utxosig[i] = ptr[i];
             break;
         }
     }

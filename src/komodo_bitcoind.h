@@ -134,8 +134,6 @@ uint256 komodo_calcmerkleroot(CBlock *pblock, uint256 prevBlockHash, int32_t nHe
 
 int32_t komodo_isPoS(CBlock *pblock, int32_t height,CTxDestination *addressout);
 
-void komodo_disconnect(CBlockIndex *pindex,CBlock& block);
-
 int32_t komodo_is_notarytx(const CTransaction& tx);
 
 int32_t komodo_block2height(CBlock *block);
@@ -237,18 +235,3 @@ int32_t komodo_acpublic(uint32_t tiptime);
 int64_t komodo_newcoins(int64_t *zfundsp,int64_t *sproutfundsp,int32_t nHeight,CBlock *pblock);
 
 int64_t komodo_coinsupply(int64_t *zfundsp,int64_t *sproutfundsp,int32_t height);
-
-struct komodo_staking
-{
-    char address[64];
-    uint256 txid;
-    arith_uint256 hashval;
-    uint64_t nValue;
-    uint32_t segid32,txtime;
-    int32_t vout;
-    CScript scriptPubKey;
-};
-
-struct komodo_staking *komodo_addutxo(struct komodo_staking *array,int32_t *numkp,int32_t *maxkp,uint32_t txtime,uint64_t nValue,uint256 txid,int32_t vout,char *address,uint8_t *hashbuf,CScript pk);
-
-int32_t komodo_staked(CMutableTransaction &txNew,uint32_t nBits,uint32_t *blocktimep,uint32_t *txtimep,uint256 *utxotxidp,int32_t *utxovoutp,uint64_t *utxovaluep,uint8_t *utxosig, uint256 merkleroot);

@@ -977,7 +977,7 @@ void CWallet::ClearNoteWitnessCache()
 }
 
 template<typename NoteDataMap>
-void CopyPreviousWitnesses(NoteDataMap& noteDataMap, int indexHeight, int64_t nWitnessCacheSize)
+void CopyPreviousWitnesses(NoteDataMap& noteDataMap, int indexHeight, int64_t nWitnessCacheSize, int64_t maxWitnessCacheSize)
 {
     for (auto& item : noteDataMap) {
         auto* nd = &(item.second);
@@ -996,7 +996,7 @@ void CopyPreviousWitnesses(NoteDataMap& noteDataMap, int indexHeight, int64_t nW
             if (nd->witnesses.size() > 0) {
                 nd->witnesses.push_front(nd->witnesses.front());
             }
-            if (nd->witnesses.size() > Params().GetConsensus().witness_cache_size) {
+            if (nd->witnesses.size() > maxWitnessCacheSize) {
                 nd->witnesses.pop_back();
             }
         }
@@ -1069,8 +1069,8 @@ void CWallet::IncrementNoteWitnesses(const CBlockIndex* pindex,
 {
     LOCK(cs_wallet);
     for (std::pair<const uint256, CWalletTx>& wtxItem : mapWallet) {
-       ::CopyPreviousWitnesses(wtxItem.second.mapSproutNoteData, pindex->nHeight, nWitnessCacheSize);
-       ::CopyPreviousWitnesses(wtxItem.second.mapSaplingNoteData, pindex->nHeight, nWitnessCacheSize);
+       ::CopyPreviousWitnesses(wtxItem.second.mapSproutNoteData, pindex->nHeight, nWitnessCacheSize, maxWitnessCacheSize);
+       ::CopyPreviousWitnesses(wtxItem.second.mapSaplingNoteData, pindex->nHeight, nWitnessCacheSize, maxWitnessCacheSize);
     }
 
     if (nWitnessCacheSize < Params().GetConsensus().witness_cache_size) {
@@ -1136,7 +1136,7 @@ void CWallet::IncrementNoteWitnesses(const CBlockIndex* pindex,
 }
 
 template<typename NoteDataMap>
-bool DecrementNoteWitnesses(NoteDataMap& noteDataMap, int indexHeight, int64_t nWitnessCacheSize)
+bool DecrementNoteWitnesses(NoteDataMap& noteDataMap, int indexHeight, int64_t nWitnessCacheSize, int64_t maxWitnessCacheSize)
 {
     extern int32_t KOMODO_REWIND;
 
@@ -1189,9 +1189,9 @@ void CWallet::DecrementNoteWitnesses(const CBlockIndex* pindex)
 {
     LOCK(cs_wallet);
     for (std::pair<const uint256, CWalletTx>& wtxItem : mapWallet) {
-        if (!::DecrementNoteWitnesses(wtxItem.second.mapSproutNoteData, pindex->nHeight, nWitnessCacheSize))
+        if (!::DecrementNoteWitnesses(wtxItem.second.mapSproutNoteData, pindex->nHeight, nWitnessCacheSize, maxWitnessCacheSize))
             needsRescan = true;
-        if (!::DecrementNoteWitnesses(wtxItem.second.mapSaplingNoteData, pindex->nHeight, nWitnessCacheSize))
+        if (!::DecrementNoteWitnesses(wtxItem.second.mapSaplingNoteData, pindex->nHeight, nWitnessCacheSize, maxWitnessCacheSize))
             needsRescan = true;
     }
     if ( Params().GetConsensus().witness_cache_size == Params().GetConsensus().coinbase_maturity+10 )
