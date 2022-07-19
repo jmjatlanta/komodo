@@ -657,6 +657,10 @@ CBlockTemplate* CreateNewBlock(CPubKey _pk,const CScript& _scriptPubKeyIn, int32
             uint64_t txfees,utxovalue; uint32_t txtime; uint256 utxotxid; int32_t i,siglen,numsigs,utxovout; uint8_t utxosig[512],*ptr;
             CMutableTransaction txStaked = CreateNewContextualCMutableTransaction(Params().GetConsensus(), stakeHeight);
 
+            LEAVE_CRITICAL_SECTION(mempool.cs);
+            LEAVE_CRITICAL_SECTION(cs_main);
+            std::cerr << __func__ << " LOCK2(cs_main, mempool.cs) ended return(0)" << std::endl;
+
             blocktime = GetTime();
             uint256 merkleroot = komodo_calcmerkleroot(pblock, pindexPrev->GetBlockHash(), nHeight, true, scriptPubKeyIn);
             //fprintf(stderr, "MINER: merkleroot.%s\n", merkleroot.GetHex().c_str());
@@ -697,7 +701,6 @@ CBlockTemplate* CreateNewBlock(CPubKey _pk,const CScript& _scriptPubKeyIn, int32
                 pblock->nTime = blocktime;
             } 
             else {
-                std::cerr << __func__ << " LOCK2(cs_main, mempool.cs) ended return(0)" << std::endl;
                 return(0);
             }
         }
