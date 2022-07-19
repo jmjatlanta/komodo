@@ -1605,6 +1605,7 @@ void static BitcoinMiner()
                     // waiting code:
                     if ( IS_KOMODO_NOTARY && pblock->nTime > GetTime() )
                     {
+                        bool bRestart = false; 
                         while ( GetTime() < pblock->nTime-2 )
                         {
                             boost::this_thread::sleep_for(boost::chrono::seconds(1));
@@ -1616,9 +1617,11 @@ void static BitcoinMiner()
                             if ( tip->nHeight >= Mining_height )
                             {
                                 fprintf(stderr, "new block arrived, restart block\n");
-                                continue;
+                                bRestart = true;
+                                break;
                             }
                         }
+                        if (bRestart) continue; // restart a new block 
                     }
                     if ( ASSETCHAINS_STAKED == 0 )
                     {
@@ -1634,7 +1637,7 @@ void static BitcoinMiner()
                         if ( KOMODO_MININGTHREADS == 0 ) // we are staking 
                         {
                             if ( komodo_waituntilelegible(pblock->nTime, Mining_height, ASSETCHAINS_STAKED_BLOCK_FUTURE_MAX) == 0 )
-                                continue;
+                                continue;  // restart a new block
                         }
                     }
                     // end of waiting code
