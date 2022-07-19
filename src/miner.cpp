@@ -161,7 +161,7 @@ CScript komodo_mineropret(int32_t nHeight);
 bool komodo_appendACscriptpub();
 CScript komodo_makeopret(CBlock *pblock, bool fNew);
 
-int32_t komodo_waituntilelegible(uint32_t blocktime, int32_t stakeHeight, uint32_t delay)
+int32_t komodo_waituntilelegible(uint32_t blocktime, int32_t tipHeight, uint32_t delay)
 {
     int64_t adjustedtime = (int64_t)GetTime();
     while ( (int64_t)blocktime-ASSETCHAINS_STAKED_BLOCK_FUTURE_MAX > adjustedtime )
@@ -170,16 +170,16 @@ int32_t komodo_waituntilelegible(uint32_t blocktime, int32_t stakeHeight, uint32
         if ( delay <= ASSETCHAINS_STAKED_BLOCK_FUTURE_HALF && secToElegible <= ASSETCHAINS_STAKED_BLOCK_FUTURE_HALF )
             break;
         if ( (rand() % 100) < 2-(secToElegible>ASSETCHAINS_STAKED_BLOCK_FUTURE_MAX) ) 
-            fprintf(stderr, "[%s:%i] %llds until elegible...\n", ASSETCHAINS_SYMBOL, stakeHeight, (long long)secToElegible);
+            fprintf(stderr, "[%s:%i] %llds until elegible...\n", ASSETCHAINS_SYMBOL, tipHeight, (long long)secToElegible);
 
         int32_t tipHeight;
         {
             LOCK(cs_main);
             tipHeight = chainActive.Tip()->nHeight;
         }
-        if ( tipHeight >= stakeHeight )
+        if ( tipHeight >= tipHeight )
         {
-            fprintf(stderr, "[%s:%i] Chain advanced, reset staking loop.\n", ASSETCHAINS_SYMBOL, stakeHeight);
+            fprintf(stderr, "[%s:%i] Chain advanced, reset staking loop.\n", ASSETCHAINS_SYMBOL, tipHeight);
             return(0);
         }
         if( !GetBoolArg("-gen",false) ) 
@@ -251,8 +251,12 @@ CBlockTemplate* CreateNewBlock(CPubKey _pk,const CScript& _scriptPubKeyIn, int32
 
     boost::this_thread::interruption_point(); // exit thread before entering locks. 
     
-    int32_t stakeHeight = 0;
-    CBlockIndex* pindexPrev = 0;
+    int32_t tipHeight = 0;
+    int nHeight = 0;
+    CBlockIndex* pindexPrev = nullptr;
+    SaplingMerkleTree sapling_tree;
+    const Consensus::Params &consensusParams = chainparams.GetConsensus();
+
     {
         // this should stop create block ever exiting until it has returned something. 
         boost::this_thread::disable_interruption noint;
@@ -262,8 +266,7 @@ CBlockTemplate* CreateNewBlock(CPubKey _pk,const CScript& _scriptPubKeyIn, int32
         LOCK2(cs_main, mempool.cs);
         std::cerr << __func__ << "LOCK2(cs_main, mempool.cs) started" << std::endl;
         pindexPrev = chainActive.Tip();
-        const int nHeight = pindexPrev->nHeight + 1;
-        const Consensus::Params &consensusParams = chainparams.GetConsensus();
+        nHeight = pindexPrev->nHeight + 1;
         uint32_t consensusBranchId = CurrentEpochBranchId(nHeight, consensusParams);
         bool sapling = NetworkUpgradeActive(nHeight, consensusParams, Consensus::UPGRADE_SAPLING);
 
@@ -291,9 +294,8 @@ CBlockTemplate* CreateNewBlock(CPubKey _pk,const CScript& _scriptPubKeyIn, int32
         }
 
         CCoinsViewCache view(pcoinsTip);
-        uint32_t expired; uint64_t commission;
+        uint32_t expired; 
         
-        SaplingMerkleTree sapling_tree;
         assert(view.GetSaplingAnchorAt(view.GetBestAnchor(SAPLING), sapling_tree));
 
         // Priority order to process transactions
@@ -649,251 +651,245 @@ CBlockTemplate* CreateNewBlock(CPubKey _pk,const CScript& _scriptPubKeyIn, int32
         pblock->nBits = GetNextWorkRequired(pindexPrev, pblock, Params().GetConsensus());
         //fprintf(stderr, "nBits.%u\n",pblock->nBits);
 
-        int32_t stakeHeight = chainActive.Height() + 1;
-
-        //LogPrintf("CreateNewBlock(): total size %u blocktime.%u nBits.%08x stake.%i\n", nBlockSize,blocktime,pblock->nBits,isStake);
-        if ( ASSETCHAINS_SYMBOL[0] != 0 && isStake )
-        {
-            uint64_t txfees,utxovalue; uint32_t txtime; uint256 utxotxid; int32_t i,siglen,numsigs,utxovout; uint8_t utxosig[512],*ptr;
-            CMutableTransaction txStaked = CreateNewContextualCMutableTransaction(Params().GetConsensus(), stakeHeight);
-
-            LEAVE_CRITICAL_SECTION(mempool.cs);
-            LEAVE_CRITICAL_SECTION(cs_main);
-            std::cerr << __func__ << " LOCK2(cs_main, mempool.cs) ended return(0)" << std::endl;
-
-            blocktime = GetTime();
-            uint256 merkleroot = komodo_calcmerkleroot(pblock, pindexPrev->GetBlockHash(), nHeight, true, scriptPubKeyIn);
-            //fprintf(stderr, "MINER: merkleroot.%s\n", merkleroot.GetHex().c_str());
-            /*
-                Instead of a split RPC and writing heaps of code, I added this.
-                It works with the consensus, because the stakeTx valuein-valueout+blockReward is enforced for the coinbase of staking blocks.
-                For example:
-                utxovalue = 30;
-                30% of the value of the staking utxo is added to the coinbase the same as fees,returning the remaining 70% to the address that staked.
-                utxovalue can be adjusted from any number 0 to 100 via the setstakingsplit RPC.
-                Can also be set with -splitperc= command line arg, or conf file.
-                0 means that it functions as it did previously (default).
-                100 means it automates the pos64staker in the daemon, combining the stake tx and the coinbase to an address. Either to -pubkey or a new address from the keystore.
-                Mining with a % here and without pubkey will over time create varied sized utxos, and evenly distribute them over many addresses and segids.
-            */
-            {
-                //LOCK(cs_main);
-                utxovalue = ASSETCHAINS_STAKED_SPLIT_PERCENTAGE;
-            }
-
-            siglen = komodo_staked(txStaked, pblock->nBits, &blocktime, &txtime, &utxotxid, &utxovout, &utxovalue, utxosig, merkleroot);
-            if ( komodo_newStakerActive(nHeight, blocktime) != 0 )
-                nFees += utxovalue;
-            //fprintf(stderr, "added to coinbase.%llu staking tx valueout.%llu\n", (long long unsigned)utxovalue, (long long unsigned)txStaked.vout[0].nValue);
-            
-            // note: long duration call to komodo_waituntilelegible moved further
-
-            if ( siglen > 0 )
-            {
-                CAmount txfees;
-
-                txfees = 0;
-
-                pblock->vtx.push_back(txStaked);
-                pblocktemplate->vTxFees.push_back(txfees);
-                pblocktemplate->vTxSigOps.push_back(GetLegacySigOpCount(txStaked));
-                nFees += txfees;
-                pblock->nTime = blocktime;
-            } 
-            else {
-                return(0);
-            }
-        }
-        
-        // Create coinbase tx
-        CMutableTransaction txNew = CreateNewContextualCMutableTransaction(consensusParams, nHeight);
-        txNew.vin.resize(1);
-        txNew.vin[0].prevout.SetNull();
-        txNew.vin[0].scriptSig = (CScript() << nHeight << CScriptNum(1)) + COINBASE_FLAGS;
-        txNew.vout.resize(1);
-        txNew.vout[0].scriptPubKey = scriptPubKeyIn;
-        txNew.vout[0].nValue = GetBlockSubsidy(nHeight,consensusParams) + nFees;
-        txNew.nExpiryHeight = 0;
-        //fprintf(stderr, "coinbase txid.%s\n", txNew.GetHash().ToString().c_str());
-        //fprintf(stderr, "MINER: coinbasetx.%s\n", EncodeHexTx(txNew).c_str());
-        //fprintf(stderr,"mine ht.%d with %.8f\n",nHeight,(double)txNew.vout[0].nValue/COIN);
-        
-        //if ((uint32_t)chainActive.Tip()->nTime < ASSETCHAINS_STAKED_HF_TIMESTAMP) {
-        if ( ASSETCHAINS_ADAPTIVEPOW <= 0 )
-            txNew.nLockTime = std::max(pindexPrev->GetMedianTimePast()+1, GetTime());
-        else txNew.nLockTime = std::max((int64_t)(pindexPrev->nTime+1), GetTime());        
-
-        if ( ASSETCHAINS_SYMBOL[0] == 0 && IS_KOMODO_NOTARY && My_notaryid >= 0 )
-            txNew.vout[0].nValue += 5000;
-        pblock->vtx[0] = txNew;
-
-        if ( nHeight > 1 && ASSETCHAINS_SYMBOL[0] != 0 && (ASSETCHAINS_OVERRIDE_PUBKEY33[0] != 0 || ASSETCHAINS_SCRIPTPUB.size() > 1) && (ASSETCHAINS_COMMISSION != 0 || ASSETCHAINS_FOUNDERS_REWARD != 0)  && (commission= komodo_commission((CBlock*)&pblocktemplate->block,(int32_t)nHeight)) != 0 )
-        {
-            int32_t i; uint8_t *ptr;
-            txNew.vout.resize(2);
-            txNew.vout[1].nValue = commission;
-            if ( ASSETCHAINS_SCRIPTPUB.size() > 1 )
-            {
-                static bool didinit = false;
-                if ( !didinit && nHeight > KOMODO_EARLYTXID_HEIGHT && KOMODO_EARLYTXID != zeroid && komodo_appendACscriptpub() )
-                {
-                    fprintf(stderr, "appended ccopreturn to ASSETCHAINS_SCRIPTPUB.%s\n", ASSETCHAINS_SCRIPTPUB.c_str());
-                    didinit = true;
-                }
-                //fprintf(stderr,"mine to -ac_script\n");
-                //txNew.vout[1].scriptPubKey = CScript() << ParseHex();
-                int32_t len = strlen(ASSETCHAINS_SCRIPTPUB.c_str());
-                len >>= 1;
-                txNew.vout[1].scriptPubKey.resize(len);
-                ptr = (uint8_t *)&txNew.vout[1].scriptPubKey[0];
-                decode_hex(ptr,len,ASSETCHAINS_SCRIPTPUB.c_str());
-            }
-            else
-            {
-                txNew.vout[1].scriptPubKey.resize(35);
-                ptr = (uint8_t *)&txNew.vout[1].scriptPubKey[0];
-                ptr[0] = 33;
-                for (i=0; i<33; i++)
-                {
-                    ptr[i+1] = ASSETCHAINS_OVERRIDE_PUBKEY33[i];
-                    //fprintf(stderr,"%02x",ptr[i+1]);
-                }
-                ptr[34] = OP_CHECKSIG;
-                //fprintf(stderr," set ASSETCHAINS_OVERRIDE_PUBKEY33 into vout[1]\n");
-            }
-            //printf("autocreate commision vout\n");
-        }
-        else if ( (uint64_t)(txNew.vout[0].nValue) >= ASSETCHAINS_TIMELOCKGTE)
-        {
-            int32_t opretlen, p2shlen, scriptlen;
-            CScriptExt opretScript = CScriptExt();
-            
-            txNew.vout.resize(2);
-            
-            // prepend time lock to original script unless original script is P2SH, in which case, we will leave the coins
-            // protected only by the time lock rather than 100% inaccessible
-            opretScript.AddCheckLockTimeVerify(komodo_block_unlocktime(nHeight));
-            if (scriptPubKeyIn.IsPayToScriptHash() || scriptPubKeyIn.IsPayToCryptoCondition())
-            {
-                fprintf(stderr,"CreateNewBlock: attempt to add timelock to pay2sh or pay2cc\n");
-                std::cerr << __func__ << " LOCK2(cs_main, mempool.cs) ended return(0)" << std::endl;
-                return 0;
-            }
-            
-            opretScript += scriptPubKeyIn;
-            
-            txNew.vout[0].scriptPubKey = CScriptExt().PayToScriptHash(CScriptID(opretScript));
-            txNew.vout[1].scriptPubKey = CScriptExt().OpReturnScript(opretScript, OPRETTYPE_TIMELOCK);
-            txNew.vout[1].nValue = 0;
-            // timelocks and commissions are currently incompatible due to validation complexity of the combination
-        } 
-        else if ( fNotarisationBlock && ASSETCHAINS_NOTARY_PAY[0] != 0 && pblock->vtx[1].vout.size() == 2 && pblock->vtx[1].vout[1].nValue == 0 )
-        {
-            // Get the OP_RETURN for the notarisation
-            uint8_t *script = (uint8_t *)&pblock->vtx[1].vout[1].scriptPubKey[0];
-            int32_t scriptlen = (int32_t)pblock->vtx[1].vout[1].scriptPubKey.size();
-            if ( script[0] == OP_RETURN )
-            {
-                uint64_t totalsats = komodo_notarypay(txNew, NotarisationNotaries, pblock->nTime, nHeight, script, scriptlen);
-                if ( totalsats == 0 )
-                {
-                    fprintf(stderr, "Could not create notary payment, trying again.\n");
-                    std::cerr << __func__ << " LOCK2(cs_main, mempool.cs) ended return(0)" << std::endl;
-                    return(0);
-                }
-                //fprintf(stderr, "Created notary payment coinbase totalsat.%lu\n",totalsats);    
-            } else fprintf(stderr, "vout 2 of notarisation is not OP_RETURN scriptlen.%i\n", scriptlen);
-        }
-        if ( ASSETCHAINS_CBOPRET != 0 )
-        {
-            int32_t numv = (int32_t)txNew.vout.size();
-            txNew.vout.resize(numv+1);
-            txNew.vout[numv].nValue = 0;
-            txNew.vout[numv].scriptPubKey = komodo_mineropret(nHeight);
-            //printf("autocreate commision/cbopret.%lld vout[%d]\n",(long long)ASSETCHAINS_CBOPRET,(int32_t)txNew.vout.size());
-        }
-        pblock->vtx[0] = txNew;
-        pblocktemplate->vTxFees[0] = -nFees;
-
-        //if (!isStake || true)
-        // Randomise nonce
-        arith_uint256 nonce = UintToArith256(GetRandHash());
-
-        // Clear the top 16 and bottom 16 or 24 bits (for local use as thread flags and counters)
-        nonce <<= ASSETCHAINS_NONCESHIFT[ASSETCHAINS_ALGO];
-        nonce >>= 16;
-        pblock->nNonce = ArithToUint256(nonce);
-
-        // Fill in header
-        pblock->hashPrevBlock  = pindexPrev->GetBlockHash();
-        pblock->hashFinalSaplingRoot   = sapling_tree.root();
-
-        // all Verus PoS chains need this data in the block at all times
-        if ( ASSETCHAINS_SYMBOL[0] == 0 || ASSETCHAINS_STAKED == 0 || KOMODO_MININGTHREADS > 0 )
-        {
-            UpdateTime(pblock, Params().GetConsensus(), pindexPrev);
-            pblock->nBits = GetNextWorkRequired(pindexPrev, pblock, Params().GetConsensus());
-        }
-        pblock->nSolution.clear();
-        pblocktemplate->vTxSigOps[0] = GetLegacySigOpCount(pblock->vtx[0]);
-        if ( ASSETCHAINS_SYMBOL[0] == 0 && IS_KOMODO_NOTARY && My_notaryid >= 0 )
-        {
-            uint32_t r; CScript opret;
-            CMutableTransaction txNotary = CreateNewContextualCMutableTransaction(Params().GetConsensus(), chainActive.Height() + 1);
-            if ( pblock->nTime < pindexPrev->nTime+60 )
-                pblock->nTime = pindexPrev->nTime + 60;
-            if ( gpucount < 33 )
-            {
-                uint8_t tmpbuffer[40]; uint32_t r; int32_t n=0; uint256 randvals;
-                memcpy(&tmpbuffer[n],&My_notaryid,sizeof(My_notaryid)), n += sizeof(My_notaryid);
-                memcpy(&tmpbuffer[n],&Mining_height,sizeof(Mining_height)), n += sizeof(Mining_height);
-                memcpy(&tmpbuffer[n],&pblock->hashPrevBlock,sizeof(pblock->hashPrevBlock)), n += sizeof(pblock->hashPrevBlock);
-                vcalc_sha256(0,(uint8_t *)&randvals,tmpbuffer,n);
-                memcpy(&r,&randvals,sizeof(r));
-                pblock->nTime += (r % (33 - gpucount)*(33 - gpucount));
-            }
-            pblock->vtx[0] = txNew;
-
-            if ( Mining_height > nDecemberHardforkHeight ) //December 2019 hardfork
-                opret = komodo_makeopret(pblock, true);
-            else
-                opret.clear();
-
-            if (komodo_notaryvin(txNotary, NOTARY_PUBKEY33, opret, pblock->nTime) > 0)
-            {
-                CAmount txfees = 5000;
-                pblock->vtx.push_back(txNotary);
-                pblocktemplate->vTxFees.push_back(txfees);
-                pblocktemplate->vTxSigOps.push_back(GetLegacySigOpCount(txNotary));
-                nFees += txfees;
-                pblocktemplate->vTxFees[0] = -nFees;
-                fprintf(stderr,"added notaryvin includes proof.%d\n", opret.size() > 0);
-            }
-            else
-            {
-                fprintf(stderr,"error adding notaryvin, need to create 0.0001 utxos\n");
-                std::cerr << __func__ << " LOCK2(cs_main, mempool.cs) ended return(0)" << std::endl;
-                return(0);
-            }
-        }
-        
-        {
-            CValidationState state;
-            //fprintf(stderr,"check validity\n");
-            if ( !TestBlockValidity(state, *pblock, pindexPrev, false, false)) // invokes CC checks
-            {
-                //throw std::runtime_error("CreateNewBlock(): TestBlockValidity failed"); // crashes the node, moved to GetBlockTemplate and issue return.
-                std::cerr << __func__ << " LOCK2(cs_main, mempool.cs) ended return(0)" << std::endl;
-                return(0);
-            }
-            //fprintf(stderr,"valid\n");
-        }
+        tipHeight = chainActive.Height() + 1;
         std::cerr << __func__ << " LOCK2(cs_main, mempool.cs) ended" << std::endl;
+    } // leave mempool.cs cs_main
+
+    //LogPrintf("CreateNewBlock(): total size %u blocktime.%u nBits.%08x stake.%i\n", nBlockSize,blocktime,pblock->nBits,isStake);
+    if ( ASSETCHAINS_SYMBOL[0] != 0 && isStake )
+    {
+        uint64_t txfees,utxovalue; uint32_t txtime; uint256 utxotxid; int32_t i,siglen,numsigs,utxovout; uint8_t utxosig[512],*ptr;
+        CMutableTransaction txStaked = CreateNewContextualCMutableTransaction(Params().GetConsensus(), tipHeight);
+
+        blocktime = GetTime();
+        uint256 merkleroot = komodo_calcmerkleroot(pblock, pindexPrev->GetBlockHash(), nHeight, true, scriptPubKeyIn);
+        //fprintf(stderr, "MINER: merkleroot.%s\n", merkleroot.GetHex().c_str());
+        /*
+            Instead of a split RPC and writing heaps of code, I added this.
+            It works with the consensus, because the stakeTx valuein-valueout+blockReward is enforced for the coinbase of staking blocks.
+            For example:
+            utxovalue = 30;
+            30% of the value of the staking utxo is added to the coinbase the same as fees,returning the remaining 70% to the address that staked.
+            utxovalue can be adjusted from any number 0 to 100 via the setstakingsplit RPC.
+            Can also be set with -splitperc= command line arg, or conf file.
+            0 means that it functions as it did previously (default).
+            100 means it automates the pos64staker in the daemon, combining the stake tx and the coinbase to an address. Either to -pubkey or a new address from the keystore.
+            Mining with a % here and without pubkey will over time create varied sized utxos, and evenly distribute them over many addresses and segids.
+        */
+        {
+            //LOCK(cs_main);
+            utxovalue = ASSETCHAINS_STAKED_SPLIT_PERCENTAGE;
+        }
+
+        siglen = komodo_staked(txStaked, pblock->nBits, &blocktime, &txtime, &utxotxid, &utxovout, &utxovalue, utxosig, merkleroot);
+        if ( komodo_newStakerActive(nHeight, blocktime) != 0 )
+            nFees += utxovalue;
+        //fprintf(stderr, "added to coinbase.%llu staking tx valueout.%llu\n", (long long unsigned)utxovalue, (long long unsigned)txStaked.vout[0].nValue);
+        
+        // note: long duration call to komodo_waituntilelegible moved further
+
+        if ( siglen > 0 )
+        {
+            CAmount txfees;
+
+            txfees = 0;
+
+            pblock->vtx.push_back(txStaked);
+            pblocktemplate->vTxFees.push_back(txfees);
+            pblocktemplate->vTxSigOps.push_back(GetLegacySigOpCount(txStaked));
+            nFees += txfees;
+            pblock->nTime = blocktime;
+        } 
+        else {
+            return(0);
+        }
     }
+    
+    // Create coinbase tx
+    CMutableTransaction txNew = CreateNewContextualCMutableTransaction(consensusParams, nHeight);
+    txNew.vin.resize(1);
+    txNew.vin[0].prevout.SetNull();
+    txNew.vin[0].scriptSig = (CScript() << nHeight << CScriptNum(1)) + COINBASE_FLAGS;
+    txNew.vout.resize(1);
+    txNew.vout[0].scriptPubKey = scriptPubKeyIn;
+    txNew.vout[0].nValue = GetBlockSubsidy(nHeight,consensusParams) + nFees;
+    txNew.nExpiryHeight = 0;
+    //fprintf(stderr, "coinbase txid.%s\n", txNew.GetHash().ToString().c_str());
+    //fprintf(stderr, "MINER: coinbasetx.%s\n", EncodeHexTx(txNew).c_str());
+    //fprintf(stderr,"mine ht.%d with %.8f\n",nHeight,(double)txNew.vout[0].nValue/COIN);
+    
+    //if ((uint32_t)chainActive.Tip()->nTime < ASSETCHAINS_STAKED_HF_TIMESTAMP) {
+    if ( ASSETCHAINS_ADAPTIVEPOW <= 0 )
+        txNew.nLockTime = std::max(pindexPrev->GetMedianTimePast()+1, GetTime());
+    else txNew.nLockTime = std::max((int64_t)(pindexPrev->nTime+1), GetTime());        
+
+    if ( ASSETCHAINS_SYMBOL[0] == 0 && IS_KOMODO_NOTARY && My_notaryid >= 0 )
+        txNew.vout[0].nValue += 5000;
+    pblock->vtx[0] = txNew;
+
+    uint64_t commission;
+    if ( nHeight > 1 && ASSETCHAINS_SYMBOL[0] != 0 && (ASSETCHAINS_OVERRIDE_PUBKEY33[0] != 0 || ASSETCHAINS_SCRIPTPUB.size() > 1) && (ASSETCHAINS_COMMISSION != 0 || ASSETCHAINS_FOUNDERS_REWARD != 0)  && (commission= komodo_commission((CBlock*)&pblocktemplate->block,(int32_t)nHeight)) != 0 )
+    {
+        int32_t i; uint8_t *ptr;
+        txNew.vout.resize(2);
+        txNew.vout[1].nValue = commission;
+        if ( ASSETCHAINS_SCRIPTPUB.size() > 1 )
+        {
+            static bool didinit = false;
+            if ( !didinit && nHeight > KOMODO_EARLYTXID_HEIGHT && KOMODO_EARLYTXID != zeroid && komodo_appendACscriptpub() )
+            {
+                fprintf(stderr, "appended ccopreturn to ASSETCHAINS_SCRIPTPUB.%s\n", ASSETCHAINS_SCRIPTPUB.c_str());
+                didinit = true;
+            }
+            //fprintf(stderr,"mine to -ac_script\n");
+            //txNew.vout[1].scriptPubKey = CScript() << ParseHex();
+            int32_t len = strlen(ASSETCHAINS_SCRIPTPUB.c_str());
+            len >>= 1;
+            txNew.vout[1].scriptPubKey.resize(len);
+            ptr = (uint8_t *)&txNew.vout[1].scriptPubKey[0];
+            decode_hex(ptr,len,ASSETCHAINS_SCRIPTPUB.c_str());
+        }
+        else
+        {
+            txNew.vout[1].scriptPubKey.resize(35);
+            ptr = (uint8_t *)&txNew.vout[1].scriptPubKey[0];
+            ptr[0] = 33;
+            for (i=0; i<33; i++)
+            {
+                ptr[i+1] = ASSETCHAINS_OVERRIDE_PUBKEY33[i];
+                //fprintf(stderr,"%02x",ptr[i+1]);
+            }
+            ptr[34] = OP_CHECKSIG;
+            //fprintf(stderr," set ASSETCHAINS_OVERRIDE_PUBKEY33 into vout[1]\n");
+        }
+        //printf("autocreate commision vout\n");
+    }
+    else if ( (uint64_t)(txNew.vout[0].nValue) >= ASSETCHAINS_TIMELOCKGTE)
+    {
+        int32_t opretlen, p2shlen, scriptlen;
+        CScriptExt opretScript = CScriptExt();
+        
+        txNew.vout.resize(2);
+        
+        // prepend time lock to original script unless original script is P2SH, in which case, we will leave the coins
+        // protected only by the time lock rather than 100% inaccessible
+        opretScript.AddCheckLockTimeVerify(komodo_block_unlocktime(nHeight));
+        if (scriptPubKeyIn.IsPayToScriptHash() || scriptPubKeyIn.IsPayToCryptoCondition())
+        {
+            fprintf(stderr,"CreateNewBlock: attempt to add timelock to pay2sh or pay2cc\n");
+            return 0;
+        }
+        
+        opretScript += scriptPubKeyIn;
+        
+        txNew.vout[0].scriptPubKey = CScriptExt().PayToScriptHash(CScriptID(opretScript));
+        txNew.vout[1].scriptPubKey = CScriptExt().OpReturnScript(opretScript, OPRETTYPE_TIMELOCK);
+        txNew.vout[1].nValue = 0;
+        // timelocks and commissions are currently incompatible due to validation complexity of the combination
+    } 
+    else if ( fNotarisationBlock && ASSETCHAINS_NOTARY_PAY[0] != 0 && pblock->vtx[1].vout.size() == 2 && pblock->vtx[1].vout[1].nValue == 0 )
+    {
+        // Get the OP_RETURN for the notarisation
+        uint8_t *script = (uint8_t *)&pblock->vtx[1].vout[1].scriptPubKey[0];
+        int32_t scriptlen = (int32_t)pblock->vtx[1].vout[1].scriptPubKey.size();
+        if ( script[0] == OP_RETURN )
+        {
+            uint64_t totalsats = komodo_notarypay(txNew, NotarisationNotaries, pblock->nTime, nHeight, script, scriptlen);
+            if ( totalsats == 0 )
+            {
+                fprintf(stderr, "Could not create notary payment, trying again.\n");
+                return(0);
+            }
+            //fprintf(stderr, "Created notary payment coinbase totalsat.%lu\n",totalsats);    
+        } else fprintf(stderr, "vout 2 of notarisation is not OP_RETURN scriptlen.%i\n", scriptlen);
+    }
+    if ( ASSETCHAINS_CBOPRET != 0 )
+    {
+        int32_t numv = (int32_t)txNew.vout.size();
+        txNew.vout.resize(numv+1);
+        txNew.vout[numv].nValue = 0;
+        txNew.vout[numv].scriptPubKey = komodo_mineropret(nHeight);
+        //printf("autocreate commision/cbopret.%lld vout[%d]\n",(long long)ASSETCHAINS_CBOPRET,(int32_t)txNew.vout.size());
+    }
+    pblock->vtx[0] = txNew;
+    pblocktemplate->vTxFees[0] = -nFees;
+
+    //if (!isStake || true)
+    // Randomise nonce
+    arith_uint256 nonce = UintToArith256(GetRandHash());
+
+    // Clear the top 16 and bottom 16 or 24 bits (for local use as thread flags and counters)
+    nonce <<= ASSETCHAINS_NONCESHIFT[ASSETCHAINS_ALGO];
+    nonce >>= 16;
+    pblock->nNonce = ArithToUint256(nonce);
+
+    // Fill in header
+    pblock->hashPrevBlock  = pindexPrev->GetBlockHash();
+    pblock->hashFinalSaplingRoot   = sapling_tree.root();
+
+    // all Verus PoS chains need this data in the block at all times
+    if ( ASSETCHAINS_SYMBOL[0] == 0 || ASSETCHAINS_STAKED == 0 || KOMODO_MININGTHREADS > 0 )
+    {
+        UpdateTime(pblock, Params().GetConsensus(), pindexPrev);
+        pblock->nBits = GetNextWorkRequired(pindexPrev, pblock, Params().GetConsensus());
+    }
+    pblock->nSolution.clear();
+    pblocktemplate->vTxSigOps[0] = GetLegacySigOpCount(pblock->vtx[0]);
+    if ( ASSETCHAINS_SYMBOL[0] == 0 && IS_KOMODO_NOTARY && My_notaryid >= 0 )
+    {
+        uint32_t r; CScript opret;
+        CMutableTransaction txNotary = CreateNewContextualCMutableTransaction(Params().GetConsensus(), tipHeight);
+        if ( pblock->nTime < pindexPrev->nTime+60 )
+            pblock->nTime = pindexPrev->nTime + 60;
+        if ( gpucount < 33 )
+        {
+            uint8_t tmpbuffer[40]; uint32_t r; int32_t n=0; uint256 randvals;
+            memcpy(&tmpbuffer[n],&My_notaryid,sizeof(My_notaryid)), n += sizeof(My_notaryid);
+            memcpy(&tmpbuffer[n],&Mining_height,sizeof(Mining_height)), n += sizeof(Mining_height);
+            memcpy(&tmpbuffer[n],&pblock->hashPrevBlock,sizeof(pblock->hashPrevBlock)), n += sizeof(pblock->hashPrevBlock);
+            vcalc_sha256(0,(uint8_t *)&randvals,tmpbuffer,n);
+            memcpy(&r,&randvals,sizeof(r));
+            pblock->nTime += (r % (33 - gpucount)*(33 - gpucount));
+        }
+        pblock->vtx[0] = txNew;
+
+        if ( Mining_height > nDecemberHardforkHeight ) //December 2019 hardfork
+            opret = komodo_makeopret(pblock, true);
+        else
+            opret.clear();
+
+        if (komodo_notaryvin(txNotary, NOTARY_PUBKEY33, opret, pblock->nTime) > 0)
+        {
+            CAmount txfees = 5000;
+            pblock->vtx.push_back(txNotary);
+            pblocktemplate->vTxFees.push_back(txfees);
+            pblocktemplate->vTxSigOps.push_back(GetLegacySigOpCount(txNotary));
+            nFees += txfees;
+            pblocktemplate->vTxFees[0] = -nFees;
+            fprintf(stderr,"added notaryvin includes proof.%d\n", opret.size() > 0);
+        }
+        else
+        {
+            fprintf(stderr,"error adding notaryvin, need to create 0.0001 utxos\n");
+            return(0);
+        }
+    }
+    
+    {
+        CValidationState state;
+        //fprintf(stderr,"check validity\n");
+        if ( !TestBlockValidity(state, *pblock, pindexPrev, false, false)) // invokes CC checks
+        {
+            //throw std::runtime_error("CreateNewBlock(): TestBlockValidity failed"); // crashes the node, moved to GetBlockTemplate and issue return.
+            return(0);
+        }
+        //fprintf(stderr,"valid\n");
+    }
+        
     if (ASSETCHAINS_SYMBOL[0] != 0 && isStake)
     {
         uint32_t delay = ASSETCHAINS_ALGO != ASSETCHAINS_EQUIHASH ? ASSETCHAINS_STAKED_BLOCK_FUTURE_MAX : ASSETCHAINS_STAKED_BLOCK_FUTURE_HALF;
-        if (komodo_waituntilelegible(blocktime, stakeHeight, delay) == 0)  {
+        if (komodo_waituntilelegible(blocktime, tipHeight, delay) == 0)  {
             return(0);
         }
     }
