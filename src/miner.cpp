@@ -161,7 +161,7 @@ CScript komodo_mineropret(int32_t nHeight);
 bool komodo_appendACscriptpub();
 CScript komodo_makeopret(CBlock *pblock, bool fNew);
 
-int32_t komodo_waituntilelegible(uint32_t blocktime, int32_t tipHeight, uint32_t delay)
+int32_t komodo_waituntilelegible(uint32_t blocktime, int32_t stakeHeight, uint32_t delay)
 {
     int64_t adjustedtime = (int64_t)GetTime();
     while ( (int64_t)blocktime-ASSETCHAINS_STAKED_BLOCK_FUTURE_MAX > adjustedtime )
@@ -170,16 +170,16 @@ int32_t komodo_waituntilelegible(uint32_t blocktime, int32_t tipHeight, uint32_t
         if ( delay <= ASSETCHAINS_STAKED_BLOCK_FUTURE_HALF && secToElegible <= ASSETCHAINS_STAKED_BLOCK_FUTURE_HALF )
             break;
         if ( (rand() % 100) < 2-(secToElegible>ASSETCHAINS_STAKED_BLOCK_FUTURE_MAX) ) 
-            fprintf(stderr, "[%s:%i] %llds until elegible...\n", ASSETCHAINS_SYMBOL, tipHeight, (long long)secToElegible);
+            fprintf(stderr, "[%s:%i] %llds until elegible...\n", ASSETCHAINS_SYMBOL, stakeHeight, (long long)secToElegible);
 
         int32_t tipHeight;
         {
             LOCK(cs_main);
             tipHeight = chainActive.Tip()->nHeight;
         }
-        if ( tipHeight >= tipHeight )
+        if ( tipHeight >= stakeHeight )
         {
-            fprintf(stderr, "[%s:%i] Chain advanced, reset staking loop.\n", ASSETCHAINS_SYMBOL, tipHeight);
+            fprintf(stderr, "[%s:%i] Chain advanced, reset staking loop.\n", ASSETCHAINS_SYMBOL, stakeHeight);
             return(0);
         }
         if( !GetBoolArg("-gen",false) ) 
@@ -256,6 +256,7 @@ CBlockTemplate* CreateNewBlock(CPubKey _pk,const CScript& _scriptPubKeyIn, int32
     CBlockIndex* pindexPrev = nullptr;
     SaplingMerkleTree sapling_tree;
     const Consensus::Params &consensusParams = chainparams.GetConsensus();
+    int64_t nMedianTimePast = 0LL;
 
     {
         // this should stop create block ever exiting until it has returned something. 
@@ -264,13 +265,13 @@ CBlockTemplate* CreateNewBlock(CPubKey _pk,const CScript& _scriptPubKeyIn, int32
         //ENTER_CRITICAL_SECTION(cs_main);
         //ENTER_CRITICAL_SECTION(mempool.cs);
         LOCK2(cs_main, mempool.cs);
-        std::cerr << __func__ << "LOCK2(cs_main, mempool.cs) started" << std::endl;
+        std::cerr << __func__ << " LOCK2(cs_main, mempool.cs) started" << std::endl;
         pindexPrev = chainActive.Tip();
         nHeight = pindexPrev->nHeight + 1;
         uint32_t consensusBranchId = CurrentEpochBranchId(nHeight, consensusParams);
         bool sapling = NetworkUpgradeActive(nHeight, consensusParams, Consensus::UPGRADE_SAPLING);
 
-        const int64_t nMedianTimePast = pindexPrev->GetMedianTimePast();
+        nMedianTimePast = pindexPrev->GetMedianTimePast();
         uint32_t proposedTime = GetTime();
 
         if (proposedTime == nMedianTimePast)
@@ -645,8 +646,9 @@ CBlockTemplate* CreateNewBlock(CPubKey _pk,const CScript& _scriptPubKeyIn, int32
         nLastBlockTx = nBlockTx;
         nLastBlockSize = nBlockSize;
         if ( ASSETCHAINS_ADAPTIVEPOW <= 0 )
-            blocktime = 1 + std::max(pindexPrev->GetMedianTimePast()+1, GetTime());
-        else blocktime = 1 + std::max((int64_t)(pindexPrev->nTime+1), GetTime());
+            blocktime = 1 + std::max(nMedianTimePast+1, GetTime());
+        else 
+            blocktime = 1 + std::max((int64_t)(pindexPrev->nTime+1), GetTime());
         //pblock->nTime = blocktime + 1;
         pblock->nBits = GetNextWorkRequired(pindexPrev, pblock, Params().GetConsensus());
         //fprintf(stderr, "nBits.%u\n",pblock->nBits);
@@ -658,7 +660,7 @@ CBlockTemplate* CreateNewBlock(CPubKey _pk,const CScript& _scriptPubKeyIn, int32
     //LogPrintf("CreateNewBlock(): total size %u blocktime.%u nBits.%08x stake.%i\n", nBlockSize,blocktime,pblock->nBits,isStake);
     if ( ASSETCHAINS_SYMBOL[0] != 0 && isStake )
     {
-        uint64_t txfees,utxovalue; uint32_t txtime; uint256 utxotxid; int32_t i,siglen,numsigs,utxovout; uint8_t utxosig[512],*ptr;
+        uint64_t txfees,utxovalue; uint32_t txtime; uint256 utxotxid; int32_t i,siglen,numsigs,utxovout; uint8_t utxosig[512];
         CMutableTransaction txStaked = CreateNewContextualCMutableTransaction(Params().GetConsensus(), tipHeight);
 
         blocktime = GetTime();
@@ -720,8 +722,9 @@ CBlockTemplate* CreateNewBlock(CPubKey _pk,const CScript& _scriptPubKeyIn, int32
     
     //if ((uint32_t)chainActive.Tip()->nTime < ASSETCHAINS_STAKED_HF_TIMESTAMP) {
     if ( ASSETCHAINS_ADAPTIVEPOW <= 0 )
-        txNew.nLockTime = std::max(pindexPrev->GetMedianTimePast()+1, GetTime());
-    else txNew.nLockTime = std::max((int64_t)(pindexPrev->nTime+1), GetTime());        
+        txNew.nLockTime = std::max(nMedianTimePast+1, GetTime());
+    else 
+        txNew.nLockTime = std::max((int64_t)(pindexPrev->nTime+1), GetTime());        
 
     if ( ASSETCHAINS_SYMBOL[0] == 0 && IS_KOMODO_NOTARY && My_notaryid >= 0 )
         txNew.vout[0].nValue += 5000;
@@ -794,6 +797,7 @@ CBlockTemplate* CreateNewBlock(CPubKey _pk,const CScript& _scriptPubKeyIn, int32
         int32_t scriptlen = (int32_t)pblock->vtx[1].vout[1].scriptPubKey.size();
         if ( script[0] == OP_RETURN )
         {
+            LOCK(cs_main);
             uint64_t totalsats = komodo_notarypay(txNew, NotarisationNotaries, pblock->nTime, nHeight, script, scriptlen);
             if ( totalsats == 0 )
             {
@@ -801,7 +805,9 @@ CBlockTemplate* CreateNewBlock(CPubKey _pk,const CScript& _scriptPubKeyIn, int32
                 return(0);
             }
             //fprintf(stderr, "Created notary payment coinbase totalsat.%lu\n",totalsats);    
-        } else fprintf(stderr, "vout 2 of notarisation is not OP_RETURN scriptlen.%i\n", scriptlen);
+        } 
+        else 
+            fprintf(stderr, "vout 2 of notarisation is not OP_RETURN scriptlen.%i\n", scriptlen);
     }
     if ( ASSETCHAINS_CBOPRET != 0 )
     {
@@ -830,6 +836,7 @@ CBlockTemplate* CreateNewBlock(CPubKey _pk,const CScript& _scriptPubKeyIn, int32
     // all Verus PoS chains need this data in the block at all times
     if ( ASSETCHAINS_SYMBOL[0] == 0 || ASSETCHAINS_STAKED == 0 || KOMODO_MININGTHREADS > 0 )
     {
+        LOCK(cs_main);
         UpdateTime(pblock, Params().GetConsensus(), pindexPrev);
         pblock->nBits = GetNextWorkRequired(pindexPrev, pblock, Params().GetConsensus());
     }
@@ -877,6 +884,7 @@ CBlockTemplate* CreateNewBlock(CPubKey _pk,const CScript& _scriptPubKeyIn, int32
     
     {
         CValidationState state;
+        LOCK(cs_main);
         //fprintf(stderr,"check validity\n");
         if ( !TestBlockValidity(state, *pblock, pindexPrev, false, false)) // invokes CC checks
         {
