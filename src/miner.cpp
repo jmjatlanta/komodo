@@ -260,6 +260,7 @@ CBlockTemplate* CreateNewBlock(CPubKey _pk,const CScript& _scriptPubKeyIn, int32
         //ENTER_CRITICAL_SECTION(cs_main);
         //ENTER_CRITICAL_SECTION(mempool.cs);
         LOCK2(cs_main, mempool.cs);
+        std::cerr << __func__ << "LOCK2(cs_main, mempool.cs) started" << std::endl;
         pindexPrev = chainActive.Tip();
         const int nHeight = pindexPrev->nHeight + 1;
         const Consensus::Params &consensusParams = chainparams.GetConsensus();
@@ -653,8 +654,6 @@ CBlockTemplate* CreateNewBlock(CPubKey _pk,const CScript& _scriptPubKeyIn, int32
         //LogPrintf("CreateNewBlock(): total size %u blocktime.%u nBits.%08x stake.%i\n", nBlockSize,blocktime,pblock->nBits,isStake);
         if ( ASSETCHAINS_SYMBOL[0] != 0 && isStake )
         {
-            //LEAVE_CRITICAL_SECTION(cs_main);
-            //LEAVE_CRITICAL_SECTION(mempool.cs);
             uint64_t txfees,utxovalue; uint32_t txtime; uint256 utxotxid; int32_t i,siglen,numsigs,utxovout; uint8_t utxosig[512],*ptr;
             CMutableTransaction txStaked = CreateNewContextualCMutableTransaction(Params().GetConsensus(), stakeHeight);
 
@@ -697,8 +696,10 @@ CBlockTemplate* CreateNewBlock(CPubKey _pk,const CScript& _scriptPubKeyIn, int32
                 nFees += txfees;
                 pblock->nTime = blocktime;
             } 
-            else 
+            else {
+                std::cerr << __func__ << " LOCK2(cs_main, mempool.cs) ended return(0)" << std::endl;
                 return(0);
+            }
         }
         
         // Create coinbase tx
@@ -772,6 +773,7 @@ CBlockTemplate* CreateNewBlock(CPubKey _pk,const CScript& _scriptPubKeyIn, int32
             if (scriptPubKeyIn.IsPayToScriptHash() || scriptPubKeyIn.IsPayToCryptoCondition())
             {
                 fprintf(stderr,"CreateNewBlock: attempt to add timelock to pay2sh or pay2cc\n");
+                std::cerr << __func__ << " LOCK2(cs_main, mempool.cs) ended return(0)" << std::endl;
                 return 0;
             }
             
@@ -793,6 +795,7 @@ CBlockTemplate* CreateNewBlock(CPubKey _pk,const CScript& _scriptPubKeyIn, int32
                 if ( totalsats == 0 )
                 {
                     fprintf(stderr, "Could not create notary payment, trying again.\n");
+                    std::cerr << __func__ << " LOCK2(cs_main, mempool.cs) ended return(0)" << std::endl;
                     return(0);
                 }
                 //fprintf(stderr, "Created notary payment coinbase totalsat.%lu\n",totalsats);    
@@ -866,6 +869,7 @@ CBlockTemplate* CreateNewBlock(CPubKey _pk,const CScript& _scriptPubKeyIn, int32
             else
             {
                 fprintf(stderr,"error adding notaryvin, need to create 0.0001 utxos\n");
+                std::cerr << __func__ << " LOCK2(cs_main, mempool.cs) ended return(0)" << std::endl;
                 return(0);
             }
         }
@@ -876,17 +880,19 @@ CBlockTemplate* CreateNewBlock(CPubKey _pk,const CScript& _scriptPubKeyIn, int32
             if ( !TestBlockValidity(state, *pblock, pindexPrev, false, false)) // invokes CC checks
             {
                 //throw std::runtime_error("CreateNewBlock(): TestBlockValidity failed"); // crashes the node, moved to GetBlockTemplate and issue return.
+                std::cerr << __func__ << " LOCK2(cs_main, mempool.cs) ended return(0)" << std::endl;
                 return(0);
             }
             //fprintf(stderr,"valid\n");
         }
-
+        std::cerr << __func__ << " LOCK2(cs_main, mempool.cs) ended" << std::endl;
     }
     if (ASSETCHAINS_SYMBOL[0] != 0 && isStake)
     {
         uint32_t delay = ASSETCHAINS_ALGO != ASSETCHAINS_EQUIHASH ? ASSETCHAINS_STAKED_BLOCK_FUTURE_MAX : ASSETCHAINS_STAKED_BLOCK_FUTURE_HALF;
-        if (komodo_waituntilelegible(blocktime, stakeHeight, delay) == 0)
+        if (komodo_waituntilelegible(blocktime, stakeHeight, delay) == 0)  {
             return(0);
+        }
     }
     //fprintf(stderr,"done new block\n");
     return pblocktemplate.release();
