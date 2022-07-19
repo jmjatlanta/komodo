@@ -2313,7 +2313,6 @@ int32_t komodo_staked(CMutableTransaction &txNew,uint32_t nBits,uint32_t *blockt
     if ( resetstaker || array.size() == 0 || time(NULL) > lasttime+600 )
     {
         LOCK2(cs_main, pwalletMain->cs_wallet);
-        std::cerr << __func__ << " LOCK2(cs_main, mempool.cs) entered" << std::endl;
         pwalletMain->AvailableCoins(vecOutputs, false, NULL, true);
         if ( array.size() != 0 )
         {
@@ -2350,7 +2349,6 @@ int32_t komodo_staked(CMutableTransaction &txNew,uint32_t nBits,uint32_t *blockt
         }
         lasttime = (uint32_t)time(NULL);
         //fprintf(stderr,"%s finished kp data of utxo for staking %u ht.%d array.size().%d array.capacity().%d\n", __func__,(uint32_t)time(NULL),nHeight,array.size(),array.capacity());
-        std::cerr << __func__ << " LOCK2(cs_main, mempool.cs) left" << std::endl;
     }
     block_from_future_rejecttime = (uint32_t)GetTime() + ASSETCHAINS_STAKED_BLOCK_FUTURE_MAX;    
     for (i=winners=0; i<array.size(); i++)

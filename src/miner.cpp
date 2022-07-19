@@ -265,7 +265,6 @@ CBlockTemplate* CreateNewBlock(CPubKey _pk,const CScript& _scriptPubKeyIn, int32
         //ENTER_CRITICAL_SECTION(cs_main);
         //ENTER_CRITICAL_SECTION(mempool.cs);
         LOCK2(cs_main, mempool.cs);
-        std::cerr << __func__ << " LOCK2(cs_main, mempool.cs) started" << std::endl;
         pindexPrev = chainActive.Tip();
         nHeight = pindexPrev->nHeight + 1;
         uint32_t consensusBranchId = CurrentEpochBranchId(nHeight, consensusParams);
@@ -654,7 +653,6 @@ CBlockTemplate* CreateNewBlock(CPubKey _pk,const CScript& _scriptPubKeyIn, int32
         //fprintf(stderr, "nBits.%u\n",pblock->nBits);
 
         tipHeight = chainActive.Height() + 1;
-        std::cerr << __func__ << " LOCK2(cs_main, mempool.cs) ended" << std::endl;
     } // leave mempool.cs cs_main
 
     //LogPrintf("CreateNewBlock(): total size %u blocktime.%u nBits.%08x stake.%i\n", nBlockSize,blocktime,pblock->nBits,isStake);
