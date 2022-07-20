@@ -5029,7 +5029,7 @@ bool FindUndoPos(CValidationState &state, int nFile, CDiskBlockPos &pos, unsigne
     return true;
 }
 
-bool CheckBlockHeader(int32_t *futureblockp,int32_t height,CBlockIndex *pindex, const CBlockHeader& blockhdr, CValidationState& state, bool fCheckPOW)
+bool CheckBlockHeader(int32_t *futureblockp,int32_t height,CBlockIndex *pindex, const CBlockHeader& blockhdr, CValidationState& state, bool fCheckPOW, bool fCheckBlockTime)
 {
     // Check timestamp
     if ( 0 )
@@ -5048,31 +5048,34 @@ bool CheckBlockHeader(int32_t *futureblockp,int32_t height,CBlockIndex *pindex, 
         }
     }
     *futureblockp = 0;
-    if ( ASSETCHAINS_ADAPTIVEPOW > 0 )
+    if (fCheckBlockTime) 
     {
-        if (blockhdr.GetBlockTime() > GetTime() + 4)
+        if ( ASSETCHAINS_ADAPTIVEPOW > 0 )
         {
-            //LogPrintf("CheckBlockHeader block from future %d error",blockhdr.GetBlockTime() - GetAdjustedTime());
-            return false;
+            if (blockhdr.GetBlockTime() > GetTime() + 4)
+            {
+                //LogPrintf("CheckBlockHeader block from future %d error",blockhdr.GetBlockTime() - GetAdjustedTime());
+                return false;
+            }
         }
-    }
-    else if (blockhdr.GetBlockTime() > GetTime() + 60)
-    {
-        /*CBlockIndex *tipindex;
-        //fprintf(stderr,"ht.%d future block %u vs time.%u + 60\n",height,(uint32_t)blockhdr.GetBlockTime(),(uint32_t)GetAdjustedTime());
-        if ( (tipindex= chainActive.Tip()) != 0 && tipindex->GetBlockHash() == blockhdr.hashPrevBlock && blockhdr.GetBlockTime() < GetAdjustedTime() + 60 + 5 )
+        else if (blockhdr.GetBlockTime() > GetTime() + 60)
         {
-            //fprintf(stderr,"it is the next block, let's wait for %d seconds\n",GetAdjustedTime() + 60 - blockhdr.GetBlockTime());
-            while ( blockhdr.GetBlockTime() > GetAdjustedTime() + 60 )
-                sleep(1);
-            //fprintf(stderr,"now its valid\n");
-        }
-        else*/
-        {
-            if (blockhdr.GetBlockTime() < GetTime() + 300)
-                *futureblockp = 1;
-            //LogPrintf("CheckBlockHeader block from future %d error",blockhdr.GetBlockTime() - GetAdjustedTime());
-            return false; //state.Invalid(error("CheckBlockHeader(): block timestamp too far in the future"),REJECT_INVALID, "time-too-new");
+            /*CBlockIndex *tipindex;
+            //fprintf(stderr,"ht.%d future block %u vs time.%u + 60\n",height,(uint32_t)blockhdr.GetBlockTime(),(uint32_t)GetAdjustedTime());
+            if ( (tipindex= chainActive.Tip()) != 0 && tipindex->GetBlockHash() == blockhdr.hashPrevBlock && blockhdr.GetBlockTime() < GetAdjustedTime() + 60 + 5 )
+            {
+                //fprintf(stderr,"it is the next block, let's wait for %d seconds\n",GetAdjustedTime() + 60 - blockhdr.GetBlockTime());
+                while ( blockhdr.GetBlockTime() > GetAdjustedTime() + 60 )
+                    sleep(1);
+                //fprintf(stderr,"now its valid\n");
+            }
+            else*/
+            {
+                if (blockhdr.GetBlockTime() < GetTime() + 300)
+                    *futureblockp = 1;
+                //LogPrintf("CheckBlockHeader block from future %d error",blockhdr.GetBlockTime() - GetAdjustedTime());
+                return false; //state.Invalid(error("CheckBlockHeader(): block timestamp too far in the future"),REJECT_INVALID, "time-too-new");
+            }
         }
     }
     // Check block version
@@ -5097,13 +5100,13 @@ int32_t komodo_checkPOW(int64_t stakeTxValue,int32_t slowflag,CBlock *pblock,int
 
 bool CheckBlock(int32_t *futureblockp,int32_t height,CBlockIndex *pindex,const CBlock& block, CValidationState& state,
                 libzcash::ProofVerifier& verifier,
-                bool fCheckPOW, bool fCheckMerkleRoot)
+                bool fCheckPOW, bool fCheckMerkleRoot, bool fCheckBlockTime)
 {
     uint8_t pubkey33[33]; uint256 hash; uint32_t tiptime = (uint32_t)block.nTime;
     // These are checks that are independent of context.
     hash = block.GetHash();
     // Check that the header is valid (particularly PoW).  This is mostly redundant with the call in AcceptBlockHeader.
-    if (!CheckBlockHeader(futureblockp,height,pindex,block,state,fCheckPOW))
+    if (!CheckBlockHeader(futureblockp,height,pindex,block,state,fCheckPOW,fCheckBlockTime))
     {
         if ( *futureblockp == 0 )
         {
@@ -5807,7 +5810,7 @@ bool ProcessNewBlock(bool from_miner,int32_t height,CValidationState &state, CNo
     return true;
 }
 
-bool TestBlockValidity(CValidationState &state, const CBlock& block, CBlockIndex * const pindexPrev, bool fCheckPOW, bool fCheckMerkleRoot)
+bool TestBlockValidity(CValidationState &state, const CBlock& block, CBlockIndex * const pindexPrev, bool fCheckPOW, bool fCheckMerkleRoot, bool fCheckBlockTime)
 {
     AssertLockHeld(cs_main);
     assert(pindexPrev == chainActive.Tip());
@@ -5824,7 +5827,7 @@ bool TestBlockValidity(CValidationState &state, const CBlock& block, CBlockIndex
         return false;
     }
     int32_t futureblock;
-    if (!CheckBlock(&futureblock,indexDummy.nHeight,0,block, state, verifier, fCheckPOW, fCheckMerkleRoot))
+    if (!CheckBlock(&futureblock,indexDummy.nHeight,0,block, state, verifier, fCheckPOW, fCheckMerkleRoot, fCheckBlockTime))
     {
         return false;
     }

@@ -884,7 +884,8 @@ CBlockTemplate* CreateNewBlock(CPubKey _pk,const CScript& _scriptPubKeyIn, int32
         CValidationState state;
         LOCK(cs_main);
         //fprintf(stderr,"check validity\n");
-        if ( !TestBlockValidity(state, *pblock, pindexPrev, false, false)) // invokes CC checks
+        bool fCheckBlockTime = !ASSETCHAINS_STAKED && (!IS_KOMODO_NOTARY || My_notaryid < 0);
+        if ( !TestBlockValidity(state, *pblock, pindexPrev, false, false, fCheckBlockTime)) // invokes CC checks
         {
             std::cerr << __func__ << " TestBlockValidity failed" << std::endl;
             //throw std::runtime_error("CreateNewBlock(): TestBlockValidity failed"); // crashes the node, moved to GetBlockTemplate and issue return.
