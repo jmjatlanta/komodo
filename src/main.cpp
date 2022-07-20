@@ -3400,7 +3400,7 @@ static int64_t nTimeTotal = 0;
 bool FindBlockPos(int32_t tmpflag,CValidationState &state, CDiskBlockPos &pos, unsigned int nAddSize, unsigned int nHeight, uint64_t nTime, bool fKnown = false);
 bool ReceivedBlockTransactions(const CBlock &block, CValidationState& state, CBlockIndex *pindexNew, const CDiskBlockPos& pos);
 
-bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pindex, CCoinsViewCache& view, bool fJustCheck,bool fCheckPOW)
+bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pindex, CCoinsViewCache& view, bool fJustCheck,bool fCheckPOW,bool fCheckBlockTime)
 {
     CDiskBlockPos blockPos;
     const CChainParams& chainparams = Params();
@@ -3424,7 +3424,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
     CAmount blockReward = GetBlockSubsidy(pindex->nHeight, chainparams.GetConsensus());
     uint64_t notarypaycheque = 0;
     // Check it again to verify JoinSplit proofs, and in case a previous version let a bad block in
-    if ( !CheckBlock(&futureblock,pindex->nHeight,pindex,block, state, fExpensiveChecks ? verifier : disabledVerifier, fCheckPOW, !fJustCheck) || futureblock != 0 )
+    if ( !CheckBlock(&futureblock,pindex->nHeight,pindex,block, state, fExpensiveChecks ? verifier : disabledVerifier, fCheckPOW, !fJustCheck, fCheckBlockTime) || futureblock != 0 )
     {
         //fprintf(stderr,"checkblock failure in connectblock futureblock.%d\n",futureblock);
         return false;
@@ -5847,7 +5847,7 @@ bool TestBlockValidity(CValidationState &state, const CBlock& block, CBlockIndex
     {
         return false;
     }
-    if (!ConnectBlock(block, state, &indexDummy, viewNew, true,fCheckPOW))
+    if (!ConnectBlock(block, state, &indexDummy, viewNew, true, fCheckPOW, fCheckBlockTime))
     {
         return false;
     }
