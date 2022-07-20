@@ -1612,6 +1612,7 @@ void static BitcoinMiner()
 
                 if (foundSol)
                 {
+                    std::cerr << __func__ << " found a new solution..." << std::endl;
                     // waiting code:
                     if ( IS_KOMODO_NOTARY && pblock->nTime > GetTime() )
                     {
