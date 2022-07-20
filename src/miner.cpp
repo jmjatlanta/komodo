@@ -883,6 +883,11 @@ CBlockTemplate* CreateNewBlock(CPubKey _pk,const CScript& _scriptPubKeyIn, int32
     {
         CValidationState state;
         LOCK(cs_main);
+
+        if (pindexPrev != chainActive.Tip()) {
+            LogPrint("pow", "%s tip changed, will start a new block", __func__);
+            return nullptr;
+        }
         //fprintf(stderr,"check validity\n");
         bool fCheckBlockTime = !ASSETCHAINS_STAKED && (!IS_KOMODO_NOTARY || My_notaryid < 0);
         std::cerr << __func__ << " fCheckBlockTime=" << fCheckBlockTime << " !ASSETCHAINS_STAKED=" << !ASSETCHAINS_STAKED << " !IS_KOMODO_NOTARY=" << !IS_KOMODO_NOTARY << " My_notaryid" << My_notaryid << std::endl; 
