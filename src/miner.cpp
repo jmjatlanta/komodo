@@ -1627,7 +1627,7 @@ void static BitcoinMiner()
                             }
                             if ( tip->nHeight >= Mining_height )
                             {
-                                fprintf(stderr, "new block arrived, restart block\n");
+                                LogPrint("pow", "KomodoMiner: new block arrived, restart a new block\n");
                                 bCanMine = false;
                                 break;
                             }
