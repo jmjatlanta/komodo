@@ -1691,20 +1691,18 @@ void static BitcoinMiner()
                 {
                     if ( ASSETCHAINS_SYMBOL[0] == 0 || Mining_height > ASSETCHAINS_MINHEIGHT )
                     {
-                        fprintf(stderr,"no nodes, break\n");
+                        LogPrintf("KomodoMiner: no nodes, break\n");
                         break;
                     }
                 }
                 if ((UintToArith256(pblock->nNonce) & 0xffff) == 0xffff)
                 {
-                    //if ( 0 && ASSETCHAINS_SYMBOL[0] != 0 )
-                    fprintf(stderr,"0xffff, break\n");
+                    LogPrintf("KomodoMiner: nNonce 0xffff, break\n");
                     break;
                 }
                 if (mempool.GetTransactionsUpdated() != nTransactionsUpdatedLast && GetTime() - nStart > 60)
                 {
-                    if ( 0 && ASSETCHAINS_SYMBOL[0] != 0 )
-                        fprintf(stderr,"timeout, break\n");
+                    LogPrintf("KomodoMiner: timeout, break\n");
                     break;
                 }
                 CBlockIndex *tip = nullptr;
@@ -1714,7 +1712,7 @@ void static BitcoinMiner()
                 }
                 if ( pindexPrev != tip )
                 {
-                    LogPrintf("KomodoMiner error: pindexPrev != tip, breaking\n");
+                    LogPrintf("KomodoMiner: tip advanced, break\n");
                     break;
                 }
                 // Update nNonce and nTime
