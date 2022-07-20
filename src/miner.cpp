@@ -886,16 +886,19 @@ CBlockTemplate* CreateNewBlock(CPubKey _pk,const CScript& _scriptPubKeyIn, int32
         //fprintf(stderr,"check validity\n");
         if ( !TestBlockValidity(state, *pblock, pindexPrev, false, false)) // invokes CC checks
         {
+            std::cerr << __func__ << " TestBlockValidity failed" << std::endl;
             //throw std::runtime_error("CreateNewBlock(): TestBlockValidity failed"); // crashes the node, moved to GetBlockTemplate and issue return.
             return(0);
         }
-        //fprintf(stderr,"valid\n");
+        std::cerr << __func__ << " TestBlockValidity okay" << std::endl;
+        //fprintf(stderr,"block valid\n");
     }
         
     if (ASSETCHAINS_SYMBOL[0] != 0 && isStake)
     {
         uint32_t delay = ASSETCHAINS_ALGO != ASSETCHAINS_EQUIHASH ? ASSETCHAINS_STAKED_BLOCK_FUTURE_MAX : ASSETCHAINS_STAKED_BLOCK_FUTURE_HALF;
         if (komodo_waituntilelegible(blocktime, tipHeight, delay) == 0)  {
+            std::cerr << __func__ << " komodo_waituntilelegible returned 0" << std::endl;
             return(0);
         }
     }
