@@ -885,6 +885,7 @@ CBlockTemplate* CreateNewBlock(CPubKey _pk,const CScript& _scriptPubKeyIn, int32
         LOCK(cs_main);
         //fprintf(stderr,"check validity\n");
         bool fCheckBlockTime = !ASSETCHAINS_STAKED && (!IS_KOMODO_NOTARY || My_notaryid < 0);
+        std::cerr << __func__ << " fCheckBlockTime=" << fCheckBlockTime << " !ASSETCHAINS_STAKED=" << !ASSETCHAINS_STAKED << " !IS_KOMODO_NOTARY=" << !IS_KOMODO_NOTARY << " My_notaryid" << My_notaryid << std::endl; 
         if ( !TestBlockValidity(state, *pblock, pindexPrev, false, false, fCheckBlockTime)) // invokes CC checks
         {
             std::cerr << __func__ << " TestBlockValidity failed" << std::endl;

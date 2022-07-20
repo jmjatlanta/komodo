@@ -5048,6 +5048,7 @@ bool CheckBlockHeader(int32_t *futureblockp,int32_t height,CBlockIndex *pindex, 
         }
     }
     *futureblockp = 0;
+    std::cerr << __func__ << " fCheckBlockTime=" << fCheckBlockTime << std::endl;
     if (fCheckBlockTime) 
     {
         if ( ASSETCHAINS_ADAPTIVEPOW > 0 )
@@ -5055,6 +5056,7 @@ bool CheckBlockHeader(int32_t *futureblockp,int32_t height,CBlockIndex *pindex, 
             if (blockhdr.GetBlockTime() > GetTime() + 4)
             {
                 //LogPrintf("CheckBlockHeader block from future %d error",blockhdr.GetBlockTime() - GetAdjustedTime());
+                std::cerr << __func__ << " 1 return false" << std::endl;
                 return false;
             }
         }
@@ -5073,20 +5075,27 @@ bool CheckBlockHeader(int32_t *futureblockp,int32_t height,CBlockIndex *pindex, 
             {
                 if (blockhdr.GetBlockTime() < GetTime() + 300)
                     *futureblockp = 1;
+                std::cerr << __func__ << " 2 return false" << std::endl;
                 //LogPrintf("CheckBlockHeader block from future %d error",blockhdr.GetBlockTime() - GetAdjustedTime());
                 return false; //state.Invalid(error("CheckBlockHeader(): block timestamp too far in the future"),REJECT_INVALID, "time-too-new");
             }
         }
     }
     // Check block version
-    if (height > 0 && blockhdr.nVersion < MIN_BLOCK_VERSION)
+    if (height > 0 && blockhdr.nVersion < MIN_BLOCK_VERSION) {
+        std::cerr << __func__ << " 3 return false" << std::endl;
+
         return state.DoS(100, error("CheckBlockHeader(): block version too low"),REJECT_INVALID, "version-too-low");
+    }
 
     // Check Equihash solution is valid
     if ( fCheckPOW )
     {
-        if ( !CheckEquihashSolution(&blockhdr, Params()) )
+        if ( !CheckEquihashSolution(&blockhdr, Params()) )  {
+            std::cerr << __func__ << " 4 return false" << std::endl;
+
             return state.DoS(100, error("CheckBlockHeader(): Equihash solution invalid"),REJECT_INVALID, "invalid-solution");
+        }
     }
     // Check proof of work matches claimed amount
     /*komodo_index2pubkey33(pubkey33,pindex,height);
@@ -5110,7 +5119,7 @@ bool CheckBlock(int32_t *futureblockp,int32_t height,CBlockIndex *pindex,const C
     {
         if ( *futureblockp == 0 )
         {
-            LogPrintf("CheckBlock header error");
+            LogPrintf("CheckBlock header error (block in future)\n");
             return false;
         }
     }
