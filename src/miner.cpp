@@ -1612,11 +1612,11 @@ void static BitcoinMiner()
 
                 if (foundSol)
                 {
+                    bool bCanMine = true; 
                     std::cerr << __func__ << " found a new solution..." << std::endl;
                     // waiting code:
                     if ( IS_KOMODO_NOTARY && pblock->nTime > GetTime() )
                     {
-                        bool bRestart = false; 
                         while ( GetTime() < pblock->nTime-2 )
                         {
                             boost::this_thread::sleep_for(boost::chrono::seconds(1));
@@ -1628,11 +1628,10 @@ void static BitcoinMiner()
                             if ( tip->nHeight >= Mining_height )
                             {
                                 fprintf(stderr, "new block arrived, restart block\n");
-                                bRestart = true;
+                                bCanMine = false;
                                 break;
                             }
                         }
-                        if (bRestart) continue; // restart a new block 
                     }
                     if ( ASSETCHAINS_STAKED == 0 )
                     {
@@ -1648,31 +1647,34 @@ void static BitcoinMiner()
                         if ( KOMODO_MININGTHREADS == 0 ) // we are staking 
                         {
                             if ( komodo_waituntilelegible(pblock->nTime, Mining_height, ASSETCHAINS_STAKED_BLOCK_FUTURE_MAX) == 0 )
-                                continue;  // restart a new block
+                                bCanMine = false;
                         }
                     }
                     // end of waiting code
 
-                    // Found a solution
-                    SetThreadPriority(THREAD_PRIORITY_NORMAL);
-                    LogPrintf("KomodoMiner:\n");
-                    LogPrintf("proof-of-work found  \n  hash: %s  \ntarget: %s\n", pblock->GetHash().GetHex(), HASHTarget.GetHex());
+                    if (bCanMine)  
+                    {
+                        // Found a solution
+                        SetThreadPriority(THREAD_PRIORITY_NORMAL);
+                        LogPrintf("KomodoMiner:\n");
+                        LogPrintf("proof-of-work found  \n  hash: %s  \ntarget: %s\n", pblock->GetHash().GetHex(), HASHTarget.GetHex());
 #ifdef ENABLE_WALLET
-                    if (ProcessBlockFound(pblock, *pwallet, reservekey)) {
+                        if (ProcessBlockFound(pblock, *pwallet, reservekey)) {
 #else
-                    if (ProcessBlockFound(pblock)) {
+                        if (ProcessBlockFound(pblock)) {
 #endif
-                        // Ignore chain updates caused by us
-                        std::lock_guard<std::mutex> lock{m_cs};
-                        cancelSolver = false;
-                    }
+                            // Ignore chain updates caused by us
+                            std::lock_guard<std::mutex> lock{m_cs};
+                            cancelSolver = false;
+                        }
 
-                    SetThreadPriority(THREAD_PRIORITY_LOWEST);
-                    // In regression test mode, stop mining after a block is found.
-                    if (chainparams.MineBlocksOnDemand()) {
-                        // Increment here because throwing skips the call below
-                        ehSolverRuns.increment();
-                        throw boost::thread_interrupted();
+                        SetThreadPriority(THREAD_PRIORITY_LOWEST);
+                        // In regression test mode, stop mining after a block is found.
+                        if (chainparams.MineBlocksOnDemand()) {
+                            // Increment here because throwing skips the call below
+                            ehSolverRuns.increment();
+                            throw boost::thread_interrupted();
+                        }
                     }
                 }
 
@@ -1712,6 +1714,7 @@ void static BitcoinMiner()
                 }
                 if ( pindexPrev != tip )
                 {
+                    LogPrintf("KomodoMiner error: pindexPrev != tip, breaking\n");
                     break;
                 }
                 // Update nNonce and nTime
