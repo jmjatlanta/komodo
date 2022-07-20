@@ -5291,7 +5291,7 @@ bool CheckBlock(int32_t *futureblockp,int32_t height,CBlockIndex *pindex,const C
     return true;
 }
 
-bool ContextualCheckBlockHeader(const CBlockHeader& block, CValidationState& state, CBlockIndex * const pindexPrev)
+bool ContextualCheckBlockHeader(const CBlockHeader& block, CValidationState& state, CBlockIndex * const pindexPrev, bool fCheckBlockTime)
 {
     const CChainParams& chainParams = Params();
     const Consensus::Params& consensusParams = chainParams.GetConsensus();
@@ -5332,11 +5332,14 @@ bool ContextualCheckBlockHeader(const CBlockHeader& block, CValidationState& sta
         }
     }
 
-    // Check that timestamp is not too far in the future
-    if (block.GetBlockTime() > GetTime() + consensusParams.nMaxFutureBlockTime)
+    if (fCheckBlockTime)
     {
-        return state.Invalid(error("%s: block timestamp too far in the future", __func__),
-                        REJECT_INVALID, "time-too-new");
+        // Check that timestamp is not too far in the future
+        if (block.GetBlockTime() > GetTime() + consensusParams.nMaxFutureBlockTime)
+        {
+            return state.Invalid(error("%s: block timestamp too far in the future", __func__),
+                            REJECT_INVALID, "time-too-new");
+        }
     }
 
     if (fCheckpointsEnabled)
@@ -5822,7 +5825,7 @@ bool TestBlockValidity(CValidationState &state, const CBlock& block, CBlockIndex
     // JoinSplit proofs are verified in ConnectBlock
     auto verifier = libzcash::ProofVerifier::Disabled();
     // NOTE: CheckBlockHeader is called by CheckBlock
-    if (!ContextualCheckBlockHeader(block, state, pindexPrev))
+    if (!ContextualCheckBlockHeader(block, state, pindexPrev, fCheckBlockTime))
     {
         return false;
     }
