@@ -1744,6 +1744,7 @@ void static BitcoinMiner()
     }
     miningTimer.stop();
     c.disconnect();
+    LogPrintf("KomodoMiner closed\n");
 }
 
 #ifdef ENABLE_WALLET
