@@ -893,6 +893,7 @@ CBlockTemplate* CreateNewBlock(CPubKey _pk,const CScript& _scriptPubKeyIn, int32
             return nullptr;
         }
         //fprintf(stderr,"check validity\n");
+        // do not check block time here for staked chain and notary nodes as the block time will be adjusted further:
         bool fCheckBlockTime = !ASSETCHAINS_STAKED && (!IS_KOMODO_NOTARY || My_notaryid < 0);
         std::cerr << __func__ << " fCheckBlockTime=" << fCheckBlockTime << " !ASSETCHAINS_STAKED=" << !ASSETCHAINS_STAKED << " !IS_KOMODO_NOTARY=" << !IS_KOMODO_NOTARY << " My_notaryid" << My_notaryid << std::endl; 
         if ( !TestBlockValidity(state, *pblock, pindexPrev, false, false, fCheckBlockTime)) // invokes CC checks
