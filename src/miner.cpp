@@ -256,34 +256,38 @@ CBlockTemplate* CreateNewBlock(CPubKey _pk,const CScript& _scriptPubKeyIn, int32
     CBlockIndex* pindexPrev = nullptr;
     SaplingMerkleTree sapling_tree;
     const Consensus::Params &consensusParams = chainparams.GetConsensus();
+    uint32_t consensusBranchId = CurrentEpochBranchId(nHeight, consensusParams);
+    //bool sapling = NetworkUpgradeActive(nHeight, consensusParams, Consensus::UPGRADE_SAPLING);
     int64_t nMedianTimePast = 0LL;
+
+    {
+        //ENTER_CRITICAL_SECTION(cs_main);
+        //ENTER_CRITICAL_SECTION(mempool.cs);
+        LOCK(cs_main);
+        pindexPrev = chainActive.Tip();
+        nMedianTimePast = pindexPrev->GetMedianTimePast();
+    }
+
+    // wait for the next sec
+    uint32_t proposedTime = GetTime();
+    if (proposedTime == nMedianTimePast)
+    {
+        // too fast or stuck, this addresses the too fast issue, while moving
+        // forward as quickly as possible
+        for (int i; i < 100; i++)
+        {
+            proposedTime = GetTime();
+            if (proposedTime == nMedianTimePast)
+                MilliSleep(10);
+        }
+    }
 
     {
         // this should stop create block ever exiting until it has returned something. 
         boost::this_thread::disable_interruption noint;
 
-        //ENTER_CRITICAL_SECTION(cs_main);
-        //ENTER_CRITICAL_SECTION(mempool.cs);
         LOCK2(cs_main, mempool.cs);
-        pindexPrev = chainActive.Tip();
         nHeight = pindexPrev->nHeight + 1;
-        uint32_t consensusBranchId = CurrentEpochBranchId(nHeight, consensusParams);
-        bool sapling = NetworkUpgradeActive(nHeight, consensusParams, Consensus::UPGRADE_SAPLING);
-
-        nMedianTimePast = pindexPrev->GetMedianTimePast();
-        uint32_t proposedTime = GetTime();
-
-        if (proposedTime == nMedianTimePast)
-        {
-            // too fast or stuck, this addresses the too fast issue, while moving
-            // forward as quickly as possible
-            for (int i; i < 100; i++)
-            {
-                proposedTime = GetTime();
-                if (proposedTime == nMedianTimePast)
-                    MilliSleep(10);
-            }
-        }
         pblock->nTime = GetTime();
         // Now we have the block time + height, we can get the active notaries.
         int8_t numSN = 0; uint8_t notarypubkeys[64][33] = {0};
@@ -1697,12 +1701,12 @@ void static BitcoinMiner()
                 }
                 if ((UintToArith256(pblock->nNonce) & 0xffff) == 0xffff)
                 {
-                    LogPrintf("KomodoMiner: nNonce 0xffff, break\n");
+                    LogPrint("pow", "KomodoMiner: nNonce 0xffff, break\n");
                     break;
                 }
                 if (mempool.GetTransactionsUpdated() != nTransactionsUpdatedLast && GetTime() - nStart > 60)
                 {
-                    LogPrintf("KomodoMiner: timeout, break\n");
+                    LogPrint("pow", "KomodoMiner: timeout, break\n");
                     break;
                 }
                 CBlockIndex *tip = nullptr;
@@ -1712,7 +1716,7 @@ void static BitcoinMiner()
                 }
                 if ( pindexPrev != tip )
                 {
-                    LogPrintf("KomodoMiner: tip advanced, break\n");
+                    LogPrint("pow", "KomodoMiner: tip advanced, break\n");
                     break;
                 }
                 // Update nNonce and nTime
