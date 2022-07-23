@@ -1420,7 +1420,7 @@ void static BitcoinMiner()
                                     gpucount++;
                             }
                             if ( dispflag != 0 )
-                                LogPrintf(" <- prev minerids from ht.%d notary.%d gpucount.%d %.2f%% t.%u\n",pindexPrev->nHeight,notaryid,gpucount,100.*(double)gpucount/j,(uint32_t)time(NULL));
+                                LogPrint("pow", " <- prev minerids from ht.%d notary.%d gpucount.%d %.2f%% t.%u\n",pindexPrev->nHeight,notaryid,gpucount,100.*(double)gpucount/j,(uint32_t)time(NULL));
                         }
                         for (j=0; j<65; j++)
                             if ( mids[j] == notaryid )
@@ -1434,10 +1434,10 @@ void static BitcoinMiner()
                     if ( (Mining_height >= 235300 && Mining_height < 236000) || (j == 65 && Mining_height > KOMODO_MAYBEMINED+1 && Mining_height > KOMODO_LASTMINED+64) )
                     {
                         HASHTarget = arith_uint256().SetCompact(KOMODO_MINDIFF_NBITS);
-                        LogPrintf("pow", "I am the chosen one for %s ht.%d\n",ASSETCHAINS_SYMBOL, pindexPrev->nHeight+1);
+                        LogPrint("pow", "I am the chosen one for %s ht.%d\n",ASSETCHAINS_SYMBOL, pindexPrev->nHeight+1);
                     } 
                     else 
-                        LogPrintf("pow", "duplicate at j.%d\n", j);
+                        LogPrint("pow", "duplicate at j.%d\n", j);
 
                     /* check if hf22 rule can be applied */
                     const Consensus::Params &params = chainparams.GetConsensus();
