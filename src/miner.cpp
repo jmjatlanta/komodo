@@ -1094,6 +1094,7 @@ static bool ProcessBlockFound(CBlock* pblock)
 
     // Found a solution
     {
+        LOCK(cs_main);
         if (pblock->hashPrevBlock != chainActive.Tip()->GetBlockHash())
         {
             uint256 hash; int32_t i;
