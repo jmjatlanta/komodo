@@ -251,15 +251,8 @@ CBlockTemplate* CreateNewBlock(CPubKey _pk,const CScript& _scriptPubKeyIn, int32
 
     boost::this_thread::interruption_point(); // exit thread before entering locks. 
     
-    int32_t tipHeight = 0;
-    int nHeight = 0;
     CBlockIndex* pindexPrev = nullptr;
-    SaplingMerkleTree sapling_tree;
-    const Consensus::Params &consensusParams = chainparams.GetConsensus();
-    uint32_t consensusBranchId = CurrentEpochBranchId(nHeight, consensusParams);
-    //bool sapling = NetworkUpgradeActive(nHeight, consensusParams, Consensus::UPGRADE_SAPLING);
     int64_t nMedianTimePast = 0LL;
-
     {
         //ENTER_CRITICAL_SECTION(cs_main);
         //ENTER_CRITICAL_SECTION(mempool.cs);
@@ -282,12 +275,17 @@ CBlockTemplate* CreateNewBlock(CPubKey _pk,const CScript& _scriptPubKeyIn, int32
         }
     }
 
+    SaplingMerkleTree sapling_tree;
+    const Consensus::Params &consensusParams = chainparams.GetConsensus();
+    int nHeight = pindexPrev->nHeight + 1;
+    uint32_t consensusBranchId = CurrentEpochBranchId(nHeight, consensusParams);
+    //bool sapling = NetworkUpgradeActive(nHeight, consensusParams, Consensus::UPGRADE_SAPLING);  //seems not used
+    int32_t tipHeight = 0;
     {
         // this should stop create block ever exiting until it has returned something. 
         boost::this_thread::disable_interruption noint;
 
         LOCK2(cs_main, mempool.cs);
-        nHeight = pindexPrev->nHeight + 1;
         pblock->nTime = GetTime();
         // Now we have the block time + height, we can get the active notaries.
         int8_t numSN = 0; uint8_t notarypubkeys[64][33] = {0};
