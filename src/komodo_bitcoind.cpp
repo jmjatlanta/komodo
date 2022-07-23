@@ -884,7 +884,7 @@ int32_t komodo_eligiblenotary(uint8_t pubkeys[66][33],int32_t *mids,uint32_t blo
                 }
             } 
             else 
-                LogPrint("%s couldnt load block.%d\n", __func__, height);
+                LogPrintf("%s couldnt load block.%d\n", __func__, height);
             if ( mids[0] >= 0 && i > 0 && mids[i] == mids[0] )
                 duplicate++;
         }

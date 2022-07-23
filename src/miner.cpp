@@ -1263,7 +1263,7 @@ void static BitcoinMiner()
     assert(solver == "tromp" || solver == "default");
     LogPrint("pow", "Using Equihash solver \"%s\" with n = %u, k = %u\n", solver, n, k);
     if ( ASSETCHAINS_SYMBOL[0] == 0 )
-        fprintf(stderr,"notaryid.%d Mining.%s with %s\n",notaryid,ASSETCHAINS_SYMBOL,solver.c_str());
+        LogPrint("pow", "notaryid.%d Mining.%s with %s\n",notaryid, ASSETCHAINS_SYMBOL, solver.c_str());
     std::mutex m_cs;
     bool cancelSolver = false;
     boost::signals2::connection c = uiInterface.NotifyBlockTip.connect(
@@ -1276,7 +1276,7 @@ void static BitcoinMiner()
 
     try {
         if ( ASSETCHAINS_SYMBOL[0] != 0 )
-            fprintf(stderr,"try %s Mining with %s\n",ASSETCHAINS_SYMBOL,solver.c_str());
+            LogPrint("pow", "try %s Mining with %s\n", ASSETCHAINS_SYMBOL, solver.c_str());
         while (true)
         {
             if (chainparams.MiningRequiresPeers()) 
@@ -1409,12 +1409,12 @@ void static BitcoinMiner()
                                     if ( mids[j] >= 0 )
                                     {
                                         if ( mids[j] == notaryid )
-                                            LogPrintf("pow", "--<%d>-- ", mids[j]);
+                                            LogPrint("pow", "--<%d>-- ", mids[j]);
                                         else
-                                            LogPrintf("pow", "%d ", mids[j]);
+                                            LogPrint("pow", "%d ", mids[j]);
                                     } 
                                     else 
-                                        LogPrintf("pow", "GPU ");
+                                        LogPrint("pow", "GPU ");
                                 }
                                 if ( mids[j] == -1 )
                                     gpucount++;
@@ -1429,7 +1429,7 @@ void static BitcoinMiner()
                             KOMODO_LASTMINED = 0;
                     } 
                     else 
-                        LogPrintf("pow", "ht.%i all NN are elegible\n",Mining_height); //else fprintf(stderr,"no nonz pubkeys\n"); 
+                        LogPrint("pow", "ht.%i all NN are elegible\n",Mining_height); //else fprintf(stderr,"no nonz pubkeys\n"); 
                     
                     if ( (Mining_height >= 235300 && Mining_height < 236000) || (j == 65 && Mining_height > KOMODO_MAYBEMINED+1 && Mining_height > KOMODO_LASTMINED+64) )
                     {
