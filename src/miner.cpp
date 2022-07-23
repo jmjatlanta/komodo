@@ -1320,18 +1320,18 @@ void static BitcoinMiner()
 #else
             CBlockTemplate *ptr = CreateNewBlockWithKey();
 #endif
-            if ( ptr == 0 )
+            if (ptr == nullptr)
             {
-                if ( 0 && !GetBoolArg("-gen",false))
+                /*if ( 0 && !GetBoolArg("-gen",false))
                 {
                     miningTimer.stop();
                     c.disconnect();
                     LogPrintf("KomodoMiner terminated\n");
                     return;
-                }
+                }*/
                 static uint32_t counter;
                 if ( counter++ < 10 && ASSETCHAINS_STAKED == 0 )
-                    fprintf(stderr,"created illegal blockB, retry\n");
+                    LogPrintf("created illegal blockB, retry\n");
                 boost::this_thread::sleep_for(boost::chrono::seconds(1));
                 continue;
             }
@@ -1356,10 +1356,12 @@ void static BitcoinMiner()
                     {
                         static uint32_t counter;
                         if ( counter++ < 10 )
-                            fprintf(stderr,"skip generating %s on-demand block, no tx avail\n",ASSETCHAINS_SYMBOL);
+                            LogPrint("pow", "skip generating %s on-demand block, no tx avail\n", ASSETCHAINS_SYMBOL);
                         boost::this_thread::sleep_for(boost::chrono::seconds(10));
                         continue;
-                    } else fprintf(stderr,"%s vouts.%d mining.%d vs %d\n",ASSETCHAINS_SYMBOL,(int32_t)pblock->vtx[0].vout.size(),Mining_height,ASSETCHAINS_MINHEIGHT);
+                    } 
+                    else
+                        LogPrint("pow", "%s vout-num.%d mining-ht.%d vs min-ht.%d\n", ASSETCHAINS_SYMBOL, (int32_t)pblock->vtx[0].vout.size(), Mining_height, ASSETCHAINS_MINHEIGHT);
                 }
             }
             // We cant increment nonce for proof transactions, as it modifes the coinbase, meaning CreateBlock must be called again to get a new valid proof to pass validation. 
@@ -1391,14 +1393,15 @@ void static BitcoinMiner()
                                 break;
                         if ( i == 33 )
                             externalflag = 1;
-                        else externalflag = 0;
+                        else 
+                            externalflag = 0;
                         if ( IS_KOMODO_NOTARY )
                         {
                             for (i=1; i<66; i++)
                                 if ( memcmp(pubkeys[i],pubkeys[0],33) == 0 )
                                     break;
                             if ( externalflag == 0 && i != 66 && mids[i] >= 0 )
-                                printf("VIOLATION at %d, notaryid.%d\n",i,mids[i]);
+                                LogPrintf("VIOLATION at i=%d, notaryid.%d\n", i, mids[i]);
                             for (j=gpucount=0; j<65; j++)
                             {
                                 if ( dispflag != 0 )
@@ -1406,29 +1409,35 @@ void static BitcoinMiner()
                                     if ( mids[j] >= 0 )
                                     {
                                         if ( mids[j] == notaryid )
-                                            fprintf(stderr,"--<%d>-- ",mids[j]);
+                                            LogPrintf("pow", "--<%d>-- ", mids[j]);
                                         else
-                                            fprintf(stderr,"%d ",mids[j]);
-                                    } else fprintf(stderr,"GPU ");
+                                            LogPrintf("pow", "%d ", mids[j]);
+                                    } 
+                                    else 
+                                        LogPrintf("pow", "GPU ");
                                 }
                                 if ( mids[j] == -1 )
                                     gpucount++;
                             }
                             if ( dispflag != 0 )
-                                fprintf(stderr," <- prev minerids from ht.%d notary.%d gpucount.%d %.2f%% t.%u\n",pindexPrev->nHeight,notaryid,gpucount,100.*(double)gpucount/j,(uint32_t)time(NULL));
+                                LogPrintf(" <- prev minerids from ht.%d notary.%d gpucount.%d %.2f%% t.%u\n",pindexPrev->nHeight,notaryid,gpucount,100.*(double)gpucount/j,(uint32_t)time(NULL));
                         }
                         for (j=0; j<65; j++)
                             if ( mids[j] == notaryid )
                                 break;
                         if ( j == 65 )
                             KOMODO_LASTMINED = 0;
-                    } else fprintf(stderr,"ht.%i all NN are elegible\n",Mining_height); //else fprintf(stderr,"no nonz pubkeys\n"); 
+                    } 
+                    else 
+                        LogPrintf("pow", "ht.%i all NN are elegible\n",Mining_height); //else fprintf(stderr,"no nonz pubkeys\n"); 
                     
                     if ( (Mining_height >= 235300 && Mining_height < 236000) || (j == 65 && Mining_height > KOMODO_MAYBEMINED+1 && Mining_height > KOMODO_LASTMINED+64) )
                     {
                         HASHTarget = arith_uint256().SetCompact(KOMODO_MINDIFF_NBITS);
-                        fprintf(stderr,"I am the chosen one for %s ht.%d\n",ASSETCHAINS_SYMBOL,pindexPrev->nHeight+1);
-                    } else fprintf(stderr,"duplicate at j.%d\n",j);
+                        LogPrintf("pow", "I am the chosen one for %s ht.%d\n",ASSETCHAINS_SYMBOL, pindexPrev->nHeight+1);
+                    } 
+                    else 
+                        LogPrintf("pow", "duplicate at j.%d\n", j);
 
                     /* check if hf22 rule can be applied */
                     const Consensus::Params &params = chainparams.GetConsensus();
