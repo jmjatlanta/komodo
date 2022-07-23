@@ -791,7 +791,7 @@ int32_t komodo_block2pubkey33(uint8_t *pubkey33,CBlock *block)
             if (pubKey.IsValid())
             {
                 memcpy(pubkey33,vch[0].data(),33);
-                return true;
+                return 1;
             }
             else memset(pubkey33,0,33);
         }
@@ -819,6 +819,7 @@ int32_t komodo_blockload(CBlock& block,CBlockIndex *pindex)
 
 uint32_t komodo_chainactive_timestamp()
 {
+    LOCK(cs_main);
     if ( chainActive.Tip() != 0 )
         return((uint32_t)chainActive.Tip()->GetBlockTime());
     else return(0);
@@ -826,6 +827,7 @@ uint32_t komodo_chainactive_timestamp()
 
 CBlockIndex *komodo_chainactive(int32_t height)
 {
+    LOCK(cs_main);
     if ( chainActive.Tip() != 0 )
     {
         if ( height <= chainActive.Tip()->nHeight )
@@ -838,6 +840,7 @@ CBlockIndex *komodo_chainactive(int32_t height)
 
 uint32_t komodo_heightstamp(int32_t height)
 {
+    LOCK(cs_main);
     CBlockIndex *ptr;
     if ( height > 0 && (ptr= komodo_chainactive(height)) != 0 )
         return(ptr->nTime);
@@ -879,7 +882,9 @@ int32_t komodo_eligiblenotary(uint8_t pubkeys[66][33],int32_t *mids,uint32_t blo
                         break;
                     }
                 }
-            } else fprintf(stderr,"couldnt load block.%d\n",height);
+            } 
+            else 
+                LogPrint("%s couldnt load block.%d\n", __func__, height);
             if ( mids[0] >= 0 && i > 0 && mids[i] == mids[0] )
                 duplicate++;
         }
