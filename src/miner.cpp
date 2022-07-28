@@ -433,7 +433,7 @@ CBlockTemplate* CreateNewBlock(CPubKey _pk,const CScript& _scriptPubKeyIn, int32
                     std::set<int> checkdupes( TMP_NotarisationNotaries.begin(), TMP_NotarisationNotaries.end() );
                     if ( checkdupes.size() != TMP_NotarisationNotaries.size() ) 
                     {
-                        fprintf(stderr, "possible notarisation is signed multiple times by same notary, passed as normal transaction.\n");
+                        LogPrint("dpow", "possible notarisation is signed multiple times by same notary, passed as normal transaction.\n");
                     } else fNotarisation = true;
                 }
                 nTotalIn += tx.GetShieldedValueIn();
@@ -463,7 +463,7 @@ CBlockTemplate* CreateNewBlock(CPubKey _pk,const CScript& _scriptPubKeyIn, int32
                         Notarisations++;
                         if ( Notarisations > 1 ) 
                         {
-                            fprintf(stderr, "skipping notarization.%d\n",Notarisations);
+                            LogPrint("dpow", "skipping notarization.%d\n", Notarisations);
                             // Any attempted notarization needs to be in its own block!
                             continue;
                         }
@@ -801,13 +801,13 @@ CBlockTemplate* CreateNewBlock(CPubKey _pk,const CScript& _scriptPubKeyIn, int32
             uint64_t totalsats = komodo_notarypay(txNew, NotarisationNotaries, pblock->nTime, nHeight, script, scriptlen);
             if ( totalsats == 0 )
             {
-                fprintf(stderr, "Could not create notary payment, trying again.\n");
+                LogPrint("dpow", "Could not create notary payment, trying again.\n");
                 return(0);
             }
             //fprintf(stderr, "Created notary payment coinbase totalsat.%lu\n",totalsats);    
         } 
         else 
-            fprintf(stderr, "vout 2 of notarisation is not OP_RETURN scriptlen.%i\n", scriptlen);
+            LogPrint("dpow", "vout 2 of notarisation is not OP_RETURN scriptlen.%i\n", scriptlen);
     }
     if ( ASSETCHAINS_CBOPRET != 0 )
     {
@@ -873,11 +873,11 @@ CBlockTemplate* CreateNewBlock(CPubKey _pk,const CScript& _scriptPubKeyIn, int32
             pblocktemplate->vTxSigOps.push_back(GetLegacySigOpCount(txNotary));
             nFees += txfees;
             pblocktemplate->vTxFees[0] = -nFees;
-            fprintf(stderr,"added notaryvin includes proof.%d\n", opret.size() > 0);
+            LogPrint("dpow", "added notaryvin includes proof size.%d\n", opret.size() > 0);
         }
         else
         {
-            fprintf(stderr,"error adding notaryvin, need to create 0.0001 utxos\n");
+            LogPrint("dpow", "error adding notaryvin, need to create 0.0001 utxos\n");
             return(0);
         }
     }
@@ -1087,12 +1087,12 @@ static bool ProcessBlockFound(CBlock* pblock, CWallet& wallet, CReserveKey& rese
 static bool ProcessBlockFound(CBlock* pblock)
 #endif // ENABLE_WALLET
 {
-    LogPrintf("%s\n", pblock->ToString());
-    LogPrintf("generated %s height.%d\n", FormatMoney(pblock->vtx[0].vout[0].nValue),chainActive.Tip()->nHeight+1);
-
     // Found a solution
     {
         LOCK(cs_main);
+        LogPrintf("%s\n", pblock->ToString());
+        LogPrintf("generated %s height.%d\n", FormatMoney(pblock->vtx[0].vout[0].nValue),chainActive.Tip()->nHeight+1);
+
         if (pblock->hashPrevBlock != chainActive.Tip()->GetBlockHash())
         {
             uint256 hash; int32_t i;
@@ -1262,7 +1262,7 @@ void static BitcoinMiner()
     assert(solver == "tromp" || solver == "default");
     LogPrint("pow", "Using Equihash solver \"%s\" with n = %u, k = %u\n", solver, n, k);
     if ( ASSETCHAINS_SYMBOL[0] == 0 )
-        LogPrint("pow", "notaryid.%d Mining.%s with %s\n",notaryid, ASSETCHAINS_SYMBOL, solver.c_str());
+        LogPrint("dpow", "notaryid.%d Mining.%s with %s\n",notaryid, ASSETCHAINS_SYMBOL, solver.c_str());
     std::mutex m_cs;
     bool cancelSolver = false;
     boost::signals2::connection c = uiInterface.NotifyBlockTip.connect(
@@ -1400,7 +1400,7 @@ void static BitcoinMiner()
                                 if ( memcmp(pubkeys[i],pubkeys[0],33) == 0 )
                                     break;
                             if ( externalflag == 0 && i != 66 && mids[i] >= 0 )
-                                LogPrintf("VIOLATION at i=%d, notaryid.%d\n", i, mids[i]);
+                                LogPrintf("dpow VIOLATION at i=%d, notaryid.%d\n", i, mids[i]);
                             for (j=gpucount=0; j<65; j++)
                             {
                                 if ( dispflag != 0 )
@@ -1408,18 +1408,18 @@ void static BitcoinMiner()
                                     if ( mids[j] >= 0 )
                                     {
                                         if ( mids[j] == notaryid )
-                                            LogPrint("pow", "--<%d>-- ", mids[j]);
+                                            LogPrint("dpow", "--<%d>-- ", mids[j]);
                                         else
-                                            LogPrint("pow", "%d ", mids[j]);
+                                            LogPrint("dpow", "%d ", mids[j]);
                                     } 
                                     else 
-                                        LogPrint("pow", "GPU ");
+                                        LogPrint("dpow", "GPU ");
                                 }
                                 if ( mids[j] == -1 )
                                     gpucount++;
                             }
                             if ( dispflag != 0 )
-                                LogPrint("pow", " <- prev minerids from ht.%d notary.%d gpucount.%d %.2f%% t.%u\n",pindexPrev->nHeight,notaryid,gpucount,100.*(double)gpucount/j,(uint32_t)time(NULL));
+                                LogPrint("dpow", " <- prev minerids from ht.%d notary.%d gpucount.%d %.2f%% t.%u\n",pindexPrev->nHeight,notaryid,gpucount,100.*(double)gpucount/j,(uint32_t)time(NULL));
                         }
                         for (j=0; j<65; j++)
                             if ( mids[j] == notaryid )
@@ -1428,15 +1428,15 @@ void static BitcoinMiner()
                             KOMODO_LASTMINED = 0;
                     } 
                     else 
-                        LogPrint("pow", "ht.%i all NN are elegible\n",Mining_height); //else fprintf(stderr,"no nonz pubkeys\n"); 
+                        LogPrint("dpow", "ht.%i all NN are elegible\n",Mining_height); //else fprintf(stderr,"no nonz pubkeys\n"); 
                     
                     if ( (Mining_height >= 235300 && Mining_height < 236000) || (j == 65 && Mining_height > KOMODO_MAYBEMINED+1 && Mining_height > KOMODO_LASTMINED+64) )
                     {
                         HASHTarget = arith_uint256().SetCompact(KOMODO_MINDIFF_NBITS);
-                        LogPrint("pow", "I am the chosen one for %s ht.%d\n",ASSETCHAINS_SYMBOL, pindexPrev->nHeight+1);
+                        LogPrint("dpow", "I am the chosen one for %s ht.%d\n",ASSETCHAINS_SYMBOL, pindexPrev->nHeight+1);
                     } 
                     else 
-                        LogPrint("pow", "duplicate at j.%d\n", j);
+                        LogPrint("dpow", "duplicate at j.%d\n", j);
 
                     /* check if hf22 rule can be applied */
                     const Consensus::Params &params = chainparams.GetConsensus();
