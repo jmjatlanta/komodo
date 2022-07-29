@@ -1516,12 +1516,12 @@ bool VerifyScript(
         return false;
     if (stack.empty())
     {
-        //printf("interpreter stack is empty, comment this debugging message\nscriptSig: %s\nscriptPubKey: %s\n",scriptSig.ToString().c_str(),scriptPubKey.ToString().c_str());
+        LogPrintf("interpreter stack is empty, comment this debugging message\nscriptSig: %s\nscriptPubKey: %s\n",scriptSig.ToString().c_str(),scriptPubKey.ToString().c_str());
         return set_error(serror, SCRIPT_ERR_EVAL_FALSE);
     }
     if (CastToBool(stack.back()) == false)
     {
-        //printf("false return value, comment this debugging message\nscriptSig: %s\nscriptPubKey: %s\n",scriptSig.ToString().c_str(),scriptPubKey.ToString().c_str());
+        LogPrintf("false return value, comment this debugging message\nscriptSig: %s\nscriptPubKey: %s\n",scriptSig.ToString().c_str(),scriptPubKey.ToString().c_str());
         return set_error(serror, SCRIPT_ERR_EVAL_FALSE);
     }
 
@@ -1549,12 +1549,12 @@ bool VerifyScript(
             return false;
         if (stack.empty())
         {
-            //printf("interpreter stack is empty #2, comment this debugging message\nscriptSig: %s\nscriptPubKey: %s\n",scriptSig.ToString().c_str(),scriptPubKey.ToString().c_str());
+            LogPrintf("interpreter stack is empty #2, comment this debugging message\nscriptSig: %s\nscriptPubKey: %s\n",scriptSig.ToString().c_str(),scriptPubKey.ToString().c_str());
             return set_error(serror, SCRIPT_ERR_EVAL_FALSE);
         }
         if (!CastToBool(stack.back()))
         {
-            //printf("false return value #2, comment this debugging message\nscriptSig: %s\nscriptPubKey: %s\n",scriptSig.ToString().c_str(),scriptPubKey.ToString().c_str());
+            LogPrintf("false return value #2, comment this debugging message\nscriptSig: %s\nscriptPubKey: %s\n",scriptSig.ToString().c_str(),scriptPubKey.ToString().c_str());
             return set_error(serror, SCRIPT_ERR_EVAL_FALSE);
         }
     }
