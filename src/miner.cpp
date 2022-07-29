@@ -1689,6 +1689,10 @@ void static BitcoinMiner()
                             throw boost::thread_interrupted();
                         }
                     }
+                    else
+                    {
+                        break; //restart with a new block
+                    }
                 }
 
                 // Check for stop or if block needs to be rebuilt
