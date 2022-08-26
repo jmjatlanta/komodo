@@ -71,6 +71,7 @@ std::ostream& operator<<(std::ostream& os, serializable<uint64_t> in)
  */
 std::ostream& operator<<(std::ostream& os, const event& in)
 {
+    static uint256 zero;
     switch (in.type)
     {
         case(EVENT_PUBKEYS):
@@ -79,10 +80,10 @@ std::ostream& operator<<(std::ostream& os, const event& in)
         case(EVENT_NOTARIZED):
         {
             const event_notarized& tmp = static_cast<const event_notarized&>(in);
-            if (tmp.MoMdepth == 0)
-                os << "N";
-            else
+            if (tmp.MoMdepth != 0 && tmp.MoM != zero)
                 os << "M";
+            else
+                os << "N";
             break;
         }
         case(EVENT_U):
@@ -195,12 +196,13 @@ event_notarized::event_notarized(FILE* fp, int32_t height, const char* _dest, bo
 
 std::ostream& operator<<(std::ostream& os, const event_notarized& in)
 {
+    static uint256 zero;
     const event& e = static_cast<const event&>(in);
     os << e;
     os << serializable<int32_t>(in.notarizedheight);
     os << serializable<uint256>(in.blockhash);
     os << serializable<uint256>(in.desttxid);
-    if (in.MoMdepth > 0)
+    if (in.MoMdepth != 0 && in.MoM != zero)
     {
         os << serializable<uint256>(in.MoM);
         os << serializable<int32_t>(in.MoMdepth);
