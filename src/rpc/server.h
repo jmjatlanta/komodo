@@ -257,6 +257,9 @@ extern UniValue tokenask(const UniValue& params, bool fHelp, const CPubKey& mypk
 extern UniValue tokencancelask(const UniValue& params, bool fHelp, const CPubKey& mypk);
 extern UniValue tokenfillask(const UniValue& params, bool fHelp, const CPubKey& mypk);
 extern UniValue tokenconvert(const UniValue& params, bool fHelp, const CPubKey& mypk);
+extern UniValue htlcaddress(const UniValue& params, bool fhelp, const CPubKey& mypk);
+extern UniValue htlclist(const UniValue& params, bool fhelp, const CPubKey& mpk);
+extern UniValue htlcinfo(const UniValue& params, bool fhelp, const CPubKey& mpk);
 extern UniValue heiraddress(const UniValue& params, bool fHelp, const CPubKey& mypk);
 extern UniValue heirfund(const UniValue& params, bool fHelp, const CPubKey& mypk);
 extern UniValue heiradd(const UniValue& params, bool fHelp, const CPubKey& mypk);

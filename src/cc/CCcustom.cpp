@@ -31,13 +31,20 @@
 #include "CCGateways.h"
 #include "CCtokens.h"
 #include "CCImportGateway.h"
+#include "CChtlc.h"
+#include "CCIncludesMinerFee.h"
 
 /*
  CCcustom has most of the functions that need to be extended to create a new CC contract.
  
- A CC scriptPubKey can only be spent if it is properly signed and validated. By constraining the vins and vouts, it is possible to implement a variety of functionality. CC vouts have an otherwise non-standard form, but it is properly supported by the enhanced bitcoin protocol code as a "cryptoconditions" output and the same pubkey will create a different address.
+ A CC scriptPubKey can only be spent if it is properly signed and validated. By constraining the vins and vouts, 
+ it is possible to implement a variety of functionality. CC vouts have an otherwise non-standard form, 
+ but it is properly supported by the enhanced bitcoin protocol code as a "cryptoconditions" output and the same 
+ pubkey will create a different address.
  
- This allows creation of a special address(es) for each contract type, which has the privkey public. That allows anybody to properly sign and spend it, but with the constraints on what is allowed in the validation code, the contract functionality can be implemented.
+ This allows creation of a special address(es) for each contract type, which has the privkey public. That allows 
+ anybody to properly sign and spend it, but with the constraints on what is allowed in the validation code, the 
+ contract functionality can be implemented.
  
  what needs to be done to add a new contract:
  1. add EVAL_CODE to eval.h
@@ -47,14 +54,20 @@
  5. add rpc calls to rpcserver.cpp and rpcserver.h and in one of the rpc.cpp files
  6. add the new .cpp files to src/Makefile.am
  
- IMPORTANT: make sure that all CC inputs and CC outputs are properly accounted for and reconcile to the satoshi. The built in utxo management will enforce overall vin/vout constraints but it wont know anything about the CC constraints. That is what your Validate function needs to do.
+ IMPORTANT: make sure that all CC inputs and CC outputs are properly accounted for and reconcile to the satoshi. 
+ The built in utxo management will enforce overall vin/vout constraints but it wont know anything about the CC 
+ constraints. That is what your Validate function needs to do.
  
- Generally speaking, there will be normal coins that change into CC outputs, CC outputs that go back to being normal coins, CC outputs that are spent to new CC outputs.
+ Generally speaking, there will be normal coins that change into CC outputs, CC outputs that go back to being 
+ normal coins, CC outputs that are spent to new CC outputs.
  
- Make sure both the CC coins and normal coins are preserved and follow the rules that make sense. It is a good idea to define specific roles for specific vins and vouts to reduce the complexity of validation.
+ Make sure both the CC coins and normal coins are preserved and follow the rules that make sense. It is a good idea 
+ to define specific roles for specific vins and vouts to reduce the complexity of validation.
  */
 
-// to create a new CCaddr, add to rpcwallet the CCaddress and start with -pubkey= with the pubkey of the new address, with its wif already imported. set normaladdr and CChexstr. run CCaddress and it will print the privkey along with autocorrect the CCaddress. which should then update the CCaddr here
+// to create a new CCaddr, add to rpcwallet the CCaddress and start with -pubkey= with the pubkey of the new address, 
+// with its wif already imported. set normaladdr and CChexstr. run CCaddress and it will print the privkey along with 
+// autocorrect the CCaddress. which should then update the CCaddr here
 
 // Assets, aka Tokens
 #define FUNCNAME IsAssetsInput
@@ -406,7 +419,12 @@ struct CCcontract_info *CCinit(struct CCcontract_info *cp, uint8_t evalcode)
             cp->validate = GatewaysValidate;
             cp->ismyvin = IsGatewaysInput;
             break;
-
+        case EVAL_HTLC:
+            HTLC::SetValues(cp);
+            break;
+        case EVAL_INCLMINERFEE:
+            IncludesMinerFee::SetValues(cp);
+            break;
 		case EVAL_TOKENS:
 			strcpy(cp->unspendableCCaddr, TokensCCaddr);
 			strcpy(cp->normaladdr, TokensNormaladdr);

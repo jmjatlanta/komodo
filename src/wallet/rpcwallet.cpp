@@ -62,6 +62,7 @@
 #include "komodo_defs.h"
 #include "hex.h"
 #include <string.h>
+#include "cc/CChtlc.h"
 
 using namespace std;
 
@@ -6201,6 +6202,41 @@ UniValue tokenaddress(const UniValue& params, bool fHelp, const CPubKey& mypk)
     return(CCaddress(cp,(char *)"Tokens", pubkey));
 }
 
+UniValue htlcaddress(const UniValue& params, bool fHelp, const CPubKey& mypk)
+{
+    struct CCcontract_info *cp,C; std::vector<unsigned char> pubkey;
+    cp = CCinit(&C,EVAL_HTLC);
+    if ( fHelp || params.size() > 1 )
+        throw runtime_error("htlcaddress [pubkey]\n");
+    if ( ensure_CCrequirements(cp->evalcode) < 0 )
+        throw runtime_error(CC_REQUIREMENTS_MSG);
+    if ( params.size() == 1 )
+        pubkey = ParseHex(params[0].get_str().c_str());
+    return(CCaddress(cp,(char *)"Tokens", pubkey));
+}
+
+UniValue htlclist(const UniValue& params, bool fHelp, const CPubKey& mypk)
+{
+    if ( fHelp || params.size() > 0 )
+        throw runtime_error("htlclist\n");
+    HTLC htlc;
+    if ( ensure_CCrequirements(htlc.evalcode) < 0 )
+        throw runtime_error(CC_REQUIREMENTS_MSG);
+    return(htlc.list());
+}
+
+UniValue htlcinfo(const UniValue& params, bool fHelp, const CPubKey& mypk)
+{
+    uint256 tokenid;
+    if ( fHelp || params.size() != 1 )
+        throw runtime_error("htlcinfo tokenid\n");
+    HTLC htlc;
+    if ( ensure_CCrequirements(htlc.evalcode) < 0 )
+        throw runtime_error(CC_REQUIREMENTS_MSG);
+    tokenid = Parseuint256((char *)params[0].get_str().c_str());
+    return(htlc.info(tokenid));
+}
+
 UniValue importgatewayaddress(const UniValue& params, bool fHelp, const CPubKey& mypk)
 {
     struct CCcontract_info *cp,C; std::vector<unsigned char> pubkey;
@@ -7000,10 +7036,12 @@ UniValue faucetinfo(const UniValue& params, bool fHelp, const CPubKey& mypk)
 
 UniValue faucetfund(const UniValue& params, bool fHelp, const CPubKey& mypk)
 {
-    UniValue result(UniValue::VOBJ); int64_t funds; std::string hex;
+    UniValue result(UniValue::VOBJ); 
+
     if ( fHelp || params.size() != 1 )
         throw runtime_error("faucetfund amount\n");
-    funds = atof(params[0].get_str().c_str()) * COIN + 0.00000000499999;
+
+    int64_t funds = atof(params[0].get_str().c_str()) * COIN + 0.00000000499999;
     if ( (0) && KOMODO_NSPV_SUPERLITE )
     {
         char coinaddr[64]; struct CCcontract_info *cp,C; CTxOut v;
@@ -7015,15 +7053,12 @@ UniValue faucetfund(const UniValue& params, bool fHelp, const CPubKey& mypk)
     if ( ensure_CCrequirements(EVAL_FAUCET) < 0 )
         throw runtime_error(CC_REQUIREMENTS_MSG);
 
-    //const CKeyStore& keystore = *pwalletMain;
-    //LOCK2(cs_main, pwalletMain->cs_wallet);
-
-    bool lockWallet = false;
-    if (!mypk.IsValid())   // if mypk is not set then it is a local call, use local wallet in AddNormalInputs
-        lockWallet = true;
-
     if (funds > 0) 
     {
+        bool lockWallet = false;
+        if (!mypk.IsValid())   // if mypk is not set then it is a local call, use local wallet in AddNormalInputs
+            lockWallet = true;
+
         if (lockWallet)
         {
             ENTER_CRITICAL_SECTION(cs_main);
@@ -7039,9 +7074,13 @@ UniValue faucetfund(const UniValue& params, bool fHelp, const CPubKey& mypk)
         if ( result[JSON_HEXTX].getValStr().size() > 0 )
         {
             result.push_back(Pair("result", "success"));
-            //result.push_back(Pair("hex", hex));
-        } else ERR_RESULT("couldnt create faucet funding transaction");
-    } else ERR_RESULT( "funding amount must be positive");
+        } 
+        else 
+            ERR_RESULT("couldnt create faucet funding transaction");
+    } 
+    else 
+        ERR_RESULT( "funding amount must be positive");
+
     return(result);
 }
 

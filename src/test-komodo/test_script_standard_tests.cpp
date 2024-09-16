@@ -6,10 +6,14 @@
 #include "script/script_error.h"
 #include "script/standard.h"
 #include "utilstrencodings.h"
+#include "cc/CChtlc.h"
+#include "testutils.h"
 
-namespace TestScriptStandartTests {
+extern CKey notaryKey;
 
-    class TestScriptStandartTests : public ::testing::Test {};
+namespace TestScriptStandardTests {
+
+    class TestScriptStandardTests : public ::testing::Test {};
 
     inline std::string txnouttypeToString(txnouttype t)
     {
@@ -45,7 +49,7 @@ namespace TestScriptStandartTests {
         return res;
     }
 
-    TEST(TestScriptStandartTests, script_standard_Solver_success) {
+    TEST(TestScriptStandardTests, script_standard_Solver_success) {
 
         CKey keys[3];
         CPubKey pubkeys[3];
@@ -132,7 +136,7 @@ namespace TestScriptStandartTests {
 
     }
 
-    TEST(TestScriptStandartTests, script_standard_Solver_failure) {
+    TEST(TestScriptStandardTests, script_standard_Solver_failure) {
         CKey key;
         CPubKey pubkey;
         key.MakeNewKey(true);
@@ -185,7 +189,7 @@ namespace TestScriptStandartTests {
         /* witness tests are absent, bcz Komodo doesn't support witness */
     }
 
-    TEST(TestScriptStandartTests, script_standard_ExtractDestination) {
+    TEST(TestScriptStandardTests, script_standard_ExtractDestination) {
 
         CKey key;
         CPubKey pubkey;
@@ -228,7 +232,7 @@ namespace TestScriptStandartTests {
         ASSERT_TRUE(!ExtractDestination(s, address));
     }
 
-    TEST(TestScriptStandartTests, script_standard_ExtractDestinations) {
+    TEST(TestScriptStandardTests, script_standard_ExtractDestinations) {
 
         CKey keys[3];
         CPubKey pubkeys[3];
@@ -295,7 +299,7 @@ namespace TestScriptStandartTests {
 
     }
 
-    TEST(TestScriptStandartTests, script_standard_GetScriptFor_) {
+    TEST(TestScriptStandardTests, script_standard_GetScriptFor_) {
 
         CKey keys[3];
         CPubKey pubkeys[3];
@@ -341,7 +345,7 @@ namespace TestScriptStandartTests {
         ASSERT_TRUE(result == expected);
     }
 
-    TEST(TestScriptStandartTests, script_standard_IsMine) {
+    TEST(TestScriptStandardTests, script_standard_IsMine) {
 
         CKey keys[2];
         CPubKey pubkeys[2];
@@ -530,7 +534,7 @@ namespace TestScriptStandartTests {
 
     }
 
-    TEST(TestScriptStandartTests, script_standard_Malpill) {
+    TEST(TestScriptStandardTests, script_standard_Malpill) {
 
         static const std::string log_tab = "             ";
 
@@ -623,4 +627,256 @@ namespace TestScriptStandartTests {
         }
     }
 
-}
+    TEST(TestScriptStandardTests, p2sh_simple)
+    {
+        // test P2SH by adding 2 numbers that total 99
+        CScript redeemScript;
+        redeemScript << OP_ADD << 99 << OP_EQUAL;
+
+        // standard P2SH (see BIP16)
+        CScript scriptPubKey;
+        scriptPubKey << OP_HASH160 << ToByteVector(CScriptID(redeemScript)) << OP_EQUAL;
+
+        CScript scriptSig;
+        scriptSig << 1 << 98; // add 1 byte (decimal 98) to stack
+        scriptSig.push_back(redeemScript.size()); // add next n bytes to stack;
+        scriptSig += redeemScript;
+
+        ScriptError err;
+        EXPECT_TRUE(VerifyScript(scriptSig, scriptPubKey, SCRIPT_VERIFY_P2SH, BaseSignatureChecker(), 1, &err));
+        EXPECT_EQ(err, SCRIPT_ERR_OK);
+    }
+
+    TEST(TestScriptStandardTests, IncludesMinerFee)
+    {
+        // turn on CryptoConditions
+        ASSETCHAINS_CC = 1;
+        // force validation although not synced
+        KOMODO_CONNECTING = 0;
+        
+        CKey key;
+        key.MakeNewKey(true);
+
+        // make a CryptoCondition
+        // Synopsis: threshold of 2 fulfillments that are:
+        // - IncludesMinerFee validates
+        // - Transaction signed by the private key of the passed-in public key
+        CC* cc = MakeCCcond1(EVAL_INCLMINERFEE, key.GetPubKey());
+
+        {
+            // create a transaction with something for the miner
+            CMutableTransaction tx;
+            tx.vin.resize(1);
+            tx.valueBalance = 100;
+            tx.vout.resize(1);
+            tx.vout[0].nValue = 99;
+            PrecomputedTransactionData mutable_txdata(tx);
+
+            // sign it
+            uint256 sighash = SignatureHash(CCPubKey(cc), tx, 0, SIGHASH_ALL, 0, 0, &mutable_txdata);
+            int out = cc_signTreeSecp256k1Msg32(cc, key.begin(), sighash.begin());
+
+            // see if it works
+            CAmount amount;
+            CTransaction txTo(tx);
+            PrecomputedTransactionData txdata(txTo);
+            auto checker = ServerTransactionSignatureChecker(&txTo, 0, amount, false, txdata);
+            ScriptError error;
+            EXPECT_TRUE(VerifyScript(CCSig(cc), CCPubKey(cc), 0, checker, 0, &error));
+            EXPECT_EQ(error, SCRIPT_ERR_OK);
+        }
+        {
+            // create a transaction with nothing for the miner
+            CMutableTransaction tx;
+            tx.vin.resize(1);
+            tx.valueBalance = 100;
+            tx.vout.resize(1);
+            tx.vout[0].nValue = 100;
+            PrecomputedTransactionData mutable_txdata(tx);
+
+            // sign it
+            uint256 sighash = SignatureHash(CCPubKey(cc), tx, 0, SIGHASH_ALL, 0, 0, &mutable_txdata);
+            int out = cc_signTreeSecp256k1Msg32(cc, key.begin(), sighash.begin());
+
+            // see if it fails
+            CAmount amount;
+            CTransaction txTo(tx);
+            PrecomputedTransactionData txdata(txTo);
+            auto checker = ServerTransactionSignatureChecker(&txTo, 0, amount, false, txdata);
+            ScriptError error;
+            EXPECT_FALSE(VerifyScript(CCSig(cc), CCPubKey(cc), 0, checker, 0, &error));
+            EXPECT_EQ(error, SCRIPT_ERR_EVAL_FALSE);
+        }
+    }
+
+    TEST(TestScriptStandardTests, IncludesMinerFeeFullProcess)
+    {
+        TestChain chain; // start a new chain
+
+        // Basic user wallets
+        auto notary = chain.AddWallet(chain.getNotaryKey());
+        auto alice = chain.AddWallet();
+        auto bob = chain.AddWallet();
+        
+        chain.generateBlock(); // Genesis block
+
+        // turn on CryptoConditions
+        ASSETCHAINS_CC = 1;
+
+        {
+            // create a transaction that gives some coin to Alice
+            CValidationState returnState = notary->Transfer(alice, 100000);
+            // verify everything worked
+            EXPECT_TRUE( returnState.IsValid() );
+            // mine a block
+            chain.generateBlock(); // vtx[0] is unrelated, vtx[1] is ours
+        }
+        {
+            // notary gives some coin to Bob, with the stipulation that he pay some kind of miner fee
+            auto notaryPrevOut = notary->GetAvailable(200000);
+            CMutableTransaction tx;
+            CTxIn notaryIn;
+            notaryIn.prevout.hash = notaryPrevOut.first.GetHash();
+            notaryIn.prevout.n = notaryPrevOut.second;
+            tx.vin.push_back(notaryIn);
+            // give some coin to bob, but he must pay something to the miners
+            CC* bobMustPayFee = MakeCCcond1(EVAL_INCLMINERFEE, bob->GetPubKey());
+            CTxOut bobOut;
+            bobOut.scriptPubKey = CCPubKey(bobMustPayFee);
+            bobOut.nValue = 200000;
+            tx.vout.push_back(bobOut);
+            // give the rest back to the notary
+            CTxOut notaryOut;
+            notaryOut.scriptPubKey = GetScriptForDestination(notary->GetPubKey());
+            notaryOut.nValue = notaryPrevOut.first.vout[1].nValue - 200000;
+            tx.vout.push_back(notaryOut);
+            // sign it
+            uint256 hash = SignatureHash(notaryPrevOut.first.vout[1].scriptPubKey, tx, 0, SIGHASH_ALL, 0, 0);
+            tx.vin[0].scriptSig << notary->Sign(hash, SIGHASH_ALL);
+            // send it to the mempool
+            CTransaction fundBob(tx);
+            CValidationState returnState = chain.acceptTx(fundBob);
+            // verify everything worked
+            EXPECT_TRUE( returnState.IsValid() );
+            // mine a block
+            CBlock currentBlock = chain.generateBlock();
+            // the wallet doesn't understand these transactions, so add this vout to Bob's wallet manually
+            bob->AddOut(currentBlock.vtx[1], 0);
+            cc_free(bobMustPayFee);
+        }
+        {
+            // alice gives everything to anyone without paying a fee
+            CValidationState returnState = alice->Transfer(notary, 100000);
+            // verify everything worked
+            EXPECT_TRUE( returnState.IsValid() );
+            // mine a block
+            chain.generateBlock();
+        }
+        {
+            // bob can't give anything to alice without paying a mining fee
+            auto bobPrevOut = bob->GetAvailable(100000);
+            CMutableTransaction tx;
+            CTxIn bobFunds;
+            bobFunds.prevout.hash = bobPrevOut.first.GetHash();
+            bobFunds.prevout.n = bobPrevOut.second;
+            tx.vin.push_back(bobFunds);
+            CTxOut aliceOut;
+            aliceOut.scriptPubKey = GetScriptForDestination(alice->GetPubKey());
+            aliceOut.nValue = bobPrevOut.first.vout[0].nValue;
+            tx.vout.push_back(aliceOut);
+            // sign it
+            CC* cc = MakeCCcond1(EVAL_INCLMINERFEE, bob->GetPubKey());
+            uint256 hash = SignatureHash(bobPrevOut.first.vout[0].scriptPubKey, tx, 0, SIGHASH_ALL, 0, 0);
+            tx.vin[0].scriptSig << bob->Sign(cc, hash);
+            // attempt to send it to the mempool
+            CTransaction fundAliceAgain(tx);
+            CValidationState returnState = chain.acceptTx(fundAliceAgain);
+            EXPECT_FALSE( returnState.IsValid() );
+            cc_free(cc);
+        }
+        {
+            // bob can give something to alice if he pays a mining fee
+            auto bobPrevOut = bob->GetAvailable(100000);
+            CMutableTransaction tx;
+            CTxIn bobFunds;
+            bobFunds.prevout.hash = bobPrevOut.first.GetHash();
+            bobFunds.prevout.n = bobPrevOut.second;
+            tx.vin.push_back(bobFunds);
+            CTxOut aliceOut;
+            aliceOut.scriptPubKey = GetScriptForDestination(alice->GetPubKey());
+            aliceOut.nValue = bobPrevOut.first.vout[bobPrevOut.second].nValue - 1;
+            tx.vout.push_back(aliceOut);
+            // sign it
+            CC* cc = MakeCCcond1(EVAL_INCLMINERFEE, bob->GetPubKey());
+            uint256 hash = SignatureHash(bobPrevOut.first.vout[bobPrevOut.second].scriptPubKey, tx, 0, SIGHASH_ALL, 0, 0);
+            tx.vin[0].scriptSig << bob->Sign(cc, hash);
+            // send it to the mempool
+            CTransaction fundAliceAgain(tx);
+            CValidationState returnState = chain.acceptTx(fundAliceAgain);
+            EXPECT_TRUE( returnState.IsValid() );
+
+            // mine a block
+            chain.generateBlock();
+            cc_free(cc);
+        }
+    }
+
+    TEST(TestScriptStandardTests, p2sh_htlc)
+    {
+        // turn on CryptoConditions
+        ASSETCHAINS_CC = 1;
+        // force validation although not synced
+        KOMODO_CONNECTING = 0;
+
+        CKey key;
+        key.MakeNewKey(true);
+        CPubKey pubkey = key.GetPubKey();
+
+        // make a CryptoCondition
+        // Synopsis: threshold of 2 fulfillments that are:
+        // - HTLC validates
+        // - Transaction signed by the passed-in public key
+        CC* cc = MakeCCcond1(EVAL_HTLC, pubkey);
+        std::cout << cc_conditionToJSONString(cc) << std::endl;
+
+        // sign it
+        CMutableTransaction tx;
+        tx.vin.resize(1);
+        PrecomputedTransactionData mutable_txdata(tx);
+        uint256 sighash = SignatureHash(CCPubKey(cc), tx, 0, SIGHASH_ALL, 0, 0, &mutable_txdata);
+        int out = cc_signTreeSecp256k1Msg32(cc, key.begin(), sighash.begin());
+        tx.vin[0].scriptSig = CCSig(cc);
+
+        // see if it works as a regular transaction
+        CAmount amount;
+        ScriptError error;
+        CTransaction txTo(tx);
+        PrecomputedTransactionData txdata(txTo);
+        auto checker = ServerTransactionSignatureChecker(&txTo, 0, amount, false, txdata);
+        EXPECT_TRUE(VerifyScript(CCSig(cc), CCPubKey(cc), 0, checker, 0, &error));
+
+        // attempt to turn it into a P2SH
+        CScript redeemScript = CCPubKey(cc);
+
+        CScript scriptSig = CCSig(cc);
+        // push the redeemScript onto the stack instead of evaluating it
+        size_t redeemScriptSize = redeemScript.size();
+        if (redeemScriptSize < 76)
+            scriptSig.push_back( (uint8_t)redeemScriptSize );
+        else
+        {
+            redeemScript.push_back(OP_PUSHDATA1);
+            redeemScript.push_back( redeemScriptSize );
+        }
+        scriptSig += redeemScript;
+
+        CScript scriptPubKey;
+        scriptPubKey << OP_HASH160 << ToByteVector(CScriptID(redeemScript)) << OP_EQUAL;       
+        EXPECT_TRUE(VerifyScript(scriptSig, scriptPubKey, SCRIPT_VERIFY_P2SH, checker, 1, &error));
+
+        EXPECT_EQ(error, SCRIPT_ERR_OK);
+        cc_free(cc);
+    }
+
+
+} // namespace TestScriptStandardTests
