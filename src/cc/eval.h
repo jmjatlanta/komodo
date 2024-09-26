@@ -210,7 +210,9 @@ public:
     void SerSymbol(Stream& s, CSerActionUnserialize act)
     {
         size_t readlen = std::min(sizeof(symbol), s.size());
-        char *nullPos = (char*) memchr(&s[0], 0, readlen);
+        char *nullPos = nullptr;
+        if (readlen > 0)
+           nullPos = (char*) memchr(&s[0], 0, readlen);
         if (!nullPos)
             throw std::ios_base::failure("couldn't parse symbol");
         s.read(symbol, nullPos-&s[0]+1);
