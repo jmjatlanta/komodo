@@ -18,6 +18,31 @@
 #include "komodo_structs.h" // KOMODO_NOTARIES_HARDCODED
 #include "komodo_utils.h" // komodo_stateptr
 
+#include <map>
+
+struct notary_entry 
+{ 
+    notary_entry(uint8_t key[33], uint8_t id) : notaryid(id)
+    {
+        pubkey = std::vector<uint8_t>(key, key + 33);
+    }
+    std::vector<uint8_t> pubkey; // 33 bytes
+    uint8_t notaryid;
+};
+
+/***
+ * A struct to hold 1 set of notaries
+ * Each set handles notarizations beginning at a certain height
+ */
+struct notaries_collection 
+{
+    int32_t height = 0;
+    std::map< std::vector<uint8_t>, notary_entry> Notaries;
+    bool IsInitialized() { return Notaries.size() != 0; }
+};
+
+std::vector<notaries_collection> Pubkeys( 1 + (KOMODO_MAXBLOCKS / KOMODO_ELECTION_GAP) ); // a collection of notary pubkeys, ordered by height index
+
 const char *Notaries_genesis[][2] =
 {
     { "jl777_testA", "03b7621b44118017a16043f19b30cc8a4cfe068ac4e42417bae16ba460c80f3828" },
@@ -81,10 +106,21 @@ int32_t getacseason(uint32_t timestamp)
     return(0);
 }
 
+/*****
+ * @breif get collection of notaries
+ * @param[out] pubkeys the results
+ * @param[in] height the height
+ * @param[in] timestamp the timestamp
+ * @returns the number of pubkeys found or -1 on error
+ */
 int32_t komodo_notaries(uint8_t pubkeys[64][33],int32_t height,uint32_t timestamp)
 {
-    int32_t i,htind,n; uint64_t mask = 0; struct knotary_entry *kp,*tmp;
-    static uint8_t kmd_pubkeys[NUM_KMD_SEASONS][64][33],didinit[NUM_KMD_SEASONS];
+    int32_t i;
+    int32_t htind;
+    int32_t n; 
+    uint64_t mask = 0; 
+    static uint8_t kmd_pubkeys[NUM_KMD_SEASONS][64][33];
+    static uint8_t didinit[NUM_KMD_SEASONS];
     
     if ( timestamp == 0 && ASSETCHAINS_SYMBOL[0] != 0 )
         timestamp = komodo_heightstamp(height);
@@ -138,29 +174,29 @@ int32_t komodo_notaries(uint8_t pubkeys[64][33],int32_t height,uint32_t timestam
     htind = height / KOMODO_ELECTION_GAP;
     if ( htind >= KOMODO_MAXBLOCKS / KOMODO_ELECTION_GAP )
         htind = (KOMODO_MAXBLOCKS / KOMODO_ELECTION_GAP) - 1;
-    if ( Pubkeys == 0 )
+    if ( !Pubkeys[0].IsInitialized() )
     {
         komodo_init(height);
-        //printf("Pubkeys.%p htind.%d vs max.%d\n",Pubkeys,htind,KOMODO_MAXBLOCKS / KOMODO_ELECTION_GAP);
     }
     {
         std::lock_guard<std::mutex> lock(komodo_mutex);
-        n = Pubkeys[htind].numnotaries;
-        if ( 0 && ASSETCHAINS_SYMBOL[0] != 0 )
-            fprintf(stderr,"%s height.%d t.%u genesis.%d\n",ASSETCHAINS_SYMBOL,height,timestamp,n);
-        HASH_ITER(hh,Pubkeys[htind].Notaries,kp,tmp)
+        n = Pubkeys[htind].Notaries.size();
+        std::for_each( Pubkeys[htind].Notaries.begin(), Pubkeys[htind].Notaries.end(), 
+                [&n, &mask, &pubkeys]( std::pair<std::vector<uint8_t>, notary_entry> entry)
         {
-            if ( kp->notaryid < n )
+            if (entry.second.notaryid < n)
             {
-                mask |= (1LL << kp->notaryid);
-                memcpy(pubkeys[kp->notaryid],kp->pubkey,33);
-            } else printf("illegal notaryid.%d vs n.%d\n",kp->notaryid,n);
-        }
+                mask |= (1LL << entry.second.notaryid);
+                memcpy(pubkeys[entry.second.notaryid], entry.second.pubkey.data(), 33);
+            }
+            else 
+                printf("illegal notaryid.%d vs n.%d\n",entry.second.notaryid,n);
+        });
     }
-    if ( (n < 64 && mask == ((1LL << n)-1)) || (n == 64 && mask == 0xffffffffffffffffLL) )
-        return(n);
+    if ( (n < 64 && mask == ((1LL << n)-1)) || (n == 64 && mask == 0xffffffffffffffffLL) ) // no ids missing
+        return n;
     printf("error retrieving notaries ht.%d got mask.%llx for n.%d\n",height,(long long)mask,n);
-    return(-1);
+    return -1;
 }
 
 int32_t komodo_electednotary(int32_t *numnotariesp,uint8_t *pubkey33,int32_t height,uint32_t timestamp)
@@ -182,7 +218,7 @@ int32_t komodo_ratify_threshold(int32_t height,uint64_t signedmask)
     htind = height / KOMODO_ELECTION_GAP;
     if ( htind >= KOMODO_MAXBLOCKS / KOMODO_ELECTION_GAP )
         htind = (KOMODO_MAXBLOCKS / KOMODO_ELECTION_GAP) - 1;
-    numnotaries = Pubkeys[htind].numnotaries;
+    numnotaries = Pubkeys[htind].Notaries.size();
     for (i=0; i<numnotaries; i++)
         if ( ((1LL << i) & signedmask) != 0 )
             wt++;
@@ -191,40 +227,40 @@ int32_t komodo_ratify_threshold(int32_t height,uint64_t signedmask)
     else return(0);
 }
 
+/*****
+ * @brief initialize the collection of notaries
+ * @param origheight the height
+ * @param pubkeys the keys to add
+ * @param num number of pubkeys in array
+ */
 void komodo_notarysinit(int32_t origheight,uint8_t pubkeys[64][33],int32_t num)
 {
     static int32_t hwmheight;
-    int32_t k,i,htind,height; struct knotary_entry *kp; struct knotaries_entry N;
-    if ( Pubkeys == 0 )
-        Pubkeys = (struct knotaries_entry *)calloc(1 + (KOMODO_MAXBLOCKS / KOMODO_ELECTION_GAP),sizeof(*Pubkeys));
-    memset(&N,0,sizeof(N));
+
+    // compute height index from height
+    int32_t htind;
     if ( origheight > 0 )
     {
+        int32_t height;
         height = (origheight + KOMODO_ELECTION_GAP/2);
         height /= KOMODO_ELECTION_GAP;
         height = ((height + 1) * KOMODO_ELECTION_GAP);
         htind = (height / KOMODO_ELECTION_GAP);
         if ( htind >= KOMODO_MAXBLOCKS / KOMODO_ELECTION_GAP )
             htind = (KOMODO_MAXBLOCKS / KOMODO_ELECTION_GAP) - 1;
-        //printf("htind.%d activation %d from %d vs %d | hwmheight.%d %s\n",htind,height,origheight,(((origheight+KOMODO_ELECTION_GAP/2)/KOMODO_ELECTION_GAP)+1)*KOMODO_ELECTION_GAP,hwmheight,ASSETCHAINS_SYMBOL);
-    } else htind = 0;
+    } 
+    else 
+        htind = 0;
+
     {
+        notaries_collection N;
         std::lock_guard<std::mutex> lock(komodo_mutex);
-        for (k=0; k<num; k++)
+        for (int32_t k = 0; k < num; k++)
         {
-            kp = (struct knotary_entry *)calloc(1,sizeof(*kp));
-            memcpy(kp->pubkey,pubkeys[k],33);
-            kp->notaryid = k;
-            HASH_ADD_KEYPTR(hh,N.Notaries,kp->pubkey,33,kp);
-            if ( 0 && height > 10000 )
-            {
-                for (i=0; i<33; i++)
-                    printf("%02x",pubkeys[k][i]);
-                printf(" notarypubs.[%d] ht.%d active at %d\n",k,origheight,htind*KOMODO_ELECTION_GAP);
-            }
+            notary_entry new_entry(pubkeys[k], k);
+            N.Notaries.insert( std::pair<std::vector<uint8_t>, notary_entry>(new_entry.pubkey, new_entry));
         }
-        N.numnotaries = num;
-        for (i=htind; i<KOMODO_MAXBLOCKS / KOMODO_ELECTION_GAP; i++)
+        for (int32_t i = htind; i < KOMODO_MAXBLOCKS / KOMODO_ELECTION_GAP; i++)
         {
             if ( Pubkeys[i].height != 0 && origheight < hwmheight )
             {
@@ -235,6 +271,7 @@ void komodo_notarysinit(int32_t origheight,uint8_t pubkeys[64][33],int32_t num)
             Pubkeys[i].height = i * KOMODO_ELECTION_GAP;
         }
     }
+
     if ( origheight > hwmheight )
         hwmheight = origheight;
 }
@@ -242,13 +279,18 @@ void komodo_notarysinit(int32_t origheight,uint8_t pubkeys[64][33],int32_t num)
 int32_t komodo_chosennotary(int32_t *notaryidp,int32_t height,uint8_t *pubkey33,uint32_t timestamp)
 {
     // -1 if not notary, 0 if notary, 1 if special notary
-    struct knotary_entry *kp; int32_t numnotaries=0,htind,modval = -1;
+    int32_t numnotaries=0;
+    int32_t htind;
+    int32_t modval = -1;
+
     *notaryidp = -1;
-    if ( height < 0 )//|| height >= KOMODO_MAXBLOCKS )
+
+    if ( height < 0 )
     {
         printf("komodo_chosennotary ht.%d illegal\n",height);
-        return(-1);
+        return -1;
     }
+
     if ( height >= KOMODO_NOTARIES_HARDCODED || ASSETCHAINS_SYMBOL[0] != 0 )
     {
         if ( (*notaryidp= komodo_electednotary(&numnotaries,pubkey33,height,timestamp)) >= 0 && numnotaries != 0 )
@@ -257,29 +299,30 @@ int32_t komodo_chosennotary(int32_t *notaryidp,int32_t height,uint8_t *pubkey33,
             return(modval);
         }
     }
+
     if ( height >= 250000 )
-        return(-1);
-    if ( Pubkeys == 0 )
+        return -1;
+
+    if ( Pubkeys[0].IsInitialized() == 0 )
         komodo_init(0);
+        
     htind = height / KOMODO_ELECTION_GAP;
     if ( htind >= KOMODO_MAXBLOCKS / KOMODO_ELECTION_GAP )
         htind = (KOMODO_MAXBLOCKS / KOMODO_ELECTION_GAP) - 1;
+    
+    std::vector<uint8_t> key{pubkey33, pubkey33 + 33};
+    std::lock_guard<std::mutex> lock(komodo_mutex);
+    auto entry = Pubkeys[htind].Notaries.find(key);
+    if ( entry != Pubkeys[htind].Notaries.end() )
     {
-        std::lock_guard<std::mutex> lock(komodo_mutex);
-        HASH_FIND(hh,Pubkeys[htind].Notaries,pubkey33,33,kp);
-    }
-    if ( kp != 0 )
-    {
-        if ( (numnotaries= Pubkeys[htind].numnotaries) > 0 )
+        if ( (numnotaries= Pubkeys[htind].Notaries.size()) > 0 )
         {
-            *notaryidp = kp->notaryid;
-            modval = ((height % numnotaries) == kp->notaryid);
-            //printf("found notary.%d ht.%d modval.%d\n",kp->notaryid,height,modval);
-        } else printf("unexpected zero notaries at height.%d\n",height);
-    } //else printf("cant find kp at htind.%d ht.%d\n",htind,height);
-    //int32_t i; for (i=0; i<33; i++)
-    //    printf("%02x",pubkey33[i]);
-    //printf(" ht.%d notary.%d special.%d htind.%d num.%d\n",height,*notaryidp,modval,htind,numnotaries);
+            *notaryidp = (*entry).second.notaryid;
+            modval = ((height % numnotaries) == (*entry).second.notaryid);
+        } 
+        else 
+            printf("unexpected zero notaries at height.%d\n",height);
+    }
     return(modval);
 }
 

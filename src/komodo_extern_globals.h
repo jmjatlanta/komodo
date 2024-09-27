@@ -90,7 +90,6 @@ extern pthread_mutex_t KOMODO_KV_mutex;
 extern pthread_mutex_t KOMODO_CC_mutex;
 extern komodo_kv *KOMODO_KV;
 extern pax_transaction *PAX;
-extern knotaries_entry *Pubkeys;
 extern komodo_state KOMODO_STATES[34];
 
 int32_t komodo_baseid(char *origbase);
